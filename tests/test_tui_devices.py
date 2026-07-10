@@ -1,0 +1,155 @@
+import asyncio
+
+from textual.widgets import Input, OptionList
+
+from tests.fakes import FakeAdapter
+from universal_remote.devices.models import Device
+from universal_remote.devices.probe import ProbeResult
+from universal_remote.devices.store import DeviceStore
+from universal_remote.registry import AdapterRegistry
+from universal_remote.tui.app import UniversalRemoteApp
+from universal_remote.tui.devices_screen import AddDeviceScreen, DeviceListScreen
+
+
+def _registry():
+    registry = AdapterRegistry()
+    registry.register(FakeAdapter(platform="fake-tv"))
+    return registry
+
+
+def _app(store, probe=lambda ip: None):
+    return UniversalRemoteApp(store=store, registry=_registry(), probe=probe)
+
+
+def _index_of(option_list: OptionList, option_id: str) -> int:
+    for index in range(option_list.option_count):
+        if option_list.get_option_at_index(index).id == option_id:
+            return index
+    raise AssertionError(f"option {option_id!r} not found")
+
+
+class TestDeviceList:
+    def test_given_saved_devices_when_opening_manage_devices_then_they_are_listed(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+                option_list = app.screen.query_one("#device-list", OptionList)
+                names = [
+                    option_list.get_option_at_index(i).prompt
+                    for i in range(option_list.option_count)
+                ]
+                assert "Living Room" in names
+
+        asyncio.run(scenario())
+
+
+class TestAddDevice:
+    def test_given_a_reachable_ip_when_probing_then_fields_prefill_and_save_persists(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        def probe(ip):
+            return ProbeResult(name="Bedroom TV", model="UN50", mac="aa:bb:cc")
+
+        async def scenario():
+            app = _app(store, probe=probe)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("a")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                app.screen.query_one("#ip", Input).value = "10.0.0.9"
+                await pilot.click("#probe")
+                await pilot.pause()
+                assert app.screen.query_one("#name", Input).value == "Bedroom TV"
+                await pilot.click("#save")
+                await pilot.pause()
+
+        asyncio.run(scenario())
+
+        saved = store.list()
+        assert [d.name for d in saved] == ["Bedroom TV"]
+        assert saved[0].ip == "10.0.0.9"
+        assert saved[0].platform == "fake-tv"
+
+    def test_given_probe_failure_when_adding_then_manual_entry_still_saves(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store, probe=lambda ip: None)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("a")
+                await pilot.pause()
+                app.screen.query_one("#ip", Input).value = "10.0.0.9"
+                await pilot.click("#probe")
+                await pilot.pause()
+                assert app.screen.query_one("#name", Input).value == ""
+                app.screen.query_one("#name", Input).value = "Manual Name"
+                await pilot.click("#save")
+                await pilot.pause()
+
+        asyncio.run(scenario())
+
+        assert [d.name for d in store.list()] == ["Manual Name"]
+
+
+class TestEditAndDelete:
+    def test_given_a_selected_device_when_edited_then_it_updates_without_adding(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Old", platform="fake-tv", ip="1.1.1.1"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                app.screen.query_one("#name", Input).value = "New"
+                await pilot.click("#save")
+                await pilot.pause()
+
+        asyncio.run(scenario())
+
+        remaining = store.list()
+        assert len(remaining) == 1
+        assert remaining[0].name == "New"
+
+    def test_given_two_devices_when_one_is_deleted_then_only_it_is_removed(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Keep", platform="fake-tv", ip="1.1.1.1"))
+        drop = store.add(Device(name="Drop", platform="fake-tv", ip="2.2.2.2"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, drop.id)
+                await pilot.pause()
+                await pilot.press("delete")
+                await pilot.pause()
+
+        asyncio.run(scenario())
+
+        assert [d.name for d in store.list()] == ["Keep"]
