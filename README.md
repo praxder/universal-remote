@@ -1,8 +1,9 @@
 # universal-remote
 
 A local, terminal-based universal TV remote. Pretty, mouse-clickable, and fully
-keyboard-drivable. Ships with a Samsung Tizen adapter; the architecture is
-platform-agnostic so new TV platforms are "one new adapter module + register it."
+keyboard-drivable. Ships with Samsung Tizen and LG WebOS adapters; the
+architecture is platform-agnostic so new TV platforms are "one new adapter
+module + register it."
 
 ## Requirements
 
@@ -19,13 +20,17 @@ uv run universal-remote
 The app opens a menu with two modes: **Manage Devices** and **Use Remote**.
 Everything is reachable by keyboard and by mouse.
 
-## Add a Samsung TV
+## Add a TV
 
 1. From the menu choose **Manage Devices** (`d`), then **Add** (`a`).
-2. Enter the TV's IP address and press **Probe** — the app queries the TV's info
+2. When more than one platform is available, pick the TV's **platform**
+   (Samsung Tizen or LG WebOS) from the selector. With a single adapter
+   installed the selector is hidden and that platform is used automatically.
+3. Enter the TV's IP address and press **Probe** — the app queries the TV's info
    endpoint (`http://<ip>:8001/api/v2/`) and pre-fills name, model, and MAC.
    If the probe fails, fill the fields in manually; adding is never blocked.
-3. **Save**.
+   Probe targets the Samsung info endpoint, so **LG TVs use manual entry**.
+4. **Save**.
 
 ## Pair and control
 
@@ -56,6 +61,14 @@ Everything is reachable by keyboard and by mouse.
   Wake-on-LAN magic packet to its stored MAC — which requires the TV's
   "Network Standby / Wake on LAN" setting to be **on** (off by default on many
   Samsungs). Power-**off** (the power key while connected) is reliable.
+
+## Caveats (LG WebOS reality)
+
+- **Pairing prompt.** First connect shows an on-screen authorization prompt;
+  accept it and the client-key is saved for later sessions.
+- **Text and power-on are best-effort**, as with Samsung: `insertText` support
+  varies by app/firmware, and power-on relies on Wake-on-LAN to the stored MAC
+  (the TV's "Wake on LAN / Mobile TV On" setting must be enabled).
 
 ## Storage
 

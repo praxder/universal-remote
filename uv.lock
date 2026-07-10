@@ -64,6 +64,18 @@ wheels = [
 ]
 
 [[package]]
+name = "aiowebostv"
+version = "0.7.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/80/9d/ac6ecbc122141a979a7e25caa36ccce8389290a3b8b02aefbafde0effcb6/aiowebostv-0.7.5.tar.gz", hash = "sha256:88406409ce2fdbe7193f88df06db86304058135e13885847101b19e973f5b9b9", size = 19814, upload-time = "2025-08-12T17:56:16.779Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4e/37/4a63f38aca2139562c92bad3b2faa702d65368dd97f0ae184431ef7453ff/aiowebostv-0.7.5-py3-none-any.whl", hash = "sha256:a900621298be87325ee2a40f46009d4cac5deb520b0c0a5e601ec86038b44c37", size = 19665, upload-time = "2025-08-12T17:56:15.663Z" },
+]
+
+[[package]]
 name = "attrs"
 version = "26.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -474,6 +486,7 @@ name = "universal-remote"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "aiowebostv" },
     { name = "samsungtvws", extra = ["async"] },
     { name = "textual" },
     { name = "wakeonlan" },
@@ -487,6 +500,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiowebostv", specifier = ">=0.7" },
     { name = "samsungtvws", extras = ["async"] },
     { name = "textual", specifier = ">=0.80" },
     { name = "wakeonlan", specifier = ">=3.0" },

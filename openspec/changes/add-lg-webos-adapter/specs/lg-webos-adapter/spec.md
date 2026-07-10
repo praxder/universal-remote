@@ -27,11 +27,15 @@ The LG WebOS adapter SHALL obtain a pairing credential (a client-key) by connect
 - **THEN** it establishes a session without triggering the authorization prompt again
 
 ### Requirement: Key mapping
-The LG WebOS adapter SHALL translate each supported generic key into the corresponding LG WebOS action when sending over a session — directional, OK, back, and home keys over the input channel, and volume, mute, and power over their WebOS service requests.
+The LG WebOS adapter SHALL translate each supported generic key into the corresponding LG WebOS action when sending over a session, so callers reference only generic keys.
 
 #### Scenario: Directional key mapped
 - **WHEN** a supported directional or select key is sent
 - **THEN** the adapter sends the matching LG WebOS action to the TV
+
+#### Scenario: Power key mapped
+- **WHEN** the power key is sent over a session
+- **THEN** the adapter powers the TV off
 
 #### Scenario: Unsupported key rejected
 - **WHEN** a caller sends a key the adapter does not declare

@@ -30,8 +30,8 @@ The Samsung adapter wraps an async client (`samsungtvws.async_remote`). `aiowebo
 - `bscpylgtv` — capable and async, but less widely deployed than the HA-backed library.
 - `pywebostv` — synchronous; would force thread-offloading to fit the async adapter and session, adding complexity.
 
-### Decision: Map generic keys onto SSAP + the input channel
-LG WebOS splits control across two mechanisms. Volume, mute, and power are SSAP service requests (`ssap://audio/volumeUp`, `ssap://audio/volumeDown`, `ssap://audio/setMute`, `ssap://system/turnOff`). Directional/OK/BACK/HOME are button events sent over the input (pointer/remote) channel (`UP`, `DOWN`, `LEFT`, `RIGHT`, `ENTER`, `BACK`, `HOME`). The adapter hides this split behind a single `LG_KEYS` mapping and a `_dispatch_key` that routes each key to the right mechanism, so callers still speak only generic `Key`s. All 11 generic keys are covered, so LG declares the same capability key set as Samsung.
+### Decision: Send the ten button keys via the input channel; power off via SSAP
+Confirmed against `aiowebostv` 0.7.5: the input channel's `button(name)` covers all ten of the non-power generic keys with native remote semantics — `UP`, `DOWN`, `LEFT`, `RIGHT`, `ENTER` (OK), `BACK`, `HOME`, `VOLUMEUP`, `VOLUMEDOWN`, and `MUTE` (a true toggle). Power is the exception: there is no power button on the input channel, and a session's power key means power-*off*, so `POWER` maps to the SSAP turn-off request via the client's `power_off()`. This keeps `_dispatch_key` to a single mapping (`LG_BUTTONS`) plus one `POWER` branch, rather than a second SSAP map. Using `button("MUTE")` avoids the alternative — SSAP `set_mute(bool)` is not a toggle and would need a `get_muted()` round-trip that can return `None`. All 11 generic keys are covered, so LG declares the same capability key set as Samsung.
 
 ### Decision: Client-key pairing reuses the credential flow verbatim
 LG pairing returns a client-key on first accept, replayed on later connects — structurally identical to Samsung's token. `pair()` returns the client-key string; `connect()` passes the stored `device.credential`. No changes to the pairing lifecycle, the `Prompt` hook, or the store.
@@ -53,7 +53,14 @@ LG exposes text entry via `ssap://com.webos.service.ime/insertText`. It is gener
 - **Power-on depends on the TV's Wake-on-LAN setting** (as with Samsung). → Same best-effort contract and MAC requirement; no new behavior to explain.
 - **Selecting the wrong platform for a device yields connect failures.** → Default to the first platform and keep the list short; a mis-set platform is correctable by deleting and re-adding.
 
-## Open Questions
+## Resolved During Implementation
 
-- Exact `aiowebostv` entry points for the input-channel button send vs SSAP request — to be confirmed against the installed version during implementation.
-- Whether pairing surfaces a cancellable prompt distinct from the connect timeout, or relies on the accept-timeout like Samsung — confirm during implementation to satisfy the "pairing can be cancelled" core requirement.
+- **`aiowebostv` entry points (0.7.5):** `WebOsClient(host, client_key=...)`; `connect()` runs the registration handshake and stores the key on the `client_key` attribute; `button(name)` sends input-channel buttons; `power_off()` sends the SSAP turn-off; `request(endpoints.INSERT_TEXT, {"text": ..., "replace": 0})` inserts text; `disconnect()` tears down.
+- **Cancellation:** handled entirely in the TUI — `PairingScreen` runs `pair()` in a cancellable worker and cancels the task on Esc/Cancel, exactly as for Samsung. The adapter needs no cancel-specific code. (TV-side rejection of the prompt is unhandled for Samsung too and is out of scope for this change.)
+
+## Verification Limits
+
+Tests use an in-memory fake client, so they prove the adapter *emits the action it was handed*, not that a real TV accepts it. Two things are only verifiable on hardware and are accepted as best-effort, in the same register as the README's Samsung caveats:
+
+- **Button-name correctness** — the ten `LG_BUTTONS` strings (`ENTER` for OK, `VOLUMEUP`, `MUTE`, …) must match LG's button vocabulary; a wrong name passes every test and fails silently on a TV.
+- **Text entry** — `insertText` support varies by app/firmware; declared `text=True` but reported unsupported on failure.

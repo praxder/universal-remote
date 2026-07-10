@@ -68,6 +68,45 @@ class FakeSamsungRemote:
         self.closed = True
 
 
+class FakeWebOsClient:
+    """Stands in for `aiowebostv.WebOsClient`; records sends and simulates pairing."""
+
+    def __init__(self, host: str, client_key: str | None = None, **_kwargs) -> None:
+        self.host = host
+        self.client_key = client_key
+        self.connected = False
+        self.disconnected = False
+        self.prompt_shown = False
+        self.sent_buttons: list[str] = []
+        self.sent_text: list[str] = []
+        self.powered_off = False
+        self.send_error: Exception | None = None
+
+    async def connect(self) -> bool:
+        self.connected = True
+        if self.client_key is None:
+            # No client-key supplied → the TV shows its authorization prompt and,
+            # on accept, registers and hands back a client-key.
+            self.prompt_shown = True
+            self.client_key = "fresh-client-key"
+        return True
+
+    async def button(self, name: str) -> None:
+        self.sent_buttons.append(name)
+
+    async def power_off(self) -> None:
+        self.powered_off = True
+
+    async def request(self, uri: str, payload=None, **_kwargs) -> dict:
+        if self.send_error is not None:
+            raise self.send_error
+        self.sent_text.append(payload["text"] if payload else "")
+        return {}
+
+    async def disconnect(self) -> None:
+        self.disconnected = True
+
+
 class FakeAdapter:
     """A configurable adapter double with a scriptable pair result."""
 

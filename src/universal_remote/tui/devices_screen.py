@@ -5,7 +5,7 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Input, Label, OptionList
+from textual.widgets import Button, Footer, Header, Input, Label, OptionList, Select
 from textual.widgets.option_list import Option
 
 from ..devices.models import Device
@@ -89,8 +89,23 @@ class AddDeviceScreen(Screen[None]):
             yield Input(placeholder="Name", id="name")
             yield Input(placeholder="Model", id="model")
             yield Input(placeholder="MAC", id="mac")
+            yield from self._platform_selector()
             yield Button("Save", id="save")
         yield Footer()
+
+    def _platform_selector(self):
+        """A platform picker, shown only when adding with more than one adapter."""
+        if self._existing is not None:
+            return
+        platforms = self.app.registry.platforms()
+        if len(platforms) <= 1:
+            return
+        yield Select(
+            [(platform, platform) for platform in platforms],
+            value=platforms[0],
+            allow_blank=False,
+            id="platform",
+        )
 
     def on_mount(self) -> None:
         if self._existing is not None:
@@ -119,9 +134,11 @@ class AddDeviceScreen(Screen[None]):
         if result.mac:
             self.query_one("#mac", Input).value = result.mac
 
-    def _default_platform(self) -> str:
+    def _selected_platform(self) -> str:
         platforms = self.app.registry.platforms()
-        return platforms[0] if platforms else ""
+        if len(platforms) <= 1:
+            return platforms[0] if platforms else ""
+        return self.query_one("#platform", Select).value
 
     def _save(self) -> None:
         ip = self.query_one("#ip", Input).value.strip()
@@ -138,7 +155,7 @@ class AddDeviceScreen(Screen[None]):
             self.app.store.add(
                 Device(
                     name=name,
-                    platform=self._default_platform(),
+                    platform=self._selected_platform(),
                     ip=ip,
                     mac=mac,
                     model=model,

@@ -2,6 +2,7 @@ import asyncio
 
 from textual.widgets import Button
 
+from universal_remote.adapters.lg import PLATFORM as LG_PLATFORM
 from universal_remote.adapters.samsung import PLATFORM
 from universal_remote.cli import build_app
 from universal_remote.devices.models import Device
@@ -20,6 +21,7 @@ class TestCliWiring:
             async with app.run_test() as pilot:
                 await pilot.pause()
                 assert app.registry.is_supported(PLATFORM)
+                assert app.registry.is_supported(LG_PLATFORM)
                 labels = {str(button.label) for button in app.screen.query(Button)}
                 assert {"Manage Devices", "Use Remote"} <= labels
 
