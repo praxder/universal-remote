@@ -57,7 +57,7 @@ class DeviceListScreen(Screen[None]):
             option_list.add_option(Option(device.name, id=device.id))
         if devices:
             option_list.add_option(None)  # divider between devices and the add row
-        option_list.add_option(Option("+ add", id=ADD_ID))
+        option_list.add_option(Option("+ Add", id=ADD_ID))
         option_list.highlighted = 0
 
     def _selected(self) -> Device | None:
