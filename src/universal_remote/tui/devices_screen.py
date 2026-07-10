@@ -94,12 +94,10 @@ class AddDeviceScreen(Screen[None]):
         yield Footer()
 
     def _platform_selector(self):
-        """A platform picker, shown only when adding with more than one adapter."""
+        """A platform picker, shown when adding a device (hidden while editing)."""
         if self._existing is not None:
             return
         platforms = self.app.registry.platforms()
-        if len(platforms) <= 1:
-            return
         yield Select(
             [(platform, platform) for platform in platforms],
             value=platforms[0],
@@ -135,9 +133,6 @@ class AddDeviceScreen(Screen[None]):
             self.query_one("#mac", Input).value = result.mac
 
     def _selected_platform(self) -> str:
-        platforms = self.app.registry.platforms()
-        if len(platforms) <= 1:
-            return platforms[0] if platforms else ""
         return self.query_one("#platform", Select).value
 
     def _save(self) -> None:

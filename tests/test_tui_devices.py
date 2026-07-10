@@ -109,27 +109,6 @@ class TestAddDevice:
 
         assert [d.name for d in store.list()] == ["Manual Name"]
 
-    def test_given_one_adapter_when_adding_then_no_platform_selector_is_shown(
-        self, tmp_path
-    ):
-        store = DeviceStore(path=tmp_path / "d.json")
-
-        async def scenario():
-            app = _app(store, registry=_registry("only-tv"))
-            async with app.run_test() as pilot:
-                await pilot.press("d")
-                await pilot.pause()
-                await pilot.press("a")
-                await pilot.pause()
-                assert not app.screen.query("#platform")
-                app.screen.query_one("#ip", Input).value = "10.0.0.9"
-                await pilot.click("#save")
-                await pilot.pause()
-
-        asyncio.run(scenario())
-
-        assert store.list()[0].platform == "only-tv"
-
     def test_given_multiple_adapters_when_adding_then_the_selected_platform_is_saved(
         self, tmp_path
     ):
