@@ -25,11 +25,11 @@ class UniversalRemoteApp(App[None]):
     /* #title width matches the TITLE_ART banner so it never wraps */
     #title { width: 42; text-align: center; margin-bottom: 1; }
     /* left-aligned so the multi-width banner lines keep their column alignment */
-    #devices-title { width: 36; text-align: left; margin: 1 0 2 0; }
+    #devices-title { width: 36; text-align: left; margin: 1 0 1 0; }
     /* wider than #devices-title so the "Add/Edit Device" banner never wraps */
     #add-title { width: 52; text-align: left; margin: 1 0 2 0; }
-    /* indent Save so its left edge lines up with the cells' text above it */
-    #add-device #save { margin: 1 0 0 3; }
+    /* slight left indent on Save to offset it from the fields above */
+    #add-device #save { margin: 1 0 0 1; }
     #quote { width: 42; text-align: center; margin-top: 1; color: $text-muted; }
     /* delete confirmation: dim the device list behind a centered dialog box */
     ConfirmDeleteScreen { align: center middle; background: $background 60%; }
