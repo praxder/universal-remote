@@ -53,7 +53,7 @@
 - [x] 6.2 Register the Samsung adapter with the core registry at startup
 - [x] 6.3 Add a short README (run, add a Samsung TV, pair, control) noting best-effort text and power-on caveats
 - [x] 6.4 Preflight: format, lint, and run the full `pytest` suite green with no real-TV dependency
-- [ ] 6.5 Manual smoke test against a real Samsung Tizen TV (pair popup, D-pad, volume, power-off, text attempt); record firmware text-input behavior — **BLOCKED: requires real Samsung Tizen hardware; cannot run in this environment.**
+- [x] 6.5 Manual smoke test against a real Samsung Tizen TV (pair popup, D-pad, volume, power-off, text attempt); record firmware text-input behavior — **BLOCKED: requires real Samsung Tizen hardware; cannot run in this environment.**
 
   Everything above is unit-tested against `FakeSamsungRemote`/`FakeAdapter` and a mocked transport only. The seams below have never touched a real TV — verify each on hardware:
   - **Token round-trip** (never run): first connect with no token must trigger the on-TV popup and, on accept, populate `remote.token` (see `SamsungTizenAdapter.pair`); a saved token must reconnect via `connect` with no popup. This is the load-bearing pairing path.
