@@ -28,6 +28,14 @@ class UniversalRemoteApp(App[None]):
     /* left-aligned so the multi-width banner lines keep their column alignment */
     #devices-title { width: 36; text-align: left; margin: 1 0 2 0; }
     #quote { width: 42; text-align: center; margin-top: 1; color: $text-muted; }
+    /* delete confirmation: dim the device list behind a centered dialog box */
+    ConfirmDeleteScreen { align: center middle; background: $background 60%; }
+    #confirm-delete {
+        width: auto; height: auto; padding: 1 2;
+        border: thick $primary; background: $surface;
+    }
+    #confirm-message { text-align: center; margin-bottom: 1; }
+    #confirm-delete Button { width: 16; margin-top: 1; }
     """
 
     def __init__(

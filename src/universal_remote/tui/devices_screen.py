@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.screen import Screen
+from textual.screen import ModalScreen, Screen
 from textual.widgets import (
     Button,
     Footer,
@@ -32,7 +32,7 @@ class DeviceListScreen(Screen[None]):
     BINDINGS = [
         ("a", "add", "Add"),
         ("e", "edit", "Edit"),
-        ("delete", "delete", "Delete"),
+        ("backspace", "delete", "Delete"),
         ("escape", "back", "Back"),
     ]
 
@@ -87,12 +87,55 @@ class DeviceListScreen(Screen[None]):
 
     def action_delete(self) -> None:
         device = self._selected()
-        if device is not None:
-            self.app.store.delete(device.id)
-            self._reload()
+        if device is None:
+            return
+
+        def _on_confirm(confirmed: bool | None) -> None:
+            if confirmed:
+                self.app.store.delete(device.id)
+                self._reload()
+
+        self.app.push_screen(ConfirmDeleteScreen(device.name), _on_confirm)
 
     def action_back(self) -> None:
         self.app.pop_screen()
+
+
+class ConfirmDeleteScreen(ModalScreen[bool]):
+    """Confirm removing a device before it is deleted from the store."""
+
+    BINDINGS = [
+        ("escape", "cancel", "Cancel"),
+        ("up", "focus_previous", "Previous"),
+        ("left", "focus_previous", "Previous"),
+        ("down", "focus_next", "Next"),
+        ("right", "focus_next", "Next"),
+    ]
+
+    def __init__(self, device_name: str) -> None:
+        super().__init__()
+        self._device_name = device_name
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="confirm-delete"):
+            yield Label(f"Delete {self._device_name}?", id="confirm-message")
+            yield Button("Delete", id="confirm", variant="error")
+            yield Button("Cancel", id="cancel")
+
+    def on_mount(self) -> None:
+        self.query_one("#cancel", Button).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(event.button.id == "confirm")
+
+    def action_cancel(self) -> None:
+        self.dismiss(False)
+
+    def action_focus_previous(self) -> None:
+        self.focus_previous()
+
+    def action_focus_next(self) -> None:
+        self.focus_next()
 
 
 class AddDeviceScreen(Screen[None]):

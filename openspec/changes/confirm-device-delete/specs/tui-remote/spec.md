@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Device management screens
-The Manage Devices mode SHALL present a "Devices" ASCII-art banner, the saved devices, and an always-present add entry as the last row of the list, backed by the device store and exposing add, edit, and delete. When one or more devices are saved, the mode SHALL list the devices first, then a separator, then the add entry; when no devices are saved, the list SHALL show only the add entry. Selecting the add entry — by Enter or by mouse click — SHALL open the add flow. Selecting a device row — by Enter or by mouse click — SHALL open that device for editing. Deleting a device SHALL be triggered by the Backspace key while a device row is highlighted, and SHALL require the user to confirm before the device is removed: the system SHALL present a confirmation prompt naming the device, remove the device only when the user confirms, and leave the store unchanged when the user cancels. Pressing Backspace while the add entry is highlighted SHALL do nothing.
+The Manage Devices mode SHALL present a "Devices" ASCII-art banner, the saved devices, and an always-present add entry as the last row of the list, backed by the device store and exposing add, edit, and delete. When one or more devices are saved, the mode SHALL list the devices first, then a separator, then the add entry; when no devices are saved, the list SHALL show only the add entry. Selecting the add entry — by Enter or by mouse click — SHALL open the add flow. Selecting a device row — by Enter or by mouse click — SHALL open that device for editing. Deleting a device SHALL be triggered by the Backspace key while a device row is highlighted, and SHALL require the user to confirm before the device is removed: the system SHALL present a confirmation prompt naming the device, remove the device only when the user confirms, and leave the store unchanged when the user cancels. The confirmation prompt SHALL default keyboard focus to its cancel action and SHALL let the user move focus between its confirm and cancel actions with the arrow keys. Pressing Backspace while the add entry is highlighted SHALL do nothing.
 
 #### Scenario: Devices listed above the add row
 - **WHEN** the user opens Manage Devices with one or more saved devices
@@ -31,6 +31,10 @@ The Manage Devices mode SHALL present a "Devices" ASCII-art banner, the saved de
 #### Scenario: Cancelling keeps the device
 - **WHEN** the confirmation prompt is shown and the user cancels
 - **THEN** no device is removed and the list is unchanged
+
+#### Scenario: Confirmation buttons navigable by arrow keys
+- **WHEN** the confirmation prompt is shown and the user presses an arrow key
+- **THEN** keyboard focus moves between the confirm and cancel actions
 
 #### Scenario: Backspace on the add entry does nothing
 - **WHEN** the add entry is highlighted and the user presses Backspace

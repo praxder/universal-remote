@@ -24,6 +24,10 @@ The codebase has no modal/dialog pattern yet; `AddDeviceScreen` is a full `Scree
 
 **Escape / Cancel both dismiss as "no".** The modal binds Escape to cancel so the prompt behaves like the rest of the app (Escape = back/cancel), returning `False`.
 
+**Render as a centered pop-up over the list, not a full page.** `ConfirmDeleteScreen` stays a `ModalScreen` — the device list remains mounted beneath it. The only reason it currently reads as a whole new page is styling: with no background/box rules the container fills the opaque screen. Add app-level CSS (matching the existing `app.py` `CSS` convention) giving the modal a translucent background so the list dims through, and a fixed-width bordered `$surface` box for the dialog. Alternative — mounting the dialog as a widget inside `DeviceListScreen` — rejected: it would lose modal input capture and is a larger structural change for a purely visual ask.
+
+**Arrow-key navigation + default focus on Cancel.** Add screen-level bindings mapping up/left → focus previous and down/right → focus next (delegating to Textual's `focus_previous`/`focus_next`), covering whichever arrow the user reaches for without changing the button layout. Focus the cancel button on mount so a destructive action never starts on Confirm. Alternative — a `Horizontal` button row + single axis — rejected as gold-plating; the vertical layout with both axes bound is simpler and matches user expectation.
+
 ## Risks / Trade-offs
 
 - [Existing tests press `delete` and assume immediate removal] → Update `tests/test_tui_devices.py`: press `backspace`, then drive the confirmation (confirm to delete, cancel to keep). Add coverage for the cancel path and the add-row no-op.

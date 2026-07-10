@@ -8,7 +8,11 @@ from universal_remote.devices.probe import ProbeResult
 from universal_remote.devices.store import DeviceStore
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
-from universal_remote.tui.devices_screen import AddDeviceScreen, DeviceListScreen
+from universal_remote.tui.devices_screen import (
+    AddDeviceScreen,
+    ConfirmDeleteScreen,
+    DeviceListScreen,
+)
 
 
 def _registry(*platforms: str):
@@ -180,7 +184,7 @@ class TestSelection:
                 await pilot.press("e")  # add row is the only (highlighted) row
                 await pilot.pause()
                 assert isinstance(app.screen, DeviceListScreen)
-                await pilot.press("delete")
+                await pilot.press("backspace")
                 await pilot.pause()
                 assert isinstance(app.screen, DeviceListScreen)
                 assert store.list() == []
@@ -307,9 +311,59 @@ class TestEditAndDelete:
                 option_list = app.screen.query_one("#device-list", OptionList)
                 option_list.highlighted = _index_of(option_list, drop.id)
                 await pilot.pause()
-                await pilot.press("delete")
+                await pilot.press("backspace")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                await pilot.click("#confirm")
                 await pilot.pause()
 
         asyncio.run(scenario())
 
         assert [d.name for d in store.list()] == ["Keep"]
+
+    def test_given_a_device_when_delete_is_cancelled_then_it_is_kept(self, tmp_path):
+        store = DeviceStore(path=tmp_path / "d.json")
+        keep = store.add(Device(name="Keep", platform="fake-tv", ip="1.1.1.1"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, keep.id)
+                await pilot.pause()
+                await pilot.press("backspace")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                await pilot.click("#cancel")
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+
+        asyncio.run(scenario())
+
+        assert [d.name for d in store.list()] == ["Keep"]
+
+    def test_given_the_confirm_prompt_when_arrow_pressed_then_focus_moves_between_buttons(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        device = store.add(Device(name="Keep", platform="fake-tv", ip="1.1.1.1"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, device.id)
+                await pilot.pause()
+                await pilot.press("backspace")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                assert app.focused.id == "cancel"  # destructive action starts on cancel
+                await pilot.press("up")
+                await pilot.pause()
+                assert app.focused.id == "confirm"
+
+        asyncio.run(scenario())
