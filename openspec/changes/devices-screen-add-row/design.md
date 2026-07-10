@@ -21,16 +21,16 @@ Rebuild on every reload (mount + `on_screen_resume`), same as today:
 ```
 devices = store.list()
 for d in devices: add_option(Option(d.name, id=d.id))
-if devices: add_option(Separator())        # separator only when devices exist
+if devices: add_option(None)               # divider under the last device
 add_option(Option("+ add", id=ADD_ID))     # ADD_ID = "__add__" sentinel
 highlighted = 0
 ```
 
-- **First run** → list is `[add]`, no separator.
-- **≥1 device** → `[dev…, Separator, add]`.
+- **First run** → list is `[add]`, no divider.
+- **≥1 device** → `[dev…, add]` with a divider line rendered under the last device.
 - `highlighted = 0` always (was gated on `devices` before; now there is always at least the add row).
 
-Sentinel id `"__add__"` cannot collide with a `Device.id` (store ids are generated tokens). `Separator` is non-selectable and skipped by keyboard navigation, so it never becomes `highlighted`.
+Textual 8.2.8 has no `Separator` type; `OptionList.add_option(None)` is the separator mechanism — it sets `_divider = True` on the previous option, drawing a rule under it. The divider is a flag on an existing option, **not** a standalone row: `option_count` is `len(devices) + 1` (devices + add), and there is no extra row for keyboard navigation to skip. Sentinel id `"__add__"` cannot collide with a `Device.id` (store ids are generated tokens).
 
 ### Selection handler
 

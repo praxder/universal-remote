@@ -53,6 +53,140 @@ class TestDeviceList:
 
         asyncio.run(scenario())
 
+    def test_given_no_devices_when_opening_manage_devices_then_only_the_add_row_shows(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                assert option_list.option_count == 1
+                assert option_list.get_option_at_index(0).id == "__add__"
+
+        asyncio.run(scenario())
+
+    def test_given_saved_devices_when_opening_then_devices_first_then_add_row_last(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        first = store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+        second = store.add(Device(name="Bedroom", platform="fake-tv", ip="10.0.0.6"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                ids = [
+                    option_list.get_option_at_index(i).id
+                    for i in range(option_list.option_count)
+                ]
+                assert ids == [first.id, second.id, "__add__"]
+
+        asyncio.run(scenario())
+
+
+class TestSelection:
+    def test_given_the_add_row_when_selected_by_enter_then_the_add_flow_opens(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("enter")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                assert app.screen._existing is None
+
+        asyncio.run(scenario())
+
+    def test_given_the_add_row_when_clicked_then_the_add_flow_opens(self, tmp_path):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                # the first list row renders at relative y=1 in the OptionList
+                await pilot.click("#device-list", offset=(2, 1))
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                assert app.screen._existing is None
+
+        asyncio.run(scenario())
+
+    def test_given_a_device_row_when_selected_by_enter_then_the_edit_flow_opens(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        device = store.add(
+            Device(name="Living Room", platform="fake-tv", ip="10.0.0.5")
+        )
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, device.id)
+                await pilot.pause()
+                await pilot.press("enter")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                assert app.screen._existing.id == device.id
+
+        asyncio.run(scenario())
+
+    def test_given_a_device_row_when_clicked_then_the_edit_flow_opens(self, tmp_path):
+        store = DeviceStore(path=tmp_path / "d.json")
+        device = store.add(
+            Device(name="Living Room", platform="fake-tv", ip="10.0.0.5")
+        )
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                # the sole device is the first list row, at relative y=1
+                await pilot.click("#device-list", offset=(2, 1))
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                assert app.screen._existing.id == device.id
+
+        asyncio.run(scenario())
+
+    def test_given_the_add_row_highlighted_when_edit_or_delete_pressed_then_nothing_happens(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")  # add row is the only (highlighted) row
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+                await pilot.press("delete")
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+                assert store.list() == []
+
+        asyncio.run(scenario())
+
 
 class TestAddDevice:
     def test_given_a_reachable_ip_when_probing_then_fields_prefill_and_save_persists(

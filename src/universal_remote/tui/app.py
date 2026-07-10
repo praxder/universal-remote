@@ -25,6 +25,8 @@ class UniversalRemoteApp(App[None]):
     #menu Button { width: 28; margin: 1 0; }
     /* #title width matches the TITLE_ART banner so it never wraps */
     #title { width: 42; text-align: center; margin-bottom: 1; }
+    /* left-aligned so the multi-width banner lines keep their column alignment */
+    #devices-title { width: 36; text-align: left; margin: 1 0 2 0; }
     #quote { width: 42; text-align: center; margin-top: 1; color: $text-muted; }
     """
 

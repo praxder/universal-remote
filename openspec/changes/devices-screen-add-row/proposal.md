@@ -23,4 +23,4 @@ The Manage Devices screen labels itself with a plain "Manage Devices" text and h
 
 - **Code**: `src/universal_remote/tui/devices_screen.py` (banner `Static`; rebuild the list in `_reload()` with device options, a `Separator` when devices exist, then an add `Option` sentinel; add `on_option_list_option_selected`; drop the `#devices-empty` label), `src/universal_remote/tui/app.py` (banner-width CSS for `#devices-title`).
 - **Tests**: `tests/test_tui_devices.py` (first-run shows only the add row; devices then separator then add; click and Enter on the add row open `AddDeviceScreen`; click and Enter on a device row open the edit flow).
-- **Dependencies**: none — `Separator` ships with Textual's `OptionList`.
+- **Dependencies**: none — the divider between devices and the add row uses `OptionList.add_option(None)`, built into Textual.

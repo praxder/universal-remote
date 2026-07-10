@@ -5,10 +5,27 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Input, Label, OptionList, Select
+from textual.widgets import (
+    Button,
+    Footer,
+    Header,
+    Input,
+    Label,
+    OptionList,
+    Select,
+    Static,
+)
 from textual.widgets.option_list import Option
 
 from ..devices.models import Device
+
+ADD_ID = "__add__"
+
+TITLE_ART = r""" ____             _
+|  _ \  _____   _(_) ___ ___  ___
+| | | |/ _ \ \ / / |/ __/ _ \/ __|
+| |_| |  __/\ V /| | (_|  __/\__ \
+|____/ \___| \_/ |_|\___\___||___/"""
 
 
 class DeviceListScreen(Screen[None]):
@@ -22,9 +39,8 @@ class DeviceListScreen(Screen[None]):
     def compose(self) -> ComposeResult:
         yield Header()
         with Vertical(id="devices"):
-            yield Label("Manage Devices", id="devices-title")
+            yield Static(TITLE_ART, id="devices-title")
             yield OptionList(id="device-list")
-            yield Label("", id="devices-empty")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -40,9 +56,9 @@ class DeviceListScreen(Screen[None]):
         for device in devices:
             option_list.add_option(Option(device.name, id=device.id))
         if devices:
-            option_list.highlighted = 0
-        empty = self.query_one("#devices-empty", Label)
-        empty.update("No devices yet — press 'a' to add one." if not devices else "")
+            option_list.add_option(None)  # divider between devices and the add row
+        option_list.add_option(Option("+ add", id=ADD_ID))
+        option_list.highlighted = 0
 
     def _selected(self) -> Device | None:
         option_list = self.query_one("#device-list", OptionList)
@@ -50,6 +66,16 @@ class DeviceListScreen(Screen[None]):
             return None
         option = option_list.get_option_at_index(option_list.highlighted)
         return next((d for d in self.app.store.list() if d.id == option.id), None)
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if event.option.id == ADD_ID:
+            self.action_add()
+            return
+        device = next(
+            (d for d in self.app.store.list() if d.id == event.option.id), None
+        )
+        if device is not None:
+            self.app.push_screen(AddDeviceScreen(existing=device))
 
     def action_add(self) -> None:
         self.app.push_screen(AddDeviceScreen())
