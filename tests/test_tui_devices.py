@@ -1,14 +1,15 @@
 import asyncio
 
-from textual.widgets import Input, OptionList, Select
+from textual.widgets import Input, OptionList, Select, Static
 
 from tests.fakes import FakeAdapter
 from universal_remote.devices.models import Device
-from universal_remote.devices.probe import ProbeResult
 from universal_remote.devices.store import DeviceStore
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
 from universal_remote.tui.devices_screen import (
+    ADD_TITLE_ART,
+    EDIT_TITLE_ART,
     AddDeviceScreen,
     ConfirmDeleteScreen,
     DeviceListScreen,
@@ -22,10 +23,8 @@ def _registry(*platforms: str):
     return registry
 
 
-def _app(store, probe=lambda ip: None, registry=None):
-    return UniversalRemoteApp(
-        store=store, registry=registry or _registry(), probe=probe
-    )
+def _app(store, registry=None):
+    return UniversalRemoteApp(store=store, registry=registry or _registry())
 
 
 def _index_of(option_list: OptionList, option_id: str) -> int:
@@ -193,16 +192,13 @@ class TestSelection:
 
 
 class TestAddDevice:
-    def test_given_a_reachable_ip_when_probing_then_fields_prefill_and_save_persists(
+    def test_given_manual_ip_and_name_when_saved_then_the_device_persists(
         self, tmp_path
     ):
         store = DeviceStore(path=tmp_path / "d.json")
 
-        def probe(ip):
-            return ProbeResult(name="Bedroom TV", model="UN50", mac="aa:bb:cc")
-
         async def scenario():
-            app = _app(store, probe=probe)
+            app = _app(store)
             async with app.run_test() as pilot:
                 await pilot.press("d")
                 await pilot.pause()
@@ -210,9 +206,7 @@ class TestAddDevice:
                 await pilot.pause()
                 assert isinstance(app.screen, AddDeviceScreen)
                 app.screen.query_one("#ip", Input).value = "10.0.0.9"
-                await pilot.click("#probe")
-                await pilot.pause()
-                assert app.screen.query_one("#name", Input).value == "Bedroom TV"
+                app.screen.query_one("#name", Input).value = "Bedroom TV"
                 await pilot.click("#save")
                 await pilot.pause()
 
@@ -223,29 +217,41 @@ class TestAddDevice:
         assert saved[0].ip == "10.0.0.9"
         assert saved[0].platform == "fake-tv"
 
-    def test_given_probe_failure_when_adding_then_manual_entry_still_saves(
+    def test_given_the_add_flow_when_opened_then_the_add_banner_is_shown(
         self, tmp_path
     ):
         store = DeviceStore(path=tmp_path / "d.json")
 
         async def scenario():
-            app = _app(store, probe=lambda ip: None)
+            app = _app(store)
             async with app.run_test() as pilot:
                 await pilot.press("d")
                 await pilot.pause()
                 await pilot.press("a")
                 await pilot.pause()
-                app.screen.query_one("#ip", Input).value = "10.0.0.9"
-                await pilot.click("#probe")
-                await pilot.pause()
-                assert app.screen.query_one("#name", Input).value == ""
-                app.screen.query_one("#name", Input).value = "Manual Name"
-                await pilot.click("#save")
-                await pilot.pause()
+                banner = app.screen.query_one("#add-title", Static)
+                assert str(banner.render()) == ADD_TITLE_ART
 
         asyncio.run(scenario())
 
-        assert [d.name for d in store.list()] == ["Manual Name"]
+    def test_given_the_edit_flow_when_opened_then_the_edit_banner_is_shown(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                banner = app.screen.query_one("#add-title", Static)
+                assert str(banner.render()) == EDIT_TITLE_ART
+
+        asyncio.run(scenario())
 
     def test_given_multiple_adapters_when_adding_then_the_selected_platform_is_saved(
         self, tmp_path

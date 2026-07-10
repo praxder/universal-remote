@@ -15,7 +15,7 @@ from universal_remote.tui.remote_screen import RemoteScreen
 def _app(store, adapter=None):
     registry = AdapterRegistry()
     registry.register(adapter or FakeAdapter(platform="fake-tv"))
-    return UniversalRemoteApp(store=store, registry=registry, probe=lambda ip: None)
+    return UniversalRemoteApp(store=store, registry=registry)
 
 
 def _dev(**overrides) -> Device:

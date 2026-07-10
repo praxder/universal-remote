@@ -13,14 +13,12 @@ class TestCapabilities:
 
         assert caps.supports(Key.DOWN) is False
 
-    def test_given_text_and_power_on_flags_when_read_then_they_are_exposed(self):
-        caps = Capabilities(keys=frozenset(), text=True, power_on=True)
+    def test_given_a_text_flag_when_read_then_it_is_exposed(self):
+        caps = Capabilities(keys=frozenset(), text=True)
 
         assert caps.text is True
-        assert caps.power_on is True
 
-    def test_given_no_flags_when_constructed_then_text_and_power_on_default_false(self):
+    def test_given_no_flags_when_constructed_then_text_defaults_false(self):
         caps = Capabilities(keys=frozenset())
 
         assert caps.text is False
-        assert caps.power_on is False

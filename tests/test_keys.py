@@ -16,7 +16,6 @@ class TestKeyVocabulary:
             "VOL_UP",
             "VOL_DOWN",
             "MUTE",
-            "POWER",
         }
 
         actual = {key.name for key in Key}

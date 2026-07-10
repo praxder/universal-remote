@@ -25,7 +25,6 @@ _CORE_KEYS = {
     Key.VOL_UP,
     Key.VOL_DOWN,
     Key.MUTE,
-    Key.POWER,
 }
 
 
@@ -65,13 +64,12 @@ class TestLgCapabilities:
 
         assert _CORE_KEYS <= caps.keys
 
-    def test_given_the_adapter_when_capabilities_read_then_text_and_power_on_are_declared(
+    def test_given_the_adapter_when_capabilities_read_then_text_is_declared(
         self,
     ):
         caps = LgWebOsAdapter().capabilities()
 
         assert caps.text is True
-        assert caps.power_on is True
 
 
 class TestLgPairing:
@@ -118,44 +116,6 @@ class TestLgKeyMapping:
         run(scenario())
 
         assert created[0].sent_buttons == ["LEFT"]
-
-
-class TestLgPower:
-    def test_given_the_power_key_when_sent_over_a_session_then_the_tv_is_powered_off(
-        self,
-    ):
-        created: list[FakeWebOsClient] = []
-        adapter = LgWebOsAdapter(client_factory=_capturing_factory(created))
-
-        async def scenario():
-            session = await adapter.connect(_device(credential="k"))
-            await session.send_key(Key.POWER)
-
-        run(scenario())
-
-        assert created[0].powered_off is True
-        assert created[0].sent_buttons == []
-
-    def test_given_a_stored_mac_when_power_on_requested_then_wol_is_sent_best_effort(
-        self,
-    ):
-        sent: list[str] = []
-        adapter = LgWebOsAdapter(wol=sent.append)
-
-        result = adapter.power_on(_device(mac="aa:bb:cc:dd:ee:ff"))
-
-        assert sent == ["aa:bb:cc:dd:ee:ff"]
-        assert result.packet_sent is True
-        assert result.best_effort is True
-
-    def test_given_no_stored_mac_when_power_on_requested_then_no_packet_is_sent(self):
-        sent: list[str] = []
-        adapter = LgWebOsAdapter(wol=sent.append)
-
-        result = adapter.power_on(_device(mac=None))
-
-        assert sent == []
-        assert result.packet_sent is False
 
 
 class TestLgText:

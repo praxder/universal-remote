@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from typing import Any
 
 
@@ -14,8 +14,6 @@ class Device:
     name: str
     platform: str
     ip: str
-    mac: str | None = None
-    model: str | None = None
     credential: str | None = None
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
@@ -24,4 +22,5 @@ class Device:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Device":
-        return cls(**data)
+        known = {f.name for f in fields(cls)}
+        return cls(**{key: value for key, value in data.items() if key in known})

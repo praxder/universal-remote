@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
 from aiowebostv import WebOsClient, endpoints
-from wakeonlan import send_magic_packet
 
 from ..capabilities import Capabilities
 from ..errors import TextUnsupportedError
@@ -19,8 +17,7 @@ if TYPE_CHECKING:
 
 PLATFORM = "lg-webos"
 
-# Generic key -> LG input-channel button name. Power is handled separately (no
-# input-channel button; a session power press means power-off via SSAP).
+# Generic key -> LG input-channel button name.
 LG_BUTTONS: dict[Key, str] = {
     Key.UP: "UP",
     Key.DOWN: "DOWN",
@@ -34,19 +31,10 @@ LG_BUTTONS: dict[Key, str] = {
     Key.MUTE: "MUTE",
 }
 
-_SUPPORTED_KEYS = frozenset(LG_BUTTONS) | {Key.POWER}
-_CAPABILITIES = Capabilities(keys=_SUPPORTED_KEYS, text=True, power_on=True)
+_CAPABILITIES = Capabilities(keys=frozenset(LG_BUTTONS), text=True)
 
 # Factory so tests can inject a fake client in place of the real WebOS client.
 ClientFactory = Callable[..., WebOsClient]
-
-
-@dataclass(frozen=True)
-class PowerOnResult:
-    """Outcome of a best-effort Wake-on-LAN power-on attempt."""
-
-    packet_sent: bool
-    best_effort: bool = True
 
 
 class LgWebOsSession(BaseSession):
@@ -57,10 +45,7 @@ class LgWebOsSession(BaseSession):
         self._client = client
 
     async def _dispatch_key(self, key: Key) -> None:
-        if key is Key.POWER:
-            await self._client.power_off()
-        else:
-            await self._client.button(LG_BUTTONS[key])
+        await self._client.button(LG_BUTTONS[key])
 
     async def _dispatch_text(self, text: str) -> None:
         try:
@@ -84,10 +69,8 @@ class LgWebOsAdapter:
     def __init__(
         self,
         client_factory: ClientFactory = WebOsClient,
-        wol: Callable[[str], None] = send_magic_packet,
     ) -> None:
         self._client_factory = client_factory
-        self._wol = wol
 
     def capabilities(self) -> Capabilities:
         return _CAPABILITIES
@@ -104,12 +87,6 @@ class LgWebOsAdapter:
         client = self._client_factory(host=device.ip, client_key=device.credential)
         await client.connect()
         return LgWebOsSession(client, _CAPABILITIES)
-
-    def power_on(self, device: "Device") -> PowerOnResult:
-        if not device.mac:
-            return PowerOnResult(packet_sent=False)
-        self._wol(device.mac)
-        return PowerOnResult(packet_sent=True)
 
 
 def register(registry: "AdapterRegistry") -> None:

@@ -25,7 +25,6 @@ _CORE_KEYS = {
     Key.VOL_UP,
     Key.VOL_DOWN,
     Key.MUTE,
-    Key.POWER,
 }
 
 
@@ -95,7 +94,6 @@ class TestSamsungKeyMapping:
         assert SAMSUNG_KEYS[Key.OK] == "KEY_ENTER"
         assert SAMSUNG_KEYS[Key.BACK] == "KEY_RETURN"
         assert SAMSUNG_KEYS[Key.HOME] == "KEY_HOME"
-        assert SAMSUNG_KEYS[Key.POWER] == "KEY_POWER"
 
     def test_given_a_directional_key_when_sent_then_the_samsung_code_is_dispatched(
         self,
@@ -125,40 +123,3 @@ class TestSamsungText:
                 await session.send_text("hello")
 
         run(scenario())
-
-
-class TestSamsungPower:
-    def test_given_the_power_key_when_sent_over_a_session_then_the_power_code_is_dispatched(
-        self,
-    ):
-        created: list[FakeSamsungRemote] = []
-        adapter = SamsungTizenAdapter(remote_factory=_capturing_factory(created))
-
-        async def scenario():
-            session = await adapter.connect(_device(credential="t"))
-            await session.send_key(Key.POWER)
-
-        run(scenario())
-
-        assert "KEY_POWER" in created[0].sent_payloads[0]
-
-    def test_given_a_stored_mac_when_power_on_requested_then_wol_is_sent_best_effort(
-        self,
-    ):
-        sent: list[str] = []
-        adapter = SamsungTizenAdapter(wol=sent.append)
-
-        result = adapter.power_on(_device(mac="aa:bb:cc:dd:ee:ff"))
-
-        assert sent == ["aa:bb:cc:dd:ee:ff"]
-        assert result.packet_sent is True
-        assert result.best_effort is True
-
-    def test_given_no_stored_mac_when_power_on_requested_then_no_packet_is_sent(self):
-        sent: list[str] = []
-        adapter = SamsungTizenAdapter(wol=sent.append)
-
-        result = adapter.power_on(_device(mac=None))
-
-        assert sent == []
-        assert result.packet_sent is False

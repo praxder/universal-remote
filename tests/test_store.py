@@ -1,3 +1,4 @@
+import json
 import stat
 
 from universal_remote.devices.models import Device
@@ -54,3 +55,43 @@ class TestDeviceStorePersistence:
         names = {d.name for d in DeviceStore(path=path).list()}
 
         assert names == {"A", "B"}
+
+
+class TestLegacyFieldTolerance:
+    def test_given_an_entry_with_legacy_mac_and_model_when_loaded_then_it_loads(
+        self, tmp_path
+    ):
+        path = tmp_path / "devices.json"
+        legacy = {
+            "name": "Old TV",
+            "platform": "samsung-tizen",
+            "ip": "10.0.0.5",
+            "mac": "aa:bb:cc:dd:ee:ff",
+            "model": "UN55LS03",
+        }
+        path.write_text(json.dumps({"devices": [legacy]}))
+
+        loaded = DeviceStore(path=path).list()
+
+        assert [d.name for d in loaded] == ["Old TV"]
+        assert loaded[0].ip == "10.0.0.5"
+
+    def test_given_a_legacy_entry_when_re_saved_then_mac_and_model_keys_are_absent(
+        self, tmp_path
+    ):
+        path = tmp_path / "devices.json"
+        legacy = {
+            "name": "Old TV",
+            "platform": "samsung-tizen",
+            "ip": "10.0.0.5",
+            "mac": "aa:bb:cc:dd:ee:ff",
+            "model": "UN55LS03",
+        }
+        path.write_text(json.dumps({"devices": [legacy]}))
+        store = DeviceStore(path=path)
+
+        store.save_all(store.list())
+
+        entry = json.loads(path.read_text())["devices"][0]
+        assert "mac" not in entry
+        assert "model" not in entry

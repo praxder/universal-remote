@@ -18,4 +18,3 @@ class Key(Enum):
     VOL_UP = "vol_up"
     VOL_DOWN = "vol_down"
     MUTE = "mute"
-    POWER = "power"

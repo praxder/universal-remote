@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
 from samsungtvws.async_remote import SamsungTVWSAsyncRemote
 from samsungtvws.remote import SendInputString, SendRemoteKey
-from wakeonlan import send_magic_packet
 
 from ..capabilities import Capabilities
 from ..errors import TextUnsupportedError
@@ -35,22 +33,13 @@ SAMSUNG_KEYS: dict[Key, str] = {
     Key.VOL_UP: "KEY_VOLUP",
     Key.VOL_DOWN: "KEY_VOLDOWN",
     Key.MUTE: "KEY_MUTE",
-    Key.POWER: "KEY_POWER",
 }
 
-# Text and power-on are attempted but not guaranteed on Samsung hardware.
-_CAPABILITIES = Capabilities(keys=frozenset(SAMSUNG_KEYS), text=True, power_on=True)
+# Text is attempted but not guaranteed on Samsung hardware.
+_CAPABILITIES = Capabilities(keys=frozenset(SAMSUNG_KEYS), text=True)
 
 # Factory so tests can inject a fake transport in place of the real remote.
 RemoteFactory = Callable[..., SamsungTVWSAsyncRemote]
-
-
-@dataclass(frozen=True)
-class PowerOnResult:
-    """Outcome of a best-effort Wake-on-LAN power-on attempt."""
-
-    packet_sent: bool
-    best_effort: bool = True
 
 
 class SamsungSession(BaseSession):
@@ -85,10 +74,8 @@ class SamsungTizenAdapter:
     def __init__(
         self,
         remote_factory: RemoteFactory = SamsungTVWSAsyncRemote,
-        wol: Callable[[str], None] = send_magic_packet,
     ) -> None:
         self._remote_factory = remote_factory
-        self._wol = wol
 
     def capabilities(self) -> Capabilities:
         return _CAPABILITIES
@@ -118,12 +105,6 @@ class SamsungTizenAdapter:
         )
         await remote.open()
         return SamsungSession(remote, _CAPABILITIES)
-
-    def power_on(self, device: "Device") -> PowerOnResult:
-        if not device.mac:
-            return PowerOnResult(packet_sent=False)
-        self._wol(device.mac)
-        return PowerOnResult(packet_sent=True)
 
 
 def register(registry: "AdapterRegistry") -> None:

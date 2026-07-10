@@ -79,7 +79,6 @@ class FakeWebOsClient:
         self.prompt_shown = False
         self.sent_buttons: list[str] = []
         self.sent_text: list[str] = []
-        self.powered_off = False
         self.send_error: Exception | None = None
 
     async def connect(self) -> bool:
@@ -93,9 +92,6 @@ class FakeWebOsClient:
 
     async def button(self, name: str) -> None:
         self.sent_buttons.append(name)
-
-    async def power_off(self) -> None:
-        self.powered_off = True
 
     async def request(self, uri: str, payload=None, **_kwargs) -> dict:
         if self.send_error is not None:
@@ -119,7 +115,7 @@ class FakeAdapter:
     ) -> None:
         self.platform = platform
         self._capabilities = capabilities or Capabilities(
-            keys=frozenset(Key), text=True, power_on=True
+            keys=frozenset(Key), text=True
         )
         self._pair_token = pair_token
         self._pair_cancels = pair_cancels

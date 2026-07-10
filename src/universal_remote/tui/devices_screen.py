@@ -27,6 +27,18 @@ TITLE_ART = r""" ____             _
 | |_| |  __/\ V /| | (_|  __/\__ \
 |____/ \___| \_/ |_|\___\___||___/"""
 
+ADD_TITLE_ART = r"""    _       _     _   ____             _
+   / \   __| | __| | |  _ \  _____   _(_) ___ ___
+  / _ \ / _` |/ _` | | | | |/ _ \ \ / / |/ __/ _ \
+ / ___ \ (_| | (_| | | |_| |  __/\ V /| | (_|  __/
+/_/   \_\__,_|\__,_| |____/ \___| \_/ |_|\___\___|"""
+
+EDIT_TITLE_ART = r""" _____    _ _ _     ____             _
+| ____|__| (_) |_  |  _ \  _____   _(_) ___ ___
+|  _| / _` | | __| | | | |/ _ \ \ / / |/ __/ _ \
+| |__| (_| | | |_  | |_| |  __/\ V /| | (_|  __/
+|_____\__,_|_|\__| |____/ \___| \_/ |_|\___\___|"""
+
 
 class DeviceListScreen(Screen[None]):
     BINDINGS = [
@@ -139,7 +151,7 @@ class ConfirmDeleteScreen(ModalScreen[bool]):
 
 
 class AddDeviceScreen(Screen[None]):
-    """IP entry with info-probe auto-fill, then confirm and save (add or edit)."""
+    """Manual IP + Name entry, then save (add or edit)."""
 
     BINDINGS = [("escape", "back", "Back")]
 
@@ -150,14 +162,11 @@ class AddDeviceScreen(Screen[None]):
     def compose(self) -> ComposeResult:
         yield Header()
         with Vertical(id="add-device"):
-            yield Label(
-                "Edit Device" if self._existing else "Add Device", id="add-title"
+            yield Static(
+                EDIT_TITLE_ART if self._existing else ADD_TITLE_ART, id="add-title"
             )
             yield Input(placeholder="IP address", id="ip")
-            yield Button("Probe", id="probe")
             yield Input(placeholder="Name", id="name")
-            yield Input(placeholder="Model", id="model")
-            yield Input(placeholder="MAC", id="mac")
             yield from self._platform_selector()
             yield Button("Save", id="save")
         yield Footer()
@@ -178,28 +187,10 @@ class AddDeviceScreen(Screen[None]):
         if self._existing is not None:
             self.query_one("#ip", Input).value = self._existing.ip
             self.query_one("#name", Input).value = self._existing.name
-            self.query_one("#model", Input).value = self._existing.model or ""
-            self.query_one("#mac", Input).value = self._existing.mac or ""
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "probe":
-            self._probe()
-        elif event.button.id == "save":
+        if event.button.id == "save":
             self._save()
-
-    def _probe(self) -> None:
-        ip = self.query_one("#ip", Input).value.strip()
-        if not ip:
-            return
-        result = self.app.probe(ip)
-        if result is None:
-            return  # probe failed → leave fields for manual entry, never block
-        if result.name:
-            self.query_one("#name", Input).value = result.name
-        if result.model:
-            self.query_one("#model", Input).value = result.model
-        if result.mac:
-            self.query_one("#mac", Input).value = result.mac
 
     def _selected_platform(self) -> str:
         return self.query_one("#platform", Select).value
@@ -207,23 +198,13 @@ class AddDeviceScreen(Screen[None]):
     def _save(self) -> None:
         ip = self.query_one("#ip", Input).value.strip()
         name = self.query_one("#name", Input).value.strip() or ip
-        model = self.query_one("#model", Input).value.strip() or None
-        mac = self.query_one("#mac", Input).value.strip() or None
         if self._existing is not None:
             self._existing.name = name
             self._existing.ip = ip
-            self._existing.model = model
-            self._existing.mac = mac
             self.app.store.update(self._existing)
         else:
             self.app.store.add(
-                Device(
-                    name=name,
-                    platform=self._selected_platform(),
-                    ip=ip,
-                    mac=mac,
-                    model=model,
-                )
+                Device(name=name, platform=self._selected_platform(), ip=ip)
             )
         self.app.pop_screen()
 

@@ -15,7 +15,7 @@ from universal_remote.tui.remote_screen import RemoteScreen, TextField
 def _app(store, adapter):
     registry = AdapterRegistry()
     registry.register(adapter)
-    return UniversalRemoteApp(store=store, registry=registry, probe=lambda ip: None)
+    return UniversalRemoteApp(store=store, registry=registry)
 
 
 def _store(tmp_path):

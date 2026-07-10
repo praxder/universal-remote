@@ -63,7 +63,6 @@ class RemoteScreen(Screen[None]):
         yield Label(f"Remote — {self._device.name}", id="remote-title")
         with Container(id="remote"):
             with Horizontal(id="row-top"):
-                yield self._key_button(Key.POWER, "⏻ Power")
                 yield self._key_button(Key.HOME, "⌂ Home")
                 yield self._key_button(Key.BACK, "↩ Back")
             with Vertical(id="dpad"):

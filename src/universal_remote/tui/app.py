@@ -6,7 +6,6 @@ from textual.app import App
 
 from typing import Callable
 
-from ..devices.probe import ProbeResult, probe_device
 from ..devices.store import DeviceStore
 from ..registry import AdapterRegistry
 from ..registry import registry as default_registry
@@ -27,6 +26,10 @@ class UniversalRemoteApp(App[None]):
     #title { width: 42; text-align: center; margin-bottom: 1; }
     /* left-aligned so the multi-width banner lines keep their column alignment */
     #devices-title { width: 36; text-align: left; margin: 1 0 2 0; }
+    /* wider than #devices-title so the "Add/Edit Device" banner never wraps */
+    #add-title { width: 52; text-align: left; margin: 1 0 2 0; }
+    /* left edge aligned with the input fields; top margin separates it from them */
+    #add-device #save { margin: 1 0 0 0; }
     #quote { width: 42; text-align: center; margin-top: 1; color: $text-muted; }
     /* delete confirmation: dim the device list behind a centered dialog box */
     ConfirmDeleteScreen { align: center middle; background: $background 60%; }
@@ -42,13 +45,11 @@ class UniversalRemoteApp(App[None]):
         self,
         store: DeviceStore | None = None,
         registry: AdapterRegistry | None = None,
-        probe: Callable[[str], ProbeResult | None] | None = None,
         quote_provider: Callable[[], Quote | None] | None = None,
     ) -> None:
         super().__init__()
         self.store = store or DeviceStore()
         self.registry = registry or default_registry
-        self.probe = probe or probe_device
         self.quote_provider = quote_provider or random_quote
 
     def on_mount(self) -> None:

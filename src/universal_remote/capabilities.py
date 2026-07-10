@@ -9,11 +9,10 @@ from .keys import Key
 
 @dataclass(frozen=True)
 class Capabilities:
-    """Keys an adapter supports plus its text and power-on flags."""
+    """Keys an adapter supports plus its text flag."""
 
     keys: frozenset[Key]
     text: bool = False
-    power_on: bool = False
 
     def supports(self, key: Key) -> bool:
         return key in self.keys

@@ -489,7 +489,6 @@ dependencies = [
     { name = "aiowebostv" },
     { name = "samsungtvws", extra = ["async"] },
     { name = "textual" },
-    { name = "wakeonlan" },
 ]
 
 [package.dev-dependencies]
@@ -503,7 +502,6 @@ requires-dist = [
     { name = "aiowebostv", specifier = ">=0.7" },
     { name = "samsungtvws", extras = ["async"] },
     { name = "textual", specifier = ">=0.80" },
-    { name = "wakeonlan", specifier = ">=3.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -519,15 +517,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/53/0c/06f8b233b8fd13b9e5ee11424ef85419ba0d8ba0b3138bf360be2ff56953/urllib3-2.7.0.tar.gz", hash = "sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c", size = 433602, upload-time = "2026-05-07T16:13:18.596Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl", hash = "sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897", size = 131087, upload-time = "2026-05-07T16:13:17.151Z" },
-]
-
-[[package]]
-name = "wakeonlan"
-version = "4.0.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/8f/16/69e4cdcce1be240667dfa2607f12e00d1c79e4606656327c4f1fb88fea40/wakeonlan-4.0.0.tar.gz", hash = "sha256:1cb30c4ae60f85ef289f4f7d4f703382ed19ba84103206dc5e2b1e51bec9f456", size = 5079, upload-time = "2026-06-28T09:23:15.711Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/80/ecebf7b1b32ebe4a10d72a09e21c4c76a2460fac159752ec9ab88508b7d0/wakeonlan-4.0.0-py3-none-any.whl", hash = "sha256:82c50fe0c8dbc4848b8398f48fd2d2ed5d4af363f3006279372d76513ef84505", size = 5882, upload-time = "2026-06-28T09:23:14.577Z" },
 ]
 
 [[package]]
