@@ -15,7 +15,7 @@ The application SHALL launch into a menu offering two modes: Manage Devices and 
 - **THEN** the application navigates to that mode
 
 ### Requirement: Device management screens
-The Manage Devices mode SHALL present a "Devices" ASCII-art banner, the saved devices, and an always-present add entry as the last row of the list, backed by the device store and exposing add, edit, and delete. When one or more devices are saved, the mode SHALL list the devices first, then a separator, then the add entry; when no devices are saved, the list SHALL show only the add entry. Selecting the add entry — by Enter or by mouse click — SHALL open the add flow. Selecting a device row — by Enter or by mouse click — SHALL open that device for editing.
+The Manage Devices mode SHALL present a "Devices" ASCII-art banner, the saved devices, and an always-present add entry as the last row of the list, backed by the device store and exposing add, edit, and delete. When one or more devices are saved, the mode SHALL list the devices first, then a separator, then the add entry; when no devices are saved, the list SHALL show only the add entry. Selecting the add entry — by Enter or by mouse click — SHALL open the add flow. Selecting a device row — by Enter or by mouse click — SHALL open that device for editing. Deleting a device SHALL be triggered by the Backspace key while a device row is highlighted, and SHALL require the user to confirm before the device is removed: the system SHALL present a confirmation prompt naming the device, remove the device only when the user confirms, and leave the store unchanged when the user cancels. The confirmation prompt SHALL default keyboard focus to its cancel action and SHALL let the user move focus between its confirm and cancel actions with the arrow keys. Pressing Backspace while the add entry is highlighted SHALL do nothing.
 
 #### Scenario: Devices listed above the add row
 - **WHEN** the user opens Manage Devices with one or more saved devices
@@ -32,6 +32,27 @@ The Manage Devices mode SHALL present a "Devices" ASCII-art banner, the saved de
 #### Scenario: Selecting a device edits it
 - **WHEN** the user selects a device row by Enter or by mouse click
 - **THEN** the application opens that device in the edit flow
+
+#### Scenario: Backspace prompts for delete confirmation
+- **WHEN** the user highlights a saved device row and presses Backspace
+- **THEN** the application shows a confirmation prompt naming that device
+- **AND** the device is still present in the store while the prompt is open
+
+#### Scenario: Confirming removes the device
+- **WHEN** the confirmation prompt is shown and the user confirms the deletion
+- **THEN** the device is removed from the store and the list refreshes without it
+
+#### Scenario: Cancelling keeps the device
+- **WHEN** the confirmation prompt is shown and the user cancels
+- **THEN** no device is removed and the list is unchanged
+
+#### Scenario: Confirmation buttons navigable by arrow keys
+- **WHEN** the confirmation prompt is shown and the user presses an arrow key
+- **THEN** keyboard focus moves between the confirm and cancel actions
+
+#### Scenario: Backspace on the add entry does nothing
+- **WHEN** the add entry is highlighted and the user presses Backspace
+- **THEN** no confirmation prompt is shown and no device is removed
 
 ### Requirement: Use Remote entry, selection, and pairing
 Entering Use Remote SHALL let the user choose a target device, then connect to it. When the chosen device has no stored credential, the application MUST run pairing first, showing on-screen guidance and allowing the user to cancel. When a credential is already stored, it SHALL connect directly. With no saved devices, the mode MUST guide the user toward adding one rather than showing an empty remote. The user MUST be able to leave Use Remote and return to the menu.
