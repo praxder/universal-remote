@@ -11,11 +11,11 @@ The system SHALL provide an adapter for the Samsung Tizen platform, registered u
 - **THEN** it returns the Samsung Tizen adapter
 
 ### Requirement: Declared Samsung capabilities
-The Samsung Tizen adapter SHALL declare support for the directional keys, OK, back, home, volume up, volume down, mute, and power. It SHALL declare text and power-on support flags that reflect its best-effort nature.
+The Samsung Tizen adapter SHALL declare support for the directional keys, OK, back, home, volume up, volume down, and mute. It SHALL declare a text support flag that reflects its best-effort nature.
 
 #### Scenario: Capabilities include the core button set
 - **WHEN** the adapter's capabilities are read
-- **THEN** the directional keys, OK, back, home, volume, mute, and power are present
+- **THEN** the directional keys, OK, back, home, volume, and mute are present
 
 ### Requirement: Token pairing
 The Samsung Tizen adapter SHALL obtain a pairing token by connecting so the TV presents its authorization popup, and SHALL return that token for persistence. Later connections SHALL reuse the stored token without re-prompting.
@@ -41,16 +41,4 @@ The Samsung Tizen adapter SHALL attempt to send text to the TV, and SHALL report
 #### Scenario: Text unsupported reported
 - **WHEN** a text send fails or the firmware rejects text input
 - **THEN** the session reports text-unsupported so the caller can inform the user
-
-### Requirement: Power handling
-The Samsung Tizen adapter SHALL power the TV off with the power key while connected, and SHALL attempt power-on via a Wake-on-LAN magic packet to the stored MAC address as a best-effort action.
-
-#### Scenario: Power off while on
-- **WHEN** power is requested while the TV is reachable
-- **THEN** the adapter sends the power key
-
-#### Scenario: Best-effort power on
-- **WHEN** power-on is requested and a MAC address is stored
-- **THEN** the adapter sends a Wake-on-LAN magic packet to that MAC
-- **AND** reports the action as best-effort rather than guaranteed
 

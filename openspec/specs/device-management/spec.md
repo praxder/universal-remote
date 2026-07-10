@@ -4,7 +4,7 @@
 TBD - created by archiving change scaffold-samsung-remote. Update Purpose after archive.
 ## Requirements
 ### Requirement: Persistent device store
-The system SHALL persist saved devices and their pairing credentials to a local file in the user's configuration directory. The file MUST be written with owner-only permissions (`0600`) because it contains secrets.
+The system SHALL persist saved devices and their pairing credentials to a local file in the user's configuration directory. The file MUST be written with owner-only permissions (`0600`) because it contains secrets. Loading the store MUST tolerate entries that carry unknown legacy fields (such as `mac` and `model`) by ignoring them rather than failing.
 
 #### Scenario: Store is created on first save
 - **WHEN** a device is saved and no store file exists yet
@@ -15,8 +15,13 @@ The system SHALL persist saved devices and their pairing credentials to a local 
 - **WHEN** a device with a pairing credential is saved and later loaded
 - **THEN** the loaded device carries the same credential value
 
+#### Scenario: Legacy fields ignored on load
+- **WHEN** the store file contains a device entry with legacy `mac` or `model` keys
+- **THEN** the device loads successfully with those keys ignored
+- **AND** the keys are absent when the device is next saved
+
 ### Requirement: List devices
-The system SHALL return all saved devices, each exposing at least name, platform, IP address, and (if known) MAC address.
+The system SHALL return all saved devices, each exposing at least name, platform, and IP address.
 
 #### Scenario: Empty store
 - **WHEN** the store contains no devices
@@ -25,23 +30,6 @@ The system SHALL return all saved devices, each exposing at least name, platform
 #### Scenario: Multiple devices
 - **WHEN** the store contains two or more devices
 - **THEN** the system returns all of them
-
-### Requirement: Add device with IP auto-fill
-The system SHALL let a user add a device by entering an IP address, and SHALL attempt to auto-fill the device name, model, and MAC by probing the device over the network. Probe failure MUST NOT block adding the device. The system SHALL let the user select which platform the device targets, defaulting to the first registered platform, and SHALL store the selected platform on the device.
-
-#### Scenario: Probe succeeds
-- **WHEN** the user enters an IP for a reachable, supported TV
-- **THEN** the system pre-fills name, model, and MAC from the probe result for the user to confirm or edit
-
-#### Scenario: Probe fails
-- **WHEN** the user enters an IP that cannot be probed
-- **THEN** the system falls back to a fully manual entry form
-- **AND** the device can still be saved with user-entered values
-
-#### Scenario: Platform selected when adding a device
-- **WHEN** the user adds a device
-- **THEN** the system offers the registered platforms for selection, defaulting to the first
-- **AND** the device is saved with the platform the user selected
 
 ### Requirement: Edit device
 The system SHALL let a user modify the stored fields of an existing device.
@@ -57,4 +45,16 @@ The system SHALL let a user remove a saved device from the store.
 - **WHEN** the user deletes a device
 - **THEN** that device is no longer returned when listing devices
 - **AND** other devices remain unaffected
+
+### Requirement: Add device by manual entry
+The system SHALL let a user add a device by manually entering an IP address and a name, with no network probe. The system SHALL let the user select which platform the device targets, defaulting to the first registered platform, and SHALL store the selected platform on the device.
+
+#### Scenario: Device saved from manual entry
+- **WHEN** the user enters an IP address and a name and saves
+- **THEN** the system stores a device with those values and the selected platform
+
+#### Scenario: Platform selected when adding a device
+- **WHEN** the user adds a device
+- **THEN** the system offers the registered platforms for selection, defaulting to the first
+- **AND** the device is saved with the platform the user selected
 
