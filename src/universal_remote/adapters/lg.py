@@ -65,6 +65,7 @@ class LgWebOsAdapter:
     """Builds LG sessions; pairing yields a client-key to persist and replay."""
 
     platform = PLATFORM
+    display_name = "LG WebOS"
 
     def __init__(
         self,

@@ -28,8 +28,8 @@ class UniversalRemoteApp(App[None]):
     #devices-title { width: 36; text-align: left; margin: 1 0 2 0; }
     /* wider than #devices-title so the "Add/Edit Device" banner never wraps */
     #add-title { width: 52; text-align: left; margin: 1 0 2 0; }
-    /* left edge aligned with the input fields; top margin separates it from them */
-    #add-device #save { margin: 1 0 0 0; }
+    /* indent Save so its left edge lines up with the cells' text above it */
+    #add-device #save { margin: 1 0 0 3; }
     #quote { width: 42; text-align: center; margin-top: 1; color: $text-muted; }
     /* delete confirmation: dim the device list behind a centered dialog box */
     ConfirmDeleteScreen { align: center middle; background: $background 60%; }

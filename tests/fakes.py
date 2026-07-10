@@ -112,8 +112,10 @@ class FakeAdapter:
         capabilities: Capabilities | None = None,
         pair_token: str = "fake-token",
         pair_cancels: bool = False,
+        display_name: str | None = None,
     ) -> None:
         self.platform = platform
+        self.display_name = display_name or platform
         self._capabilities = capabilities or Capabilities(
             keys=frozenset(Key), text=True
         )

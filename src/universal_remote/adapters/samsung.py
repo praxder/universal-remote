@@ -70,6 +70,7 @@ class SamsungTizenAdapter:
     """Builds Samsung sessions; pairing yields a token to persist and replay."""
 
     platform = PLATFORM
+    display_name = "Samsung Tizen"
 
     def __init__(
         self,

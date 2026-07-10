@@ -217,6 +217,56 @@ class TestAddDevice:
         assert saved[0].ip == "10.0.0.9"
         assert saved[0].platform == "fake-tv"
 
+    def test_given_the_add_flow_when_opened_then_cells_are_ordered_type_name_ip(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("a")
+                await pilot.pause()
+                children = app.screen.query_one("#add-device").children
+                assert [w.id for w in children] == [
+                    "add-title",
+                    "platform",
+                    "name",
+                    "ip",
+                    "save",
+                ]
+
+        asyncio.run(scenario())
+
+    def test_given_multiple_adapters_when_adding_then_the_dropdown_shows_friendly_labels(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        registry = AdapterRegistry()
+        registry.register(
+            FakeAdapter(platform="samsung-tizen", display_name="Samsung Tizen")
+        )
+        registry.register(FakeAdapter(platform="lg-webos", display_name="LG WebOS"))
+
+        async def scenario():
+            app = _app(store, registry=registry)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("a")
+                await pilot.pause()
+                selector = app.screen.query_one("#platform", Select)
+                labels = [(str(prompt), value) for prompt, value in selector._options]
+                assert labels == [
+                    ("Samsung Tizen", "samsung-tizen"),
+                    ("LG WebOS", "lg-webos"),
+                ]
+                assert selector.value == "samsung-tizen"
+
+        asyncio.run(scenario())
+
     def test_given_the_add_flow_when_opened_then_the_add_banner_is_shown(
         self, tmp_path
     ):
@@ -371,5 +421,81 @@ class TestEditAndDelete:
                 await pilot.press("up")
                 await pilot.pause()
                 assert app.focused.id == "confirm"
+
+        asyncio.run(scenario())
+
+
+class TestEditDeviceType:
+    def test_given_the_edit_flow_when_opened_then_device_type_is_read_only(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        registry = AdapterRegistry()
+        registry.register(
+            FakeAdapter(platform="samsung-tizen", display_name="Samsung Tizen")
+        )
+        store.add(Device(name="Den", platform="samsung-tizen", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store, registry=registry)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                display = app.screen.query_one("#platform-display", Input)
+                assert display.value == "Samsung Tizen"
+                assert display.disabled is True
+                assert len(app.screen.query("#platform")) == 0
+
+        asyncio.run(scenario())
+
+
+class TestFormNavigation:
+    def test_given_the_device_type_cell_when_arrows_pressed_then_focus_moves_through_cells(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("a")
+                await pilot.pause()
+                app.screen.query_one("#platform", Select).focus()
+                await pilot.pause()
+                assert app.focused.id == "platform"
+                for expected in ("name", "ip", "save"):
+                    await pilot.press("down")
+                    await pilot.pause()
+                    assert app.focused.id == expected
+                await pilot.press("up")
+                await pilot.pause()
+                assert app.focused.id == "ip"
+
+        asyncio.run(scenario())
+
+    def test_given_the_device_type_cell_when_enter_pressed_then_the_dropdown_opens(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("a")
+                await pilot.pause()
+                selector = app.screen.query_one("#platform", Select)
+                selector.focus()
+                await pilot.pause()
+                assert selector.expanded is False
+                await pilot.press("enter")
+                await pilot.pause()
+                assert selector.expanded is True
 
         asyncio.run(scenario())

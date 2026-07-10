@@ -27,6 +27,9 @@ class AdapterRegistry:
     def platforms(self) -> list[str]:
         return list(self._adapters)
 
+    def adapters(self) -> list[Adapter]:
+        return list(self._adapters.values())
+
 
 # The default registry adapters register into at startup.
 registry = AdapterRegistry()

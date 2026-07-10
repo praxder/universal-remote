@@ -57,6 +57,12 @@ class TestSamsungRegistration:
 
         assert registry.resolve(PLATFORM).platform == PLATFORM
 
+    def test_given_the_adapter_when_display_name_read_then_it_is_human_readable(self):
+        adapter = SamsungTizenAdapter()
+
+        assert adapter.display_name == "Samsung Tizen"
+        assert adapter.platform == PLATFORM
+
 
 class TestSamsungCapabilities:
     def test_given_the_adapter_when_capabilities_read_then_the_core_button_set_is_declared(

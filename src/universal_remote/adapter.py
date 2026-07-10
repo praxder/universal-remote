@@ -20,6 +20,7 @@ class Adapter(Protocol):
     """Builds sessions for one TV platform; pairing is distinct from connecting."""
 
     platform: str
+    display_name: str
 
     def capabilities(self) -> Capabilities: ...
 

@@ -36,3 +36,15 @@ class TestAdapterRegistry:
         registry.register(_StubAdapter())
 
         assert registry.is_supported("stub-tv") is True
+
+    def test_given_registered_adapters_when_listing_then_all_are_returned_in_order(
+        self,
+    ):
+        registry = AdapterRegistry()
+        first = _StubAdapter()
+        second = _StubAdapter()
+        second.platform = "other-tv"
+        registry.register(first)
+        registry.register(second)
+
+        assert registry.adapters() == [first, second]

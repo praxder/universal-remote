@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.screen import ModalScreen, Screen
 from textual.widgets import (
@@ -150,10 +151,35 @@ class ConfirmDeleteScreen(ModalScreen[bool]):
         self.focus_next()
 
 
-class AddDeviceScreen(Screen[None]):
-    """Manual IP + Name entry, then save (add or edit)."""
+class DeviceTypeSelect(Select):
+    """A Select that moves field focus on Up/Down and opens on Enter/Space.
 
-    BINDINGS = [("escape", "back", "Back")]
+    The base Select binds Up/Down to open its overlay, which would trap focus in
+    the add form. Here Up/Down navigate the form instead; once the overlay is
+    open, its own Up/Down still move between options.
+    """
+
+    BINDINGS = [
+        Binding("enter,space", "show_overlay", "Show menu", show=False),
+        Binding("up", "focus_previous_field", "Previous", show=False),
+        Binding("down", "focus_next_field", "Next", show=False),
+    ]
+
+    def action_focus_previous_field(self) -> None:
+        self.screen.focus_previous()
+
+    def action_focus_next_field(self) -> None:
+        self.screen.focus_next()
+
+
+class AddDeviceScreen(Screen[None]):
+    """Manual device-type, Name, and IP entry, then save (add or edit)."""
+
+    BINDINGS = [
+        ("escape", "back", "Back"),
+        ("up", "focus_previous", "Previous"),
+        ("down", "focus_next", "Next"),
+    ]
 
     def __init__(self, existing: Device | None = None) -> None:
         super().__init__()
@@ -165,20 +191,24 @@ class AddDeviceScreen(Screen[None]):
             yield Static(
                 EDIT_TITLE_ART if self._existing else ADD_TITLE_ART, id="add-title"
             )
-            yield Input(placeholder="IP address", id="ip")
+            yield from self._device_type_cell()
             yield Input(placeholder="Name", id="name")
-            yield from self._platform_selector()
+            yield Input(placeholder="IP address", id="ip")
             yield Button("Save", id="save")
         yield Footer()
 
-    def _platform_selector(self):
-        """A platform picker, shown when adding a device (hidden while editing)."""
+    def _device_type_cell(self):
+        """A platform picker when adding; a read-only label when editing."""
         if self._existing is not None:
+            adapter = self.app.registry.resolve(self._existing.platform)
+            yield Input(
+                value=adapter.display_name, disabled=True, id="platform-display"
+            )
             return
-        platforms = self.app.registry.platforms()
-        yield Select(
-            [(platform, platform) for platform in platforms],
-            value=platforms[0],
+        adapters = self.app.registry.adapters()
+        yield DeviceTypeSelect(
+            [(adapter.display_name, adapter.platform) for adapter in adapters],
+            value=adapters[0].platform,
             allow_blank=False,
             id="platform",
         )
@@ -207,6 +237,12 @@ class AddDeviceScreen(Screen[None]):
                 Device(name=name, platform=self._selected_platform(), ip=ip)
             )
         self.app.pop_screen()
+
+    def action_focus_previous(self) -> None:
+        self.focus_previous()
+
+    def action_focus_next(self) -> None:
+        self.focus_next()
 
     def action_back(self) -> None:
         self.app.pop_screen()
