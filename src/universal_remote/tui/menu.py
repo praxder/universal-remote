@@ -3,27 +3,45 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.binding import Binding
+from textual.containers import Center, Vertical
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Label
+from textual.widgets import Button, Footer, Header, Static
 
 from .devices_screen import DeviceListScreen
 from .remote_flow import UseRemoteScreen
+
+TITLE_ART = r""" _   _       _                          _ 
+| | | |_ __ (_)_   _____ _ __ ___  __ _| |
+| | | | '_ \| \ \ / / _ \ '__/ __|/ _` | |
+| |_| | | | | |\ V /  __/ |  \__ \ (_| | |
+ \___/|_| |_|_| \_/ \___|_|  |___/\__,_|_|
+
+ ____                      _       
+|  _ \ ___ _ __ ___   ___ | |_ ___ 
+| |_) / _ \ '_ ` _ \ / _ \| __/ _ \
+|  _ <  __/ | | | | | (_) | ||  __/
+|_| \_\___|_| |_| |_|\___/ \__\___|"""
 
 
 class MenuScreen(Screen[None]):
     BINDINGS = [
         ("d", "manage_devices", "Manage Devices"),
         ("r", "use_remote", "Use Remote"),
-        ("q", "quit", "Quit"),
+        Binding("up", "app.focus_previous", "Previous", show=False),
+        Binding("down", "app.focus_next", "Next", show=False),
+        ("q", "app.quit", "Quit"),
     ]
 
     def compose(self) -> ComposeResult:
         yield Header()
         with Vertical(id="menu"):
-            yield Label("Universal Remote", id="title")
-            yield Button("Manage Devices", id="manage")
-            yield Button("Use Remote", id="use")
+            with Center():
+                yield Static(TITLE_ART, id="title")
+            with Center():
+                yield Button("Manage Devices", id="manage")
+            with Center():
+                yield Button("Use Remote", id="use")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

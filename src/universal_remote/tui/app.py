@@ -16,11 +16,14 @@ from .menu import MenuScreen
 class UniversalRemoteApp(App[None]):
     """Launches into the entry menu; screens read `store` and `registry` off the app."""
 
+    TITLE = "Universal Remote"
+
     CSS = """
     Screen { align: center middle; }
-    #menu { width: auto; height: auto; }
+    #menu { width: 100%; height: auto; }
     #menu Button { width: 28; margin: 1 0; }
-    #title { text-style: bold; margin-bottom: 1; }
+    /* #title width matches the TITLE_ART banner so it never wraps */
+    #title { width: 42; text-align: center; margin-bottom: 1; }
     """
 
     def __init__(

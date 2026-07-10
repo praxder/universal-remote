@@ -52,3 +52,104 @@ class TestMenu:
                 assert isinstance(app.screen, UseRemoteScreen)
 
         asyncio.run(scenario())
+
+    def test_given_the_app_when_it_starts_then_the_title_is_universal_remote(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test():
+                assert app.title == "Universal Remote"
+
+        asyncio.run(scenario())
+
+    def test_given_the_menu_when_shown_then_the_title_is_a_multiline_ascii_banner(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                title = app.screen.query_one("#title")
+                assert "\n" in str(title.render())
+
+        asyncio.run(scenario())
+
+    def test_given_focus_on_manage_when_down_arrow_then_focus_moves_to_use(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.screen.set_focus(app.screen.query_one("#manage", Button))
+                await pilot.press("down")
+                assert app.focused is not None
+                assert app.focused.id == "use"
+
+        asyncio.run(scenario())
+
+    def test_given_focus_on_use_when_up_arrow_then_focus_moves_to_manage(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.screen.set_focus(app.screen.query_one("#use", Button))
+                await pilot.press("up")
+                assert app.focused is not None
+                assert app.focused.id == "manage"
+
+        asyncio.run(scenario())
+
+    def test_given_focus_on_use_when_down_arrow_then_focus_cycles_to_manage(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.screen.set_focus(app.screen.query_one("#use", Button))
+                await pilot.press("down")
+                assert app.focused is not None
+                assert app.focused.id == "manage"
+
+        asyncio.run(scenario())
+
+    def test_given_focus_on_manage_when_up_arrow_then_focus_cycles_to_use(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.screen.set_focus(app.screen.query_one("#manage", Button))
+                await pilot.press("up")
+                assert app.focused is not None
+                assert app.focused.id == "use"
+
+        asyncio.run(scenario())
+
+    def test_given_the_menu_when_shown_then_the_arrow_bindings_are_hidden_from_the_footer(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                bindings = app.screen.active_bindings
+                assert bindings["up"].binding.show is False
+                assert bindings["down"].binding.show is False
+
+        asyncio.run(scenario())
+
+    def test_given_the_menu_when_q_is_pressed_then_the_app_quits(self, tmp_path):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test() as pilot:
+                await pilot.press("q")
+                await pilot.pause()
+                assert app._exit is True
+
+        asyncio.run(scenario())
