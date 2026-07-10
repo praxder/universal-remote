@@ -11,6 +11,7 @@ from ..devices.store import DeviceStore
 from ..registry import AdapterRegistry
 from ..registry import registry as default_registry
 from .menu import MenuScreen
+from .quotes import Quote, random_quote
 
 
 class UniversalRemoteApp(App[None]):
@@ -24,6 +25,7 @@ class UniversalRemoteApp(App[None]):
     #menu Button { width: 28; margin: 1 0; }
     /* #title width matches the TITLE_ART banner so it never wraps */
     #title { width: 42; text-align: center; margin-bottom: 1; }
+    #quote { width: 42; text-align: center; margin-top: 1; color: $text-muted; }
     """
 
     def __init__(
@@ -31,11 +33,13 @@ class UniversalRemoteApp(App[None]):
         store: DeviceStore | None = None,
         registry: AdapterRegistry | None = None,
         probe: Callable[[str], ProbeResult | None] | None = None,
+        quote_provider: Callable[[], Quote | None] | None = None,
     ) -> None:
         super().__init__()
         self.store = store or DeviceStore()
         self.registry = registry or default_registry
         self.probe = probe or probe_device
+        self.quote_provider = quote_provider or random_quote
 
     def on_mount(self) -> None:
         self.push_screen(MenuScreen())

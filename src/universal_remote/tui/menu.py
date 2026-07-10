@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Center, Vertical
@@ -42,6 +43,14 @@ class MenuScreen(Screen[None]):
                 yield Button("Manage Devices", id="manage")
             with Center():
                 yield Button("Use Remote", id="use")
+            quote = self.app.quote_provider()
+            if quote:
+                with Center():
+                    yield Static(
+                        f'"{escape(quote.text)}"\n'
+                        f"— {escape(quote.character)}, {escape(quote.source)}",
+                        id="quote",
+                    )
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

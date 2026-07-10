@@ -6,12 +6,15 @@ from universal_remote.devices.store import DeviceStore
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
 from universal_remote.tui.devices_screen import DeviceListScreen
+from universal_remote.tui.quotes import Quote
 from universal_remote.tui.remote_flow import UseRemoteScreen
 
 
-def _app(tmp_path):
+def _app(tmp_path, quote_provider=None):
     return UniversalRemoteApp(
-        store=DeviceStore(path=tmp_path / "d.json"), registry=AdapterRegistry()
+        store=DeviceStore(path=tmp_path / "d.json"),
+        registry=AdapterRegistry(),
+        quote_provider=quote_provider,
     )
 
 
@@ -141,6 +144,48 @@ class TestMenu:
                 bindings = app.screen.active_bindings
                 assert bindings["up"].binding.show is False
                 assert bindings["down"].binding.show is False
+
+        asyncio.run(scenario())
+
+    def test_given_a_quote_provider_when_the_menu_shows_then_the_quote_and_attribution_appear(
+        self, tmp_path
+    ):
+        async def scenario():
+            quote = Quote("May the Force be with you.", "Darth Vader", "Star Wars")
+            app = _app(tmp_path, quote_provider=lambda: quote)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                rendered = str(app.screen.query_one("#quote").render())
+                assert "May the Force be with you." in rendered
+                assert "— Darth Vader, Star Wars" in rendered
+
+        asyncio.run(scenario())
+
+    def test_given_the_menu_when_shown_then_the_quote_provider_is_consulted_once(
+        self, tmp_path
+    ):
+        async def scenario():
+            calls = []
+
+            def provider():
+                calls.append(1)
+                return Quote("May the Force be with you.", "Darth Vader", "Star Wars")
+
+            app = _app(tmp_path, quote_provider=provider)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                assert calls == [1]
+
+        asyncio.run(scenario())
+
+    def test_given_no_quote_when_the_menu_shows_then_no_quote_widget_is_present(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path, quote_provider=lambda: None)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                assert len(app.screen.query("#quote")) == 0
 
         asyncio.run(scenario())
 
