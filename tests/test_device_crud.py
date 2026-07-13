@@ -39,3 +39,54 @@ class TestDeviceCrud:
         store.delete(drop.id)
 
         assert [d.name for d in store.list()] == ["Keep"]
+
+
+class TestFindConflict:
+    def test_given_a_duplicate_name_when_checked_then_the_name_message_is_returned(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_device(name="Living Room", ip="10.0.0.5"))
+
+        message = store.find_conflict(name=" living room ", ip="10.0.0.9")
+
+        assert message == "A device named ' living room ' already exists."
+
+    def test_given_a_duplicate_ip_when_checked_then_the_ip_message_is_returned(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_device(name="Living Room", ip="10.0.0.5"))
+
+        message = store.find_conflict(name="Bedroom", ip=" 10.0.0.5 ")
+
+        assert message == "A device with IP  10.0.0.5  already exists."
+
+    def test_given_a_unique_name_and_ip_when_checked_then_none_is_returned(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_device(name="Living Room", ip="10.0.0.5"))
+
+        assert store.find_conflict(name="Bedroom", ip="10.0.0.9") is None
+
+    def test_given_both_name_and_ip_collide_when_checked_then_the_name_message_wins(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_device(name="Living Room", ip="10.0.0.5"))
+
+        message = store.find_conflict(name="Living Room", ip="10.0.0.5")
+
+        assert message == "A device named 'Living Room' already exists."
+
+    def test_given_the_matching_device_is_excluded_when_checked_then_none_is_returned(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        device = store.add(_device(name="Living Room", ip="10.0.0.5"))
+
+        assert (
+            store.find_conflict(name="Living Room", ip="10.0.0.5", exclude_id=device.id)
+            is None
+        )

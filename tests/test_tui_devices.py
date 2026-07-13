@@ -1,6 +1,6 @@
 import asyncio
 
-from textual.widgets import Input, OptionList, Select, Static
+from textual.widgets import Input, Label, OptionList, Select, Static
 
 from tests.fakes import FakeAdapter
 from universal_remote.devices.models import Device
@@ -235,6 +235,7 @@ class TestAddDevice:
                     "platform",
                     "name",
                     "ip",
+                    "error",
                     "save",
                 ]
 
@@ -325,6 +326,195 @@ class TestAddDevice:
         asyncio.run(scenario())
 
         assert store.list()[0].platform == "lg-webos"
+
+
+class TestDuplicateRejection:
+    def test_given_the_add_screen_opens_then_the_error_row_is_hidden(self, tmp_path):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("a")
+                await pilot.pause()
+                assert app.screen.query_one("#error", Label).display is False
+
+        asyncio.run(scenario())
+
+    def test_given_a_conflict_when_saving_then_the_error_row_becomes_visible(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("a")
+                await pilot.pause()
+                app.screen.query_one("#name", Input).value = "Living Room"
+                await pilot.click("#save")
+                await pilot.pause()
+                assert app.screen.query_one("#error", Label).display is True
+
+        asyncio.run(scenario())
+
+    def test_given_a_duplicate_name_when_saving_a_new_device_then_it_is_blocked(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("a")
+                await pilot.pause()
+                app.screen.query_one("#name", Input).value = "living room"
+                app.screen.query_one("#ip", Input).value = "10.0.0.9"
+                await pilot.click("#save")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                error = str(app.screen.query_one("#error", Label).render())
+                assert error == "A device named 'living room' already exists."
+
+        asyncio.run(scenario())
+
+        assert [d.name for d in store.list()] == ["Living Room"]
+
+    def test_given_a_duplicate_ip_when_saving_a_new_device_then_it_is_blocked(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("a")
+                await pilot.pause()
+                app.screen.query_one("#name", Input).value = "Bedroom"
+                app.screen.query_one("#ip", Input).value = "10.0.0.5"
+                await pilot.click("#save")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                error = str(app.screen.query_one("#error", Label).render())
+                assert error == "A device with IP 10.0.0.5 already exists."
+
+        asyncio.run(scenario())
+
+        assert [d.name for d in store.list()] == ["Living Room"]
+
+    def test_given_a_unique_name_and_ip_when_saving_then_the_device_persists(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("a")
+                await pilot.pause()
+                app.screen.query_one("#name", Input).value = "Bedroom"
+                app.screen.query_one("#ip", Input).value = "10.0.0.9"
+                await pilot.click("#save")
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+
+        asyncio.run(scenario())
+
+        assert sorted(d.name for d in store.list()) == ["Bedroom", "Living Room"]
+
+    def test_given_an_edited_device_kept_unchanged_when_saved_then_it_persists(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                await pilot.click("#save")
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+
+        asyncio.run(scenario())
+
+        assert [d.name for d in store.list()] == ["Living Room"]
+
+    def test_given_an_edit_onto_another_devices_name_when_saved_then_it_is_blocked(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+        bedroom = store.add(Device(name="Bedroom", platform="fake-tv", ip="10.0.0.6"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, bedroom.id)
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                app.screen.query_one("#name", Input).value = "Living Room"
+                await pilot.click("#save")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                error = str(app.screen.query_one("#error", Label).render())
+                assert error == "A device named 'Living Room' already exists."
+
+        asyncio.run(scenario())
+
+        assert sorted(d.name for d in store.list()) == ["Bedroom", "Living Room"]
+
+    def test_given_an_edit_onto_another_devices_ip_when_saved_then_it_is_blocked(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+        bedroom = store.add(Device(name="Bedroom", platform="fake-tv", ip="10.0.0.6"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, bedroom.id)
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                app.screen.query_one("#ip", Input).value = "10.0.0.5"
+                await pilot.click("#save")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                error = str(app.screen.query_one("#error", Label).render())
+                assert error == "A device with IP 10.0.0.5 already exists."
+
+        asyncio.run(scenario())
+
+        assert sorted(d.ip for d in store.list()) == ["10.0.0.5", "10.0.0.6"]
 
 
 class TestEditAndDelete:
