@@ -57,6 +57,40 @@ class TestDeviceStorePersistence:
         assert names == {"A", "B"}
 
 
+class TestReconnectionIdentifier:
+    def test_given_a_device_with_an_identifier_when_round_tripped_then_it_is_preserved(
+        self, tmp_path
+    ):
+        path = tmp_path / "devices.json"
+        DeviceStore(path=path).save_all([_device(identifier="atv-id-123")])
+
+        reloaded = DeviceStore(path=path).list()
+
+        assert reloaded[0].identifier == "atv-id-123"
+
+    def test_given_a_device_without_an_identifier_when_loaded_then_it_is_none(
+        self, tmp_path
+    ):
+        path = tmp_path / "devices.json"
+        DeviceStore(path=path).save_all([_device()])
+
+        reloaded = DeviceStore(path=path).list()
+
+        assert reloaded[0].identifier is None
+
+    def test_given_an_entry_with_no_identifier_key_when_loaded_then_it_loads(
+        self, tmp_path
+    ):
+        path = tmp_path / "devices.json"
+        entry = {"name": "Legacy", "platform": "samsung-tizen", "ip": "10.0.0.5"}
+        path.write_text(json.dumps({"devices": [entry]}))
+
+        loaded = DeviceStore(path=path).list()
+
+        assert [d.name for d in loaded] == ["Legacy"]
+        assert loaded[0].identifier is None
+
+
 class TestLegacyFieldTolerance:
     def test_given_an_entry_with_legacy_mac_and_model_when_loaded_then_it_loads(
         self, tmp_path

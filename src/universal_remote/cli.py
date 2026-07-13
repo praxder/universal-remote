@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .adapters.appletv import register as register_appletv
 from .adapters.lg import register as register_lg
 from .adapters.samsung import register as register_samsung
 from .devices.store import DeviceStore
@@ -13,6 +14,7 @@ def build_app(store: DeviceStore | None = None) -> UniversalRemoteApp:
     """Register the known adapters with the core registry and build the app."""
     register_samsung(registry)
     register_lg(registry)
+    register_appletv(registry)
     return UniversalRemoteApp(store=store, registry=registry)
 
 

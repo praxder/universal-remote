@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, Footer, Header, Label, LoadingIndicator, OptionList
+from textual.widgets import (
+    Button,
+    Footer,
+    Header,
+    Input,
+    Label,
+    LoadingIndicator,
+    OptionList,
+)
 from textual.widgets.option_list import Option
 
 from ..devices.models import Device
@@ -151,6 +161,9 @@ class PairingScreen(Screen[Device | None]):
         super().__init__()
         self._device = device
         self._worker = None
+        # Bridges the pairing worker and the UI: set by the submit handler when
+        # an adapter (e.g. Apple TV) asks for a PIN. None until the adapter asks.
+        self._pin_future: asyncio.Future[str] | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -160,6 +173,9 @@ class PairingScreen(Screen[Device | None]):
                 "Accept the authorization popup on your TV.",
                 id="pairing-guidance",
             )
+            with Vertical(id="pin-entry"):
+                yield Input(id="pin-input")
+                yield Button("Submit", id="submit")
             yield Button("Cancel", id="cancel")
         yield Footer()
 
@@ -167,18 +183,37 @@ class PairingScreen(Screen[Device | None]):
         self._worker = self.run_worker(self._pair(), exclusive=True)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "cancel":
+        if event.button.id == "submit":
+            self._submit_pin()
+        elif event.button.id == "cancel":
             self.action_cancel()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self._submit_pin()
 
     def action_cancel(self) -> None:
         if self._worker is not None:
             self._worker.cancel()
         self.dismiss(None)
 
+    async def _prompt(self, message: str) -> str:
+        """Show a PIN-entry state and await the value the user submits."""
+        self.query_one("#pairing-guidance", Label).update(message)
+        self.query_one("#pin-entry").display = True
+        pin_input = self.query_one("#pin-input", Input)
+        pin_input.value = ""
+        pin_input.focus()
+        self._pin_future = asyncio.get_running_loop().create_future()
+        return await self._pin_future
+
+    def _submit_pin(self) -> None:
+        if self._pin_future is not None and not self._pin_future.done():
+            self._pin_future.set_result(self.query_one("#pin-input", Input).value)
+
     async def _pair(self) -> None:
         adapter = self.app.registry.resolve(self._device.platform)
         try:
-            token = await adapter.pair(self._device)
+            token = await adapter.pair(self._device, prompt=self._prompt)
         except PairingCancelledError:
             self.dismiss(None)
             return

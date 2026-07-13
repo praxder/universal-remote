@@ -1,7 +1,7 @@
 # universal-remote
 
 A local, terminal-based universal TV remote. Pretty, mouse-clickable, and fully
-keyboard-drivable. Ships with Samsung Tizen and LG WebOS adapters; the
+keyboard-drivable. Ships with Samsung Tizen, LG WebOS, and Apple TV adapters; the
 architecture is platform-agnostic so new TV platforms are "one new adapter
 module + register it."
 
@@ -24,20 +24,21 @@ Everything is reachable by keyboard and by mouse.
 
 1. From the menu choose **Manage Devices** (`d`), then **Add** (`a`).
 2. When more than one platform is available, pick the TV's **platform**
-   (Samsung Tizen or LG WebOS) from the selector. With a single adapter
+   (Samsung Tizen, LG WebOS, or Apple TV) from the selector. With a single adapter
    installed the selector is hidden and that platform is used automatically.
 3. Enter the TV's IP address and press **Probe** — the app queries the TV's info
    endpoint (`http://<ip>:8001/api/v2/`) and pre-fills name, model, and MAC.
    If the probe fails, fill the fields in manually; adding is never blocked.
-   Probe targets the Samsung info endpoint, so **LG TVs use manual entry**.
+   Probe targets the Samsung info endpoint, so **LG and Apple TV use manual entry**.
 4. **Save**.
 
 ## Pair and control
 
 1. From the menu choose **Use Remote** (`r`) and pick your TV.
-2. First time only: the TV shows an **authorization popup** — accept it. The
-   pairing token is saved so later sessions connect without a popup. Pairing is
-   cancellable (Esc).
+2. First time only: Samsung and LG show an **authorization popup** — accept it.
+   **Apple TV** instead displays a **PIN** on the TV screen; type it into the app
+   when prompted. The credential is saved so later sessions connect without
+   re-pairing. Pairing is cancellable (Esc).
 3. The remote appears. Control it by mouse (click any button) or keyboard:
 
    | Key | Action |
@@ -69,6 +70,17 @@ Everything is reachable by keyboard and by mouse.
 - **Text and power-on are best-effort**, as with Samsung: `insertText` support
   varies by app/firmware, and power-on relies on Wake-on-LAN to the stored MAC
   (the TV's "Wake on LAN / Mobile TV On" setting must be enabled).
+
+## Caveats (Apple TV reality)
+
+- **PIN pairing.** First connect shows a PIN on the Apple TV; type it into the
+  app to pair over the Companion protocol. The credential is saved for later
+  sessions, and the device's identity is re-verified on reconnect.
+- **No mute.** The Companion remote has no mute action, so **MUTE is unavailable
+  on Apple TV** — the on-screen button is shown disabled.
+- **Text is best-effort**, as with the other platforms: keyboard entry depends on
+  a focused text field, and a failed send reports "not supported" rather than
+  silently dropping input.
 
 ## Storage
 

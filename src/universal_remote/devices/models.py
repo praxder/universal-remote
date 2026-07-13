@@ -15,6 +15,7 @@ class Device:
     platform: str
     ip: str
     credential: str | None = None
+    identifier: str | None = None
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
     def to_dict(self) -> dict[str, Any]:

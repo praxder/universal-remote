@@ -118,6 +118,130 @@ class FakeWebOsClient:
         self.disconnected = True
 
 
+class _MethodRecorder:
+    """Spy for a `pyatv` interface: records the names of async methods called on it.
+
+    A wrong method name records happily, so tests assert the exact pyatv strings
+    (e.g. `"select"`, `"menu"`, `"volume_up"`) to catch a mismapped key.
+    """
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def __getattr__(self, name: str):
+        async def record(*_args, **_kwargs) -> None:
+            self.calls.append(name)
+
+        return record
+
+
+class FakeAppleTvKeyboard:
+    """Records text set on the device; can reject to exercise best-effort text."""
+
+    def __init__(self, reject_text: bool = False) -> None:
+        self.reject_text = reject_text
+        self.text: list[str] = []
+
+    async def text_set(self, text: str) -> None:
+        if self.reject_text:
+            raise RuntimeError("keyboard not focused")
+        self.text.append(text)
+
+
+class FakeAppleTv:
+    """Stands in for `pyatv`'s connected `AppleTV`; volume routes through `audio`."""
+
+    def __init__(self, reject_text: bool = False) -> None:
+        self.remote_control = _MethodRecorder()
+        self.audio = _MethodRecorder()
+        self.keyboard = FakeAppleTvKeyboard(reject_text)
+        self.closed = False
+
+    def close(self) -> set:  # pyatv's close() is synchronous, returning tasks
+        self.closed = True
+        return set()
+
+
+class FakeAppleTvConfig:
+    """Stands in for a scanned `BaseConfig`: carries an identity and takes credentials."""
+
+    def __init__(self, identifier: str = "atv-id-123") -> None:
+        self.identifier = identifier
+        self.applied_credentials: dict[object, str] = {}
+
+    def set_credentials(self, protocol: object, credentials: str) -> bool:
+        self.applied_credentials[protocol] = credentials
+        return True
+
+
+class FakeAppleTvService:
+    """The pairing handler's service; its credential appears once pairing finishes."""
+
+    def __init__(self) -> None:
+        self.credentials: str | None = None
+
+
+class FakePairingHandler:
+    """Drives the two-phase Companion PIN pairing: begin → pin → finish."""
+
+    def __init__(self, credentials: str = "companion-cred") -> None:
+        self.device_provides_pin = True
+        self.began = False
+        self.finished = False
+        self.closed = False
+        self.pin_value: int | None = None
+        self._credentials = credentials
+        self.service = FakeAppleTvService()
+
+    async def begin(self) -> None:
+        self.began = True
+
+    def pin(self, value: int) -> None:
+        self.pin_value = value
+
+    async def finish(self) -> None:
+        self.finished = True
+        self.service.credentials = self._credentials
+
+    @property
+    def has_paired(self) -> bool:
+        return self.finished
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+class FakePyatv:
+    """Stands in for the `pyatv` module: scan/pair/connect over the confirmed API."""
+
+    def __init__(
+        self,
+        config: FakeAppleTvConfig | None = None,
+        atv: FakeAppleTv | None = None,
+        pairing: FakePairingHandler | None = None,
+        connect_error: Exception | None = None,
+        scan_empty: bool = False,
+    ) -> None:
+        self.config = config or FakeAppleTvConfig()
+        self.atv = atv or FakeAppleTv()
+        self.pairing = pairing or FakePairingHandler()
+        self.connect_error = connect_error
+        self.scan_empty = scan_empty
+        self.scanned_hosts: list[list[str] | None] = []
+
+    async def scan(self, loop, hosts=None, **_kwargs) -> list[FakeAppleTvConfig]:
+        self.scanned_hosts.append(hosts)
+        return [] if self.scan_empty else [self.config]
+
+    async def pair(self, config, protocol, loop, **_kwargs) -> FakePairingHandler:
+        return self.pairing
+
+    async def connect(self, config, loop, **_kwargs) -> FakeAppleTv:
+        if self.connect_error is not None:
+            raise self.connect_error
+        return self.atv
+
+
 class FakeAdapter:
     """A configurable adapter double with a scriptable pair result."""
 
@@ -129,6 +253,8 @@ class FakeAdapter:
         pair_cancels: bool = False,
         connect_error: Exception | None = None,
         display_name: str | None = None,
+        prompt_message: str | None = None,
+        pair_identifier: str | None = None,
     ) -> None:
         self.platform = platform
         self.display_name = display_name or platform
@@ -138,10 +264,15 @@ class FakeAdapter:
         self._pair_token = pair_token
         self._pair_cancels = pair_cancels
         self.connect_error = connect_error
+        # When set, pair asks for a value through the prompt (a PIN adapter);
+        # when None it pairs popup-only like Samsung/LG.
+        self._prompt_message = prompt_message
+        self._pair_identifier = pair_identifier
         # When set, connect blocks on this event so a test can keep a connect
         # in flight (e.g. to exercise cancellation).
         self.connect_gate: asyncio.Event | None = None
         self.paired_devices: list[object] = []
+        self.entered_values: list[str] = []
         self.sessions: list[FakeSession] = []
 
     def capabilities(self) -> Capabilities:
@@ -150,6 +281,12 @@ class FakeAdapter:
     async def pair(self, device: object = None, *, prompt=None) -> str:
         if self._pair_cancels:
             raise PairingCancelledError()
+        if self._prompt_message is not None:
+            if prompt is None:
+                raise PairingCancelledError()
+            self.entered_values.append(await prompt(self._prompt_message))
+            if self._pair_identifier is not None and device is not None:
+                device.identifier = self._pair_identifier
         self.paired_devices.append(device)
         return self._pair_token
 

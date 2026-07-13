@@ -1,6 +1,6 @@
 import asyncio
 
-from textual.widgets import Label, OptionList
+from textual.widgets import Button, Input, Label, OptionList
 
 from tests.fakes import FakeAdapter
 from universal_remote.devices.models import Device
@@ -8,7 +8,11 @@ from universal_remote.devices.store import DeviceStore
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
 from universal_remote.tui.menu import MenuScreen
-from universal_remote.tui.remote_flow import ConnectingModal, UseRemoteScreen
+from universal_remote.tui.remote_flow import (
+    ConnectingModal,
+    PairingScreen,
+    UseRemoteScreen,
+)
 from universal_remote.tui.remote_screen import RemoteScreen
 
 
@@ -147,6 +151,127 @@ class TestUseRemoteConnect:
         asyncio.run(scenario())
 
         assert store.list()[0].credential is None
+
+
+class TestPairingPinEntry:
+    def test_given_an_adapter_prompts_when_pairing_then_a_pin_entry_state_is_shown(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="ATV"))
+        adapter = FakeAdapter(
+            platform="fake-tv", prompt_message="Enter the PIN shown on your Apple TV"
+        )
+
+        async def scenario():
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                await pilot.press("enter")
+                await _settle(pilot)
+                assert isinstance(app.screen, PairingScreen)
+                guidance = str(app.screen.query_one("#pairing-guidance", Label).content)
+                assert "PIN" in guidance
+                assert app.screen.query_one("#pin-entry").display is True
+
+        asyncio.run(scenario())
+
+    def test_given_a_pin_is_submitted_when_pairing_then_credential_and_identifier_stored(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="ATV"))
+        adapter = FakeAdapter(
+            platform="fake-tv",
+            pair_token="atv-cred",
+            prompt_message="Enter the PIN",
+            pair_identifier="atv-id-9",
+        )
+
+        async def scenario():
+            adapter.connect_gate = asyncio.Event()  # hold the connect mid-flight
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                await pilot.press("enter")
+                await _settle(pilot)
+                assert isinstance(app.screen, PairingScreen)
+                app.screen.query_one("#pin-input", Input).value = "1234"
+                app.screen.query_one("#submit", Button).press()
+                await _settle(pilot)
+                assert isinstance(app.screen, ConnectingModal)
+                adapter.connect_gate.set()
+                await _settle(pilot)
+                assert isinstance(app.screen, RemoteScreen)
+
+        asyncio.run(scenario())
+
+        assert adapter.entered_values == ["1234"]
+        saved = store.list()[0]
+        assert saved.credential == "atv-cred"
+        assert saved.identifier == "atv-id-9"
+
+    def test_given_a_pin_when_submitted_via_enter_then_pairing_completes(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="ATV"))
+        adapter = FakeAdapter(
+            platform="fake-tv", pair_token="atv-cred", prompt_message="Enter the PIN"
+        )
+
+        async def scenario():
+            adapter.connect_gate = asyncio.Event()  # hold the connect mid-flight
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                await pilot.press("enter")
+                await _settle(pilot)
+                assert isinstance(app.screen, PairingScreen)
+                app.screen.query_one("#pin-input", Input).value = "4321"
+                await pilot.press("enter")  # submit the PIN from the focused input
+                await _settle(pilot)
+                assert isinstance(app.screen, ConnectingModal)
+                adapter.connect_gate.set()
+                await _settle(pilot)
+                assert isinstance(app.screen, RemoteScreen)
+
+        asyncio.run(scenario())
+
+        assert adapter.entered_values == ["4321"]
+        assert store.list()[0].credential == "atv-cred"
+
+    def test_given_a_pin_prompt_when_cancelled_then_no_remote_and_no_credential(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="ATV"))
+        adapter = FakeAdapter(
+            platform="fake-tv",
+            prompt_message="Enter the PIN",
+            pair_identifier="atv-id-9",
+        )
+
+        async def scenario():
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                await pilot.press("enter")
+                await _settle(pilot)
+                assert isinstance(app.screen, PairingScreen)
+                await pilot.press("escape")
+                await _settle(pilot)
+                assert isinstance(app.screen, UseRemoteScreen)
+
+        asyncio.run(scenario())
+
+        saved = store.list()[0]
+        assert saved.credential is None
+        assert saved.identifier is None
 
 
 class TestUseRemoteExit:

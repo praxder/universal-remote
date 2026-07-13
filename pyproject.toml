@@ -8,6 +8,7 @@ dependencies = [
     "textual>=0.80",
     "samsungtvws[async]",
     "aiowebostv>=0.7",
+    "pyatv>=0.18.0",
 ]
 
 [project.scripts]
