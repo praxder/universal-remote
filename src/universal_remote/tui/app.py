@@ -30,6 +30,8 @@ class UniversalRemoteApp(App[None]):
     #add-title { width: 52; text-align: left; margin: 1 0 2 0; }
     /* slight left indent on Save to offset it from the fields above */
     #add-device #save { margin: 1 0 0 1; }
+    /* duplicate-save error: hidden until there is a message, then shown in red */
+    #add-device #error { display: none; color: $error; margin: 1 0 0 0; }
     #quote { width: 42; text-align: center; margin-top: 1; color: $text-muted; }
     /* delete confirmation: dim the device list behind a centered dialog box */
     ConfirmDeleteScreen { align: center middle; background: $background 60%; }

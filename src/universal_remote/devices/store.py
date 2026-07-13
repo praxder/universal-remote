@@ -40,6 +40,22 @@ class DeviceStore:
             handle.write(payload)
         os.chmod(self._path, 0o600)
 
+    def find_conflict(
+        self, name: str, ip: str, exclude_id: str | None = None
+    ) -> str | None:
+        """A message if another saved device shares this name or IP, else None.
+
+        Name matches ignore case and surrounding whitespace; IP matches exactly
+        after trimming. A name collision takes precedence over an IP collision.
+        """
+        others = [device for device in self.list() if device.id != exclude_id]
+        wanted_name = name.strip().casefold()
+        if any(device.name.strip().casefold() == wanted_name for device in others):
+            return f"A device named '{name}' already exists."
+        if any(device.ip.strip() == ip.strip() for device in others):
+            return f"A device with IP {ip} already exists."
+        return None
+
     def add(self, device: Device) -> Device:
         devices = self.list()
         devices.append(device)

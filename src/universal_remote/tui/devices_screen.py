@@ -194,6 +194,7 @@ class AddDeviceScreen(Screen[None]):
             yield from self._device_type_cell()
             yield Input(placeholder="Name", id="name")
             yield Input(placeholder="IP address", id="ip")
+            yield Label("", id="error")
             yield Button("Save", id="save")
         yield Footer()
 
@@ -228,6 +229,13 @@ class AddDeviceScreen(Screen[None]):
     def _save(self) -> None:
         ip = self.query_one("#ip", Input).value.strip()
         name = self.query_one("#name", Input).value.strip() or ip
+        exclude_id = self._existing.id if self._existing is not None else None
+        conflict = self.app.store.find_conflict(name, ip, exclude_id=exclude_id)
+        if conflict is not None:
+            error = self.query_one("#error", Label)
+            error.update(conflict)
+            error.display = True
+            return
         if self._existing is not None:
             self._existing.name = name
             self._existing.ip = ip
