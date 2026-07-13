@@ -10,7 +10,7 @@ from universal_remote.adapters.samsung import (
     register,
 )
 from universal_remote.devices.models import Device
-from universal_remote.errors import TextUnsupportedError
+from universal_remote.errors import ConnectionFailedError, TextUnsupportedError
 from universal_remote.keys import Key
 from universal_remote.registry import AdapterRegistry
 
@@ -92,6 +92,39 @@ class TestSamsungPairing:
 
         assert created[0].token == "stored-token"
         assert created[0].popup_shown is False
+
+
+class TestSamsungConnectFailure:
+    def test_given_connect_refused_when_connecting_then_connection_failed_is_raised(
+        self,
+    ):
+        def factory(**kwargs):
+            remote = FakeSamsungRemote(**kwargs)
+            remote.open_error = ConnectionRefusedError("refused")
+            return remote
+
+        adapter = SamsungTizenAdapter(remote_factory=factory)
+
+        with pytest.raises(ConnectionFailedError):
+            run(adapter.connect(_device(credential="t")))
+
+    def test_given_connect_times_out_when_connecting_then_it_is_bounded_and_wrapped(
+        self,
+    ):
+        created: list[FakeSamsungRemote] = []
+
+        def factory(**kwargs):
+            remote = FakeSamsungRemote(**kwargs)
+            remote.open_error = asyncio.TimeoutError()
+            created.append(remote)
+            return remote
+
+        adapter = SamsungTizenAdapter(remote_factory=factory, connect_timeout=0.01)
+
+        with pytest.raises(ConnectionFailedError):
+            run(adapter.connect(_device(credential="t")))
+
+        assert created[0].timeout == 0.01
 
 
 class TestSamsungKeyMapping:

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Callable
 
 from aiowebostv import WebOsClient, endpoints
 
 from ..capabilities import Capabilities
-from ..errors import TextUnsupportedError
+from ..errors import ConnectionFailedError, TextUnsupportedError
 from ..keys import Key
 from ..session import BaseSession
 
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
     from ..registry import AdapterRegistry
 
 PLATFORM = "lg-webos"
+_CONNECT_TIMEOUT = 10  # seconds to reach the TV before treating it as unreachable
 
 # Generic key -> LG input-channel button name.
 LG_BUTTONS: dict[Key, str] = {
@@ -70,8 +72,10 @@ class LgWebOsAdapter:
     def __init__(
         self,
         client_factory: ClientFactory = WebOsClient,
+        connect_timeout: float = _CONNECT_TIMEOUT,
     ) -> None:
         self._client_factory = client_factory
+        self._connect_timeout = connect_timeout
 
     def capabilities(self) -> Capabilities:
         return _CAPABILITIES
@@ -86,7 +90,12 @@ class LgWebOsAdapter:
 
     async def connect(self, device: "Device") -> LgWebOsSession:
         client = self._client_factory(host=device.ip, client_key=device.credential)
-        await client.connect()
+        # The client factory takes no connect timeout, so bound it here; both a
+        # transport failure and a timeout surface as ConnectionFailedError.
+        try:
+            await asyncio.wait_for(client.connect(), self._connect_timeout)
+        except Exception as exc:
+            raise ConnectionFailedError(f"Could not connect to {device.name}") from exc
         return LgWebOsSession(client, _CAPABILITIES)
 
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from universal_remote.capabilities import Capabilities
 from universal_remote.errors import PairingCancelledError
 from universal_remote.keys import Key
@@ -43,14 +45,20 @@ class FakeSamsungRemote:
         self.host = host
         self.token = token
         self.port = port
+        self.timeout = timeout
         self.name = name
         self.opened = False
         self.closed = False
         self.popup_shown = False
         self.sent_payloads: list[str] = []
         self.send_error: Exception | None = None
+        self.open_error: Exception | None = None
 
     async def open(self) -> object:
+        # The real library enforces the connect timeout internally; a fake stands
+        # in for that by raising a preset error (transport failure or timeout).
+        if self.open_error is not None:
+            raise self.open_error
         self.opened = True
         if self.token is None:
             # No token supplied → the TV shows its authorization popup and, on
@@ -80,8 +88,15 @@ class FakeWebOsClient:
         self.sent_buttons: list[str] = []
         self.sent_text: list[str] = []
         self.send_error: Exception | None = None
+        self.connect_error: Exception | None = None
+        self.connect_hangs = False
 
     async def connect(self) -> bool:
+        if self.connect_error is not None:
+            raise self.connect_error
+        if self.connect_hangs:
+            # Block indefinitely so the adapter's own timeout must abort us.
+            await asyncio.sleep(3600)
         self.connected = True
         if self.client_key is None:
             # No client-key supplied → the TV shows its authorization prompt and,
@@ -112,6 +127,7 @@ class FakeAdapter:
         capabilities: Capabilities | None = None,
         pair_token: str = "fake-token",
         pair_cancels: bool = False,
+        connect_error: Exception | None = None,
         display_name: str | None = None,
     ) -> None:
         self.platform = platform
@@ -121,6 +137,10 @@ class FakeAdapter:
         )
         self._pair_token = pair_token
         self._pair_cancels = pair_cancels
+        self.connect_error = connect_error
+        # When set, connect blocks on this event so a test can keep a connect
+        # in flight (e.g. to exercise cancellation).
+        self.connect_gate: asyncio.Event | None = None
         self.paired_devices: list[object] = []
         self.sessions: list[FakeSession] = []
 
@@ -134,6 +154,10 @@ class FakeAdapter:
         return self._pair_token
 
     async def connect(self, device: object = None) -> FakeSession:
+        if self.connect_error is not None:
+            raise self.connect_error
+        if self.connect_gate is not None:
+            await self.connect_gate.wait()
         session = FakeSession(self._capabilities)
         self.sessions.append(session)
         return session

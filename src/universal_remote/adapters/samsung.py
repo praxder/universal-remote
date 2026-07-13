@@ -8,7 +8,7 @@ from samsungtvws.async_remote import SamsungTVWSAsyncRemote
 from samsungtvws.remote import SendInputString, SendRemoteKey
 
 from ..capabilities import Capabilities
-from ..errors import TextUnsupportedError
+from ..errors import ConnectionFailedError, TextUnsupportedError
 from ..keys import Key
 from ..session import BaseSession
 
@@ -20,6 +20,7 @@ PLATFORM = "samsung-tizen"
 APP_NAME = "UniversalRemote"
 CONTROL_PORT = 8002  # wss control channel; 8001 would be plain ws
 _PAIR_TIMEOUT = 30  # seconds to allow for tapping "Allow" on the TV
+_CONNECT_TIMEOUT = 10  # seconds to reach the TV before treating it as unreachable
 
 # Generic key -> Samsung remote key code.
 SAMSUNG_KEYS: dict[Key, str] = {
@@ -75,8 +76,10 @@ class SamsungTizenAdapter:
     def __init__(
         self,
         remote_factory: RemoteFactory = SamsungTVWSAsyncRemote,
+        connect_timeout: float = _CONNECT_TIMEOUT,
     ) -> None:
         self._remote_factory = remote_factory
+        self._connect_timeout = connect_timeout
 
     def capabilities(self) -> Capabilities:
         return _CAPABILITIES
@@ -102,9 +105,13 @@ class SamsungTizenAdapter:
             token=device.credential,
             port=CONTROL_PORT,
             name=APP_NAME,
+            timeout=self._connect_timeout,  # the library bounds the connect itself
             key_press_delay=0,
         )
-        await remote.open()
+        try:
+            await remote.open()
+        except Exception as exc:
+            raise ConnectionFailedError(f"Could not connect to {device.name}") from exc
         return SamsungSession(remote, _CAPABILITIES)
 
 

@@ -25,3 +25,7 @@ class SessionClosedError(UniversalRemoteError):
 
 class PairingCancelledError(UniversalRemoteError):
     """Pairing was cancelled before a credential was obtained."""
+
+
+class ConnectionFailedError(UniversalRemoteError):
+    """A device could not be connected to (unreachable, refused, or timed out)."""

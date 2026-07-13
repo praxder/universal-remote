@@ -8,7 +8,7 @@ from universal_remote.devices.store import DeviceStore
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
 from universal_remote.tui.menu import MenuScreen
-from universal_remote.tui.remote_flow import UseRemoteScreen
+from universal_remote.tui.remote_flow import ConnectingModal, UseRemoteScreen
 from universal_remote.tui.remote_screen import RemoteScreen
 
 
@@ -22,6 +22,13 @@ def _dev(**overrides) -> Device:
     base = dict(name="TV", platform="fake-tv", ip="1.1.1.1")
     base.update(overrides)
     return Device(**base)
+
+
+async def _settle(pilot, times: int = 6) -> None:
+    # Reaching the remote now hops through a dismiss/callback per screen, so let
+    # the loop cycle enough times for those to complete.
+    for _ in range(times):
+        await pilot.pause()
 
 
 class TestUseRemoteSelection:
@@ -73,13 +80,20 @@ class TestUseRemoteConnect:
         adapter = FakeAdapter(platform="fake-tv")
 
         async def scenario():
+            adapter.connect_gate = asyncio.Event()  # hold the connect mid-flight
             app = _app(store, adapter=adapter)
             async with app.run_test() as pilot:
                 await pilot.press("r")
                 await pilot.pause()
                 await pilot.press("enter")
-                await pilot.pause()
+                await _settle(pilot)
+                # selection routes through the connecting modal, not a raw connect
+                assert isinstance(app.screen, ConnectingModal)
+                adapter.connect_gate.set()
+                await _settle(pilot)
                 assert isinstance(app.screen, RemoteScreen)
+                # the modal dismissed itself; nothing orphaned below
+                assert isinstance(app.screen_stack[-2], UseRemoteScreen)
 
         asyncio.run(scenario())
 
@@ -94,14 +108,20 @@ class TestUseRemoteConnect:
         adapter = FakeAdapter(platform="fake-tv", pair_token="new-tok")
 
         async def scenario():
+            adapter.connect_gate = asyncio.Event()  # hold the connect mid-flight
             app = _app(store, adapter=adapter)
             async with app.run_test() as pilot:
                 await pilot.press("r")
                 await pilot.pause()
                 await pilot.press("enter")
-                await pilot.pause()
-                await pilot.pause()
+                await _settle(pilot)
+                # after pairing, the flow hands off to the connecting modal
+                assert isinstance(app.screen, ConnectingModal)
+                adapter.connect_gate.set()
+                await _settle(pilot)
                 assert isinstance(app.screen, RemoteScreen)
+                # pairing and the modal both dismissed; nothing orphaned below
+                assert isinstance(app.screen_stack[-2], UseRemoteScreen)
 
         asyncio.run(scenario())
 
@@ -121,9 +141,8 @@ class TestUseRemoteConnect:
                 await pilot.press("r")
                 await pilot.pause()
                 await pilot.press("enter")
-                await pilot.pause()
-                await pilot.pause()
-                assert not isinstance(app.screen, RemoteScreen)
+                await _settle(pilot)
+                assert isinstance(app.screen, UseRemoteScreen)
 
         asyncio.run(scenario())
 

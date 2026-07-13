@@ -10,7 +10,7 @@ from universal_remote.adapters.lg import (
     register,
 )
 from universal_remote.devices.models import Device
-from universal_remote.errors import TextUnsupportedError
+from universal_remote.errors import ConnectionFailedError, TextUnsupportedError
 from universal_remote.keys import Key
 from universal_remote.registry import AdapterRegistry
 
@@ -98,6 +98,32 @@ class TestLgPairing:
 
         assert created[0].client_key == "stored-key"
         assert created[0].prompt_shown is False
+
+
+class TestLgConnectFailure:
+    def test_given_connect_raises_a_transport_error_when_connecting_then_connection_failed_is_raised(
+        self,
+    ):
+        def factory(**kwargs):
+            client = FakeWebOsClient(**kwargs)
+            client.connect_error = RuntimeError("connection refused")
+            return client
+
+        adapter = LgWebOsAdapter(client_factory=factory)
+
+        with pytest.raises(ConnectionFailedError):
+            run(adapter.connect(_device(credential="k")))
+
+    def test_given_connect_hangs_when_connecting_then_it_fails_within_the_timeout(self):
+        def factory(**kwargs):
+            client = FakeWebOsClient(**kwargs)
+            client.connect_hangs = True
+            return client
+
+        adapter = LgWebOsAdapter(client_factory=factory, connect_timeout=0.01)
+
+        with pytest.raises(ConnectionFailedError):
+            run(adapter.connect(_device(credential="k")))
 
 
 class TestLgKeyMapping:

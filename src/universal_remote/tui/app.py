@@ -39,6 +39,16 @@ class UniversalRemoteApp(App[None]):
     }
     #confirm-message { text-align: center; margin-bottom: 1; }
     #confirm-delete Button { width: 16; margin-top: 1; }
+    /* connecting: dim the device list behind a centered dialog box */
+    ConnectingModal { align: center middle; background: $background 60%; }
+    #connecting {
+        width: auto; height: auto; padding: 1 2;
+        border: thick $primary; background: $surface; align: center middle;
+    }
+    #connecting-loading, #connecting-error { width: auto; height: auto; align: center middle; }
+    #connecting LoadingIndicator { height: 1; margin-bottom: 1; }
+    #connect-error { text-align: center; margin-bottom: 1; }
+    #connecting Button { width: 16; margin-top: 1; }
     """
 
     def __init__(
