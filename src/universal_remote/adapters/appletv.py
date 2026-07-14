@@ -39,6 +39,17 @@ APPLETV_RC_KEYS: dict[Key, str] = {
     Key.HOME: "home",
     Key.VOL_UP: "volume_up",
     Key.VOL_DOWN: "volume_down",
+    # MENU is intentionally absent: the Apple TV menu button is the BACK key.
+    Key.CH_UP: "channel_up",
+    Key.CH_DOWN: "channel_down",
+    Key.PLAY: "play",
+    Key.PAUSE: "pause",
+    Key.PLAY_PAUSE: "play_pause",
+    # skip_backward/forward jump ~10s; the shared REWIND/FAST_FORWARD keys accept
+    # this jump semantics on Apple TV (LG/Samsung scan) — see design.
+    Key.REWIND: "skip_backward",
+    Key.FAST_FORWARD: "skip_forward",
+    Key.STOP: "stop",
 }
 
 # MUTE is intentionally absent: pyatv exposes no mute on RemoteControl or Audio.

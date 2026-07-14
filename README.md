@@ -49,11 +49,14 @@ menus and lists alongside the arrow keys.
    | Enter | OK |
    | Esc | Back |
    | Space | Home |
+   | `0`–`9` | Number-pad digits (ignored on TVs without a number pad) |
    | `t` | Enter the text field (type, Enter sends, Esc leaves the field) |
    | `q` | Exit the remote |
 
-   Volume, mute, and power are on-screen buttons. Buttons the connected TV does
-   not support are shown disabled.
+   Menu, channel up/down, volume, mute, the media-transport keys (play, pause,
+   play/pause, rewind, fast-forward, stop), the number pad, and power are
+   on-screen buttons; the digit keys above also drive the number pad. Buttons the
+   connected TV does not support are shown disabled.
 
 ## Caveats (Samsung hardware reality)
 

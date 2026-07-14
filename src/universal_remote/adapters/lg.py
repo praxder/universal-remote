@@ -31,6 +31,17 @@ LG_BUTTONS: dict[Key, str] = {
     Key.VOL_UP: "VOLUMEUP",
     Key.VOL_DOWN: "VOLUMEDOWN",
     Key.MUTE: "MUTE",
+    Key.MENU: "MENU",
+    Key.CH_UP: "CHANNELUP",
+    Key.CH_DOWN: "CHANNELDOWN",
+    # No combined PLAY_PAUSE on LG — that button stays unmapped (disabled).
+    Key.PLAY: "PLAY",
+    Key.PAUSE: "PAUSE",
+    Key.REWIND: "REWIND",
+    Key.FAST_FORWARD: "FASTFORWARD",
+    Key.STOP: "STOP",
+    # Number pad: LG's button names are the bare digits "0"–"9".
+    **{Key[f"NUM_{digit}"]: str(digit) for digit in range(10)},
 }
 
 _CAPABILITIES = Capabilities(keys=frozenset(LG_BUTTONS), text=True)

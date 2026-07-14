@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Grid, Horizontal, Vertical
 from textual.message import Message
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Label
@@ -35,6 +35,27 @@ class TextField(Input):
 class RemoteScreen(Screen[None]):
     """A physical-remote-like surface driven by clicks and by the keyboard."""
 
+    # Compact one-row buttons so the fuller button set fits an 80×24 terminal
+    # without scrolling. The `#remote` id scope is deliberate: Textual sets
+    # Button borders per-variant (e.g. `Button.-default`), whose class specificity
+    # beats a plain `RemoteScreen Button` — so `border: none` only wins from an
+    # id-scoped selector. Without the border removed, box-sizing eats the single
+    # row and the label renders on zero rows (blank buttons).
+    # Borderless removes Textual's default disabled cue, so a dimmed disabled look
+    # is set explicitly (Apple TV shows many disabled keys); `!important` beats
+    # Textual's built-in disabled text-opacity (0.6), and the panel background is
+    # a second, border-independent cue.
+    DEFAULT_CSS = """
+    #remote Button { height: 1; border: none; min-width: 0; }
+    #remote Button:disabled { text-opacity: 40% !important; background: $panel; }
+    /* Auto heights so the button set sizes to its content: if it ever exceeds the
+       terminal the screen scrolls (a visible, testable signal) rather than the
+       rows silently compressing into an unreadable smear. The row containers
+       default to 1fr and would otherwise stretch to fill. */
+    #remote, RemoteScreen Horizontal, RemoteScreen Vertical { height: auto; }
+    #numpad { grid-size: 3; grid-rows: 1; grid-columns: 5; width: auto; height: auto; }
+    """
+
     BINDINGS = [
         Binding("up", "send('UP')", "Up"),
         Binding("down", "send('DOWN')", "Down"),
@@ -47,6 +68,11 @@ class RemoteScreen(Screen[None]):
         Binding("enter", "send('OK')", "OK"),
         Binding("escape", "send('BACK')", "Back"),
         Binding("space", "send('HOME')", "Home"),
+        # Digit keys drive the number pad; hidden from the footer to avoid clutter.
+        *(
+            Binding(str(digit), f"send('NUM_{digit}')", show=False)
+            for digit in range(10)
+        ),
         Binding("t", "text_mode", "Text"),
         Binding("q", "exit_remote", "Exit"),
     ]
@@ -67,6 +93,7 @@ class RemoteScreen(Screen[None]):
         yield Label(f"Remote — {self._device.name}", id="remote-title")
         with Container(id="remote"):
             with Horizontal(id="row-top"):
+                yield self._key_button(Key.MENU, "☰ Menu")
                 yield self._key_button(Key.HOME, "⌂ Home")
                 yield self._key_button(Key.BACK, "↩ Back")
             with Vertical(id="dpad"):
@@ -76,10 +103,22 @@ class RemoteScreen(Screen[None]):
                     yield self._key_button(Key.OK, "OK")
                     yield self._key_button(Key.RIGHT, "▶")
                 yield self._key_button(Key.DOWN, "▼")
-            with Horizontal(id="row-vol"):
+            with Horizontal(id="row-chan-vol"):
+                yield self._key_button(Key.CH_UP, "Ch +")
+                yield self._key_button(Key.CH_DOWN, "Ch −")
                 yield self._key_button(Key.VOL_UP, "Vol +")
                 yield self._key_button(Key.VOL_DOWN, "Vol −")
                 yield self._key_button(Key.MUTE, "Mute")
+            with Horizontal(id="row-media"):
+                yield self._key_button(Key.REWIND, "◀◀")
+                yield self._key_button(Key.PLAY, "▶")
+                yield self._key_button(Key.PAUSE, "❚❚")
+                yield self._key_button(Key.PLAY_PAUSE, "▶❚❚")
+                yield self._key_button(Key.STOP, "■")
+                yield self._key_button(Key.FAST_FORWARD, "▶▶")
+            with Grid(id="numpad"):
+                for digit in (1, 2, 3, 4, 5, 6, 7, 8, 9, 0):
+                    yield self._key_button(Key[f"NUM_{digit}"], str(digit))
             yield TextField(placeholder="Press 't' to type…", id="text", disabled=True)
             yield Label("", id="text-status")
         yield Footer()
@@ -105,7 +144,13 @@ class RemoteScreen(Screen[None]):
             await self._send(Key[button_id.removeprefix("key-").upper()])
 
     async def action_send(self, key_name: str) -> None:
-        await self._send(Key[key_name])
+        key = Key[key_name]
+        # A bound hotkey for an unsupported key (e.g. a digit on Apple TV) behaves
+        # like its disabled button: nothing sent, no message. The click path never
+        # reaches here — disabled buttons do not fire.
+        if not self._capabilities.supports(key):
+            return
+        await self._send(key)
 
     async def _send(self, key: Key) -> None:
         try:

@@ -85,6 +85,12 @@ class TestAppleTvCapabilities:
 
         assert Key.MUTE not in caps.keys
 
+    def test_given_the_adapter_when_capabilities_read_then_menu_is_absent(self):
+        # Apple TV's menu button is the BACK key; it declares no separate MENU.
+        caps = AppleTvAdapter().capabilities()
+
+        assert Key.MENU not in caps.keys
+
     def test_given_the_adapter_when_capabilities_read_then_text_is_declared(self):
         caps = AppleTvAdapter().capabilities()
 
@@ -194,6 +200,25 @@ class TestAppleTvKeyMapping:
         assert APPLETV_RC_KEYS[Key.HOME] == "home"
         assert APPLETV_RC_KEYS[Key.VOL_UP] == "volume_up"
         assert APPLETV_RC_KEYS[Key.VOL_DOWN] == "volume_down"
+
+    def test_given_the_key_maps_when_read_then_channel_keys_map_and_menu_is_absent(
+        self,
+    ):
+        assert APPLETV_RC_KEYS[Key.CH_UP] == "channel_up"
+        assert APPLETV_RC_KEYS[Key.CH_DOWN] == "channel_down"
+        assert Key.MENU not in APPLETV_RC_KEYS
+
+    def test_given_the_key_maps_when_read_then_all_six_media_keys_map(self):
+        assert APPLETV_RC_KEYS[Key.PLAY] == "play"
+        assert APPLETV_RC_KEYS[Key.PAUSE] == "pause"
+        assert APPLETV_RC_KEYS[Key.PLAY_PAUSE] == "play_pause"
+        assert APPLETV_RC_KEYS[Key.REWIND] == "skip_backward"
+        assert APPLETV_RC_KEYS[Key.FAST_FORWARD] == "skip_forward"
+        assert APPLETV_RC_KEYS[Key.STOP] == "stop"
+
+    def test_given_the_key_maps_when_read_then_no_number_keys_are_declared(self):
+        # pyatv exposes no digit entry, so Apple TV declares no number keys.
+        assert not any(Key[f"NUM_{digit}"] in APPLETV_RC_KEYS for digit in range(10))
 
     def test_given_a_directional_key_when_sent_then_remote_control_is_dispatched(self):
         fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-1"))

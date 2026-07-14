@@ -16,7 +16,16 @@ class TestKeyVocabulary:
             "VOL_UP",
             "VOL_DOWN",
             "MUTE",
-        }
+            "MENU",
+            "CH_UP",
+            "CH_DOWN",
+            "PLAY",
+            "PAUSE",
+            "PLAY_PAUSE",
+            "REWIND",
+            "FAST_FORWARD",
+            "STOP",
+        } | {f"NUM_{digit}" for digit in range(10)}
 
         actual = {key.name for key in Key}
 

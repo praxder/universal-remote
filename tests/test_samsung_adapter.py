@@ -134,6 +134,23 @@ class TestSamsungKeyMapping:
         assert SAMSUNG_KEYS[Key.BACK] == "KEY_RETURN"
         assert SAMSUNG_KEYS[Key.HOME] == "KEY_HOME"
 
+    def test_given_the_key_map_when_read_then_menu_and_channel_keys_map(self):
+        assert SAMSUNG_KEYS[Key.MENU] == "KEY_MENU"
+        assert SAMSUNG_KEYS[Key.CH_UP] == "KEY_CHUP"
+        assert SAMSUNG_KEYS[Key.CH_DOWN] == "KEY_CHDOWN"
+
+    def test_given_the_key_map_when_read_then_media_keys_map_without_play_pause(self):
+        assert SAMSUNG_KEYS[Key.PLAY] == "KEY_PLAY"
+        assert SAMSUNG_KEYS[Key.PAUSE] == "KEY_PAUSE"
+        assert SAMSUNG_KEYS[Key.REWIND] == "KEY_REWIND"
+        assert SAMSUNG_KEYS[Key.FAST_FORWARD] == "KEY_FF"
+        assert SAMSUNG_KEYS[Key.STOP] == "KEY_STOP"
+        assert Key.PLAY_PAUSE not in SAMSUNG_KEYS
+
+    def test_given_the_key_map_when_read_then_the_digit_keys_map_to_key_digits(self):
+        for digit in range(10):
+            assert SAMSUNG_KEYS[Key[f"NUM_{digit}"]] == f"KEY_{digit}"
+
     def test_given_a_directional_key_when_sent_then_the_samsung_code_is_dispatched(
         self,
     ):

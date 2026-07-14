@@ -137,6 +137,27 @@ class TestLgKeyMapping:
         assert LG_BUTTONS[Key.VOL_UP] == "VOLUMEUP"
         assert LG_BUTTONS[Key.MUTE] == "MUTE"
 
+    def test_given_the_button_map_when_read_then_menu_and_channel_keys_map(self):
+        assert LG_BUTTONS[Key.MENU] == "MENU"
+        assert LG_BUTTONS[Key.CH_UP] == "CHANNELUP"
+        assert LG_BUTTONS[Key.CH_DOWN] == "CHANNELDOWN"
+
+    def test_given_the_button_map_when_read_then_media_keys_map_without_play_pause(
+        self,
+    ):
+        assert LG_BUTTONS[Key.PLAY] == "PLAY"
+        assert LG_BUTTONS[Key.PAUSE] == "PAUSE"
+        assert LG_BUTTONS[Key.REWIND] == "REWIND"
+        assert LG_BUTTONS[Key.FAST_FORWARD] == "FASTFORWARD"
+        assert LG_BUTTONS[Key.STOP] == "STOP"
+        assert Key.PLAY_PAUSE not in LG_BUTTONS
+
+    def test_given_the_button_map_when_read_then_the_digit_keys_map_to_bare_digits(
+        self,
+    ):
+        for digit in range(10):
+            assert LG_BUTTONS[Key[f"NUM_{digit}"]] == str(digit)
+
     def test_given_a_directional_key_when_sent_then_the_lg_button_is_dispatched(self):
         created: list[FakeWebOsClient] = []
         adapter = LgWebOsAdapter(client_factory=_capturing_factory(created))

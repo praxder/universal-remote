@@ -48,6 +48,61 @@ class TestCapabilityDisabling:
 
         asyncio.run(scenario())
 
+    def test_given_a_disabled_button_when_the_remote_shows_then_it_is_visibly_dimmed(
+        self, tmp_path
+    ):
+        # Borderless buttons weaken Textual's default disabled cue, so the compact
+        # style dims disabled text explicitly. Guard it so a future restyle cannot
+        # silently drop the affordance.
+        caps = Capabilities(keys=frozenset(Key) - {Key.MUTE}, text=True)
+        adapter = FakeAdapter(platform="fake-tv", capabilities=caps)
+
+        async def scenario():
+            app = _app(_store(tmp_path), adapter)
+            async with app.run_test() as pilot:
+                await _goto_remote(app, pilot)
+                dimmed = app.screen.query_one("#key-mute", Button)
+                full = app.screen.query_one("#key-up", Button)
+                assert dimmed.styles.text_opacity == 0.4
+                assert full.styles.text_opacity == 1.0
+
+        asyncio.run(scenario())
+
+    def test_given_play_pause_unsupported_when_the_remote_shows_then_only_it_is_disabled(
+        self, tmp_path
+    ):
+        # LG/Samsung declare separate PLAY and PAUSE but no combined toggle.
+        caps = Capabilities(keys=frozenset(Key) - {Key.PLAY_PAUSE}, text=True)
+        adapter = FakeAdapter(platform="fake-tv", capabilities=caps)
+
+        async def scenario():
+            app = _app(_store(tmp_path), adapter)
+            async with app.run_test() as pilot:
+                await _goto_remote(app, pilot)
+                assert app.screen.query_one("#key-play_pause", Button).disabled is True
+                assert app.screen.query_one("#key-play", Button).disabled is False
+                assert app.screen.query_one("#key-pause", Button).disabled is False
+
+        asyncio.run(scenario())
+
+    def test_given_no_number_support_when_the_remote_shows_then_the_whole_pad_is_disabled(
+        self, tmp_path
+    ):
+        # Apple TV declares no number keys, so the entire pad renders disabled.
+        digits = {Key[f"NUM_{d}"] for d in range(10)}
+        caps = Capabilities(keys=frozenset(Key) - digits, text=True)
+        adapter = FakeAdapter(platform="fake-tv", capabilities=caps)
+
+        async def scenario():
+            app = _app(_store(tmp_path), adapter)
+            async with app.run_test() as pilot:
+                await _goto_remote(app, pilot)
+                for digit in range(10):
+                    button = app.screen.query_one(f"#key-num_{digit}", Button)
+                    assert button.disabled is True
+
+        asyncio.run(scenario())
+
     def test_given_text_unsupported_when_the_remote_shows_then_the_field_is_disabled_with_a_message(
         self, tmp_path
     ):

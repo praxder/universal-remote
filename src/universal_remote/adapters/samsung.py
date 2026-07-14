@@ -34,6 +34,19 @@ SAMSUNG_KEYS: dict[Key, str] = {
     Key.VOL_UP: "KEY_VOLUP",
     Key.VOL_DOWN: "KEY_VOLDOWN",
     Key.MUTE: "KEY_MUTE",
+    Key.MENU: "KEY_MENU",
+    Key.CH_UP: "KEY_CHUP",
+    Key.CH_DOWN: "KEY_CHDOWN",
+    # No combined PLAY_PAUSE on Samsung — that button stays unmapped (disabled).
+    # These media codes were not found in the vendored library; verify on real
+    # hardware (see tasks 4.4). A wrong code is a single dict-entry fix.
+    Key.PLAY: "KEY_PLAY",
+    Key.PAUSE: "KEY_PAUSE",
+    Key.REWIND: "KEY_REWIND",
+    Key.FAST_FORWARD: "KEY_FF",
+    Key.STOP: "KEY_STOP",
+    # Number pad: Samsung's digit codes are KEY_0–KEY_9.
+    **{Key[f"NUM_{digit}"]: f"KEY_{digit}" for digit in range(10)},
 }
 
 # Text is attempted but not guaranteed on Samsung hardware.
