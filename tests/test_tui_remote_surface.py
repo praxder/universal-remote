@@ -1,6 +1,6 @@
 import asyncio
 
-from textual.widgets import Button
+from textual.widgets import Button, Label
 
 from tests.fakes import FakeAdapter
 from universal_remote.devices.models import Device
@@ -87,3 +87,27 @@ class TestRemoteSurface:
             Key.HOME,
             Key.BACK,
         ]
+
+    def test_given_a_key_dispatch_fails_when_pressed_then_the_remote_survives(
+        self, tmp_path
+    ):
+        # Arrange: a live remote whose device will fail the next key dispatch.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test() as pilot:
+                await _goto_remote(app, pilot)
+                adapter.sessions[0].dispatch_error = RuntimeError("device dropped")
+
+                # Act: press a key that will raise inside dispatch.
+                await pilot.press("up")
+                await pilot.pause()
+
+                # Assert: the remote is still up and reports the failure.
+                assert isinstance(app.screen, RemoteScreen)
+                status = app.screen.query_one("#text-status", Label)
+                assert "UP" in str(status.content)
+
+        asyncio.run(scenario())

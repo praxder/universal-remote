@@ -18,8 +18,13 @@ class FakeSession(BaseSession):
         self.sent_keys: list[Key] = []
         self.sent_text: list[str] = []
         self.closed = False
+        # When set, dispatching any key raises it — stands in for a device-side
+        # failure (timeout, dropped connection) the on-screen remote must survive.
+        self.dispatch_error: Exception | None = None
 
     async def _dispatch_key(self, key: Key) -> None:
+        if self.dispatch_error is not None:
+            raise self.dispatch_error
         self.sent_keys.append(key)
 
     async def _dispatch_text(self, text: str) -> None:
@@ -149,7 +154,7 @@ class FakeAppleTvKeyboard:
 
 
 class FakeAppleTv:
-    """Stands in for `pyatv`'s connected `AppleTV`; volume routes through `audio`."""
+    """Stands in for `pyatv`'s connected `AppleTV`; volume routes through `remote_control`."""
 
     def __init__(self, reject_text: bool = False) -> None:
         self.remote_control = _MethodRecorder()

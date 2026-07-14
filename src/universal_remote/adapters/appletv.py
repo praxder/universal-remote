@@ -24,7 +24,11 @@ if TYPE_CHECKING:
 PLATFORM = "apple-tv"
 PAIR_PROMPT = "Enter the PIN shown on your Apple TV"
 
-# Generic key -> pyatv RemoteControl method name.
+# Generic key -> pyatv RemoteControl method name. Volume rides RemoteControl's
+# fire-and-forget HID keys, not the Audio interface: Audio.volume_up/volume_down
+# block on a volume-state ack that an idle Apple TV never sends, timing out after
+# 5s and crashing the remote. RemoteControl.volume_* is deprecated in pyatv (a
+# docstring note, no runtime error), but it is the correct button-remote behaviour.
 APPLETV_RC_KEYS: dict[Key, str] = {
     Key.UP: "up",
     Key.DOWN: "down",
@@ -33,18 +37,12 @@ APPLETV_RC_KEYS: dict[Key, str] = {
     Key.OK: "select",
     Key.BACK: "menu",
     Key.HOME: "home",
-}
-
-# Generic key -> pyatv Audio method name (RemoteControl volume is deprecated).
-APPLETV_AUDIO_KEYS: dict[Key, str] = {
     Key.VOL_UP: "volume_up",
     Key.VOL_DOWN: "volume_down",
 }
 
 # MUTE is intentionally absent: pyatv exposes no mute on RemoteControl or Audio.
-_CAPABILITIES = Capabilities(
-    keys=frozenset(APPLETV_RC_KEYS) | frozenset(APPLETV_AUDIO_KEYS), text=True
-)
+_CAPABILITIES = Capabilities(keys=frozenset(APPLETV_RC_KEYS), text=True)
 
 
 class AppleTvSession(BaseSession):
@@ -55,10 +53,7 @@ class AppleTvSession(BaseSession):
         self._atv = atv
 
     async def _dispatch_key(self, key: Key) -> None:
-        if key in APPLETV_RC_KEYS:
-            await getattr(self._atv.remote_control, APPLETV_RC_KEYS[key])()
-        else:
-            await getattr(self._atv.audio, APPLETV_AUDIO_KEYS[key])()
+        await getattr(self._atv.remote_control, APPLETV_RC_KEYS[key])()
 
     async def _dispatch_text(self, text: str) -> None:
         try:

@@ -5,7 +5,6 @@ from pyatv.const import Protocol
 
 from tests.fakes import FakeAppleTv, FakeAppleTvConfig, FakePairingHandler, FakePyatv
 from universal_remote.adapters.appletv import (
-    APPLETV_AUDIO_KEYS,
     APPLETV_RC_KEYS,
     PLATFORM,
     AppleTvAdapter,
@@ -193,8 +192,8 @@ class TestAppleTvKeyMapping:
         assert APPLETV_RC_KEYS[Key.OK] == "select"
         assert APPLETV_RC_KEYS[Key.BACK] == "menu"
         assert APPLETV_RC_KEYS[Key.HOME] == "home"
-        assert APPLETV_AUDIO_KEYS[Key.VOL_UP] == "volume_up"
-        assert APPLETV_AUDIO_KEYS[Key.VOL_DOWN] == "volume_down"
+        assert APPLETV_RC_KEYS[Key.VOL_UP] == "volume_up"
+        assert APPLETV_RC_KEYS[Key.VOL_DOWN] == "volume_down"
 
     def test_given_a_directional_key_when_sent_then_remote_control_is_dispatched(self):
         fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-1"))
@@ -220,9 +219,12 @@ class TestAppleTvKeyMapping:
 
         assert fake.atv.remote_control.calls == ["select"]
 
-    def test_given_a_volume_key_when_sent_then_audio_is_dispatched_not_remote_control(
+    def test_given_a_volume_key_when_sent_then_remote_control_is_dispatched_not_audio(
         self,
     ):
+        # Volume goes through the fire-and-forget RemoteControl HID path, not the
+        # Audio interface: Audio.volume_* blocks on a volume-state ack that an idle
+        # Apple TV never sends, timing out and crashing the remote.
         fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-1"))
         adapter = AppleTvAdapter(pyatv_api=fake)
 
@@ -232,8 +234,8 @@ class TestAppleTvKeyMapping:
 
         run(scenario())
 
-        assert fake.atv.audio.calls == ["volume_up"]
-        assert fake.atv.remote_control.calls == []
+        assert fake.atv.remote_control.calls == ["volume_up"]
+        assert fake.atv.audio.calls == []
 
     def test_given_the_mute_key_when_sent_then_it_is_rejected_as_unsupported(self):
         fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-1"))

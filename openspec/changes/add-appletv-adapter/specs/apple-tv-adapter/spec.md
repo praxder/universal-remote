@@ -56,6 +56,11 @@ The Apple TV adapter SHALL translate each supported generic key into the corresp
 - **WHEN** the back or home key is sent over a session
 - **THEN** the adapter sends the menu or home action respectively
 
+#### Scenario: Volume keys are fire-and-forget
+- **WHEN** volume up or volume down is sent over a session
+- **THEN** the adapter presses the corresponding remote-control volume key without waiting for a volume-state acknowledgement
+- **AND** an Apple TV that never reports its volume does not cause the send to time out or crash the remote
+
 #### Scenario: Unsupported key rejected
 - **WHEN** a caller sends a key the adapter does not declare
 - **THEN** the session reports the key as unsupported and does not send an arbitrary substitute

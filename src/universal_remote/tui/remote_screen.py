@@ -85,9 +85,10 @@ class RemoteScreen(Screen[None]):
             if not self._capabilities.supports(key):
                 self.query_one(f"#key-{key.name.lower()}", Button).disabled = True
         if not self._capabilities.text:
-            self.query_one("#text-status", Label).update(
-                "Text entry is not supported on this device"
-            )
+            self._status("Text entry is not supported on this device")
+
+    def _status(self, message: str) -> None:
+        self.query_one("#text-status", Label).update(message)
 
     def _key_button(self, key: Key, label: str) -> Button:
         button = Button(label, id=f"key-{key.name.lower()}")
@@ -106,9 +107,11 @@ class RemoteScreen(Screen[None]):
         try:
             await self._session.send_key(key)
         except UnsupportedKeyError:
-            self.query_one("#text-status", Label).update(
-                f"{key.name} is not supported on this device"
-            )
+            self._status(f"{key.name} is not supported on this device")
+        except Exception:
+            # A single failed key press (device timeout, dropped connection) must
+            # not take down the remote — report it and stay on-screen.
+            self._status(f"{key.name} failed — the device may be unreachable")
 
     def action_text_mode(self) -> None:
         if not self._capabilities.text:
@@ -123,9 +126,7 @@ class RemoteScreen(Screen[None]):
             try:
                 await self._session.send_text(text)
             except TextUnsupportedError:
-                self.query_one("#text-status", Label).update(
-                    "Text entry is not supported on this device"
-                )
+                self._status("Text entry is not supported on this device")
         self._exit_text_mode()
 
     def on_text_field_exit_requested(self, event: TextField.ExitRequested) -> None:
