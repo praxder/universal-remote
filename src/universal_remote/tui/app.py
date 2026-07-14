@@ -58,11 +58,13 @@ class UniversalRemoteApp(App[None]):
         width: auto; height: auto; padding: 1 2;
         border: thick $primary; background: $surface;
     }
+    /* guidance sets the box width; title/buttons fill it and center their content */
+    #pairing-guidance { text-align: center; }
+    #pairing-title { width: 100%; text-align: center; }
     /* PIN entry: hidden until an adapter (e.g. Apple TV) asks for a PIN */
-    #pin-entry { display: none; width: auto; height: auto; align: center middle; }
-    #pin-entry Input { width: 24; margin-top: 1; }
-    /* nudge the pairing buttons off the left edge and space them vertically */
-    #pairing #submit, #pairing #cancel { margin: 1 0 0 1; }
+    #pin-entry { display: none; width: 100%; height: auto; }
+    #pin-entry Input { width: 100%; margin-top: 1; }
+    #pairing #submit, #pairing #cancel { width: 100%; margin-top: 1; }
     """
 
     def __init__(
