@@ -51,6 +51,7 @@ class UniversalRemoteApp(App[None]):
     #connecting LoadingIndicator { height: 1; margin-bottom: 1; }
     #connect-error { text-align: center; margin-bottom: 1; }
     #connecting Button { width: 16; margin-top: 1; }
+    #cancel-row { width: 100%; }  /* full width so its centered button centers in the box */
     /* PIN entry: hidden until an adapter (e.g. Apple TV) asks for a PIN */
     #pin-entry { display: none; width: auto; height: auto; align: center middle; }
     #pin-entry Input { width: 24; margin-top: 1; }

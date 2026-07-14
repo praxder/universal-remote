@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import Center, Vertical
 from textual.screen import ModalScreen, Screen
 from textual.widgets import (
     Button,
@@ -44,7 +44,8 @@ class ConnectingModal(ModalScreen[Session | None]):
             with Vertical(id="connecting-loading"):
                 yield LoadingIndicator()
                 yield Label(f"Connecting to {self._device.name}…")
-                yield Button("Cancel", id="cancel")
+                with Center(id="cancel-row"):
+                    yield Button("Cancel", id="cancel")
             with Vertical(id="connecting-error"):
                 yield Label("", id="connect-error")
                 yield Button("Retry", id="retry")
