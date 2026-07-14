@@ -54,6 +54,8 @@ class UniversalRemoteApp(App[None]):
     /* PIN entry: hidden until an adapter (e.g. Apple TV) asks for a PIN */
     #pin-entry { display: none; width: auto; height: auto; align: center middle; }
     #pin-entry Input { width: 24; margin-top: 1; }
+    /* nudge the pairing buttons off the left edge and space them vertically */
+    #pairing #submit, #pairing #cancel { margin: 1 0 0 1; }
     """
 
     def __init__(
