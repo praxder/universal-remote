@@ -54,7 +54,66 @@ class TestUseRemoteSelection:
                     picker.get_option_at_index(i).prompt
                     for i in range(picker.option_count)
                 }
-                assert names == {"Living", "Bedroom"}
+                assert names == {"1. Living", "2. Bedroom"}
+
+        asyncio.run(scenario())
+
+    def test_given_saved_devices_when_opening_use_remote_then_rows_are_numbered(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Living"))
+        store.add(_dev(name="Bedroom", ip="2.2.2.2"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                picker = app.screen.query_one("#device-picker", OptionList)
+                prompts = [
+                    picker.get_option_at_index(i).prompt
+                    for i in range(picker.option_count)
+                ]
+                assert prompts == ["1. Living", "2. Bedroom"]
+
+        asyncio.run(scenario())
+
+    def test_given_use_remote_when_a_digit_is_pressed_then_the_nth_device_is_acted_on(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Living", credential="tok"))  # #1 would connect
+        store.add(_dev(name="Bedroom", ip="2.2.2.2"))  # #2 has no credential
+        adapter = FakeAdapter(platform="fake-tv", prompt_message="Enter the PIN")
+
+        async def scenario():
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                await pilot.press("2")
+                await _settle(pilot)
+                assert isinstance(app.screen, PairingScreen)
+                assert app.screen._device.name == "Bedroom"
+
+        asyncio.run(scenario())
+
+    def test_given_use_remote_when_an_out_of_range_digit_is_pressed_then_nothing_happens(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Living", credential="tok"))
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                await pilot.press("2")  # only one device
+                await _settle(pilot)
+                assert isinstance(app.screen, UseRemoteScreen)
 
         asyncio.run(scenario())
 
@@ -71,6 +130,31 @@ class TestUseRemoteSelection:
                 message = str(app.screen.query_one("#no-devices", Label).content)
                 assert "add" in message.lower()
                 assert not isinstance(app.screen, RemoteScreen)
+
+        asyncio.run(scenario())
+
+
+class TestUseRemoteVimNavigation:
+    def test_given_the_picker_when_j_and_k_pressed_then_the_highlight_moves(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Living"))
+        store.add(_dev(name="Bedroom", ip="2.2.2.2"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                picker = app.screen.query_one("#device-picker", OptionList)
+                assert picker.highlighted == 0
+                await pilot.press("j")
+                await pilot.pause()
+                assert picker.highlighted == 1
+                await pilot.press("k")
+                await pilot.pause()
+                assert picker.highlighted == 0
 
         asyncio.run(scenario())
 

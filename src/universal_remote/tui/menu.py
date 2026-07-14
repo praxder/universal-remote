@@ -31,6 +31,10 @@ class MenuScreen(Screen[None]):
         ("r", "use_remote", "Use Remote"),
         Binding("up", "app.focus_previous", "Previous", show=False),
         Binding("down", "app.focus_next", "Next", show=False),
+        Binding("k", "app.focus_previous", "Previous", show=False),
+        Binding("h", "app.focus_previous", "Previous", show=False),
+        Binding("j", "app.focus_next", "Next", show=False),
+        Binding("l", "app.focus_next", "Next", show=False),
         ("q", "app.quit", "Quit"),
     ]
 

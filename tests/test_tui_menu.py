@@ -134,6 +134,30 @@ class TestMenu:
 
         asyncio.run(scenario())
 
+    def test_given_focus_on_manage_when_j_then_focus_moves_to_use(self, tmp_path):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.screen.set_focus(app.screen.query_one("#manage", Button))
+                await pilot.press("j")
+                assert app.focused is not None
+                assert app.focused.id == "use"
+
+        asyncio.run(scenario())
+
+    def test_given_focus_on_use_when_k_then_focus_moves_to_manage(self, tmp_path):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.screen.set_focus(app.screen.query_one("#use", Button))
+                await pilot.press("k")
+                assert app.focused is not None
+                assert app.focused.id == "manage"
+
+        asyncio.run(scenario())
+
     def test_given_the_menu_when_shown_then_the_arrow_bindings_are_hidden_from_the_footer(
         self, tmp_path
     ):

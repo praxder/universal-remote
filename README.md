@@ -18,7 +18,9 @@ uv run universal-remote
 ```
 
 The app opens a menu with two modes: **Manage Devices** and **Use Remote**.
-Everything is reachable by keyboard and by mouse.
+Everything is reachable by keyboard and by mouse. Device lists number each saved
+device — press its number (`1`–`9`) to open it — and `h`/`j`/`k`/`l` move through
+menus and lists alongside the arrow keys.
 
 ## Add a TV
 
@@ -43,10 +45,10 @@ Everything is reachable by keyboard and by mouse.
 
    | Key | Action |
    | --- | --- |
-   | Arrows | D-pad up/down/left/right |
+   | Arrows or `h` `j` `k` `l` | D-pad left/down/up/right |
    | Enter | OK |
    | Esc | Back |
-   | `h` | Home |
+   | Space | Home |
    | `t` | Enter the text field (type, Enter sends, Esc leaves the field) |
    | `q` | Exit the remote |
 

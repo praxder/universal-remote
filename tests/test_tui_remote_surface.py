@@ -8,7 +8,7 @@ from universal_remote.devices.store import DeviceStore
 from universal_remote.keys import Key
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
-from universal_remote.tui.remote_screen import RemoteScreen
+from universal_remote.tui.remote_screen import RemoteScreen, TextField
 
 
 def _app(store, adapter):
@@ -61,7 +61,7 @@ class TestRemoteSurface:
 
         assert adapter.sessions[0].sent_keys == [Key.MUTE]
 
-    def test_given_the_remote_when_keys_pressed_then_dpad_ok_home_and_back_map(
+    def test_given_the_remote_when_arrow_keys_pressed_then_dpad_ok_and_back_map(
         self, tmp_path
     ):
         store = _store_with_device(tmp_path)
@@ -74,7 +74,6 @@ class TestRemoteSurface:
                 await pilot.press("up")
                 await pilot.press("left")
                 await pilot.press("enter")
-                await pilot.press("h")
                 await pilot.press("escape")
                 await pilot.pause()
 
@@ -84,9 +83,68 @@ class TestRemoteSurface:
             Key.UP,
             Key.LEFT,
             Key.OK,
-            Key.HOME,
             Key.BACK,
         ]
+
+    def test_given_the_remote_when_vim_keys_pressed_then_the_dpad_directions_map(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test() as pilot:
+                await _goto_remote(app, pilot)
+                await pilot.press("h")
+                await pilot.press("j")
+                await pilot.press("k")
+                await pilot.press("l")
+                await pilot.pause()
+
+        asyncio.run(scenario())
+
+        assert adapter.sessions[0].sent_keys == [
+            Key.LEFT,
+            Key.DOWN,
+            Key.UP,
+            Key.RIGHT,
+        ]
+
+    def test_given_the_remote_when_space_pressed_then_home_is_sent(self, tmp_path):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test() as pilot:
+                await _goto_remote(app, pilot)
+                await pilot.press("space")
+                await pilot.pause()
+
+        asyncio.run(scenario())
+
+        assert adapter.sessions[0].sent_keys == [Key.HOME]
+
+    def test_given_the_text_field_focused_when_vim_keys_and_space_typed_then_they_fill_not_navigate(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test() as pilot:
+                await _goto_remote(app, pilot)
+                await pilot.press("t")  # enter the text field
+                await pilot.pause()
+                await pilot.press("h", "j", "k", "l", "space")
+                await pilot.pause()
+                assert app.screen.query_one("#text", TextField).value == "hjkl "
+
+        asyncio.run(scenario())
+
+        assert adapter.sessions[0].sent_keys == []  # no D-pad, no HOME while typing
 
     def test_given_a_key_dispatch_fails_when_pressed_then_the_remote_survives(
         self, tmp_path

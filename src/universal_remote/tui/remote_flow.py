@@ -21,6 +21,7 @@ from textual.widgets.option_list import Option
 from ..devices.models import Device
 from ..errors import ConnectionFailedError, PairingCancelledError
 from ..session import Session
+from .device_option_list import DeviceOptionList
 from .remote_screen import RemoteScreen
 
 
@@ -97,21 +98,22 @@ class UseRemoteScreen(Screen[None]):
         yield Header()
         with Vertical(id="use-remote"):
             yield Label("Use Remote", id="use-remote-title")
-            yield OptionList(id="device-picker")
+            yield DeviceOptionList(id="device-picker")
             yield Label("", id="no-devices")
         yield Footer()
 
     def on_mount(self) -> None:
         devices = self.app.store.list()
-        picker = self.query_one("#device-picker", OptionList)
+        picker = self.query_one("#device-picker", DeviceOptionList)
         if not devices:
             picker.display = False
             self.query_one("#no-devices", Label).update(
                 "No devices saved — add one in Manage Devices first."
             )
             return
-        for device in devices:
-            picker.add_option(Option(device.name, id=device.id))
+        for i, device in enumerate(devices):
+            picker.add_option(Option(f"{i + 1}. {device.name}", id=device.id))
+        picker.device_count = len(devices)
         picker.highlighted = 0
         picker.focus()
 

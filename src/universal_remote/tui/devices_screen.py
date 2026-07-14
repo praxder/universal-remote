@@ -19,6 +19,7 @@ from textual.widgets import (
 from textual.widgets.option_list import Option
 
 from ..devices.models import Device
+from .device_option_list import DeviceOptionList
 
 ADD_ID = "__add__"
 
@@ -53,7 +54,7 @@ class DeviceListScreen(Screen[None]):
         yield Header()
         with Vertical(id="devices"):
             yield Static(TITLE_ART, id="devices-title")
-            yield OptionList(id="device-list")
+            yield DeviceOptionList(id="device-list")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -63,11 +64,12 @@ class DeviceListScreen(Screen[None]):
         self._reload()
 
     def _reload(self) -> None:
-        option_list = self.query_one("#device-list", OptionList)
+        option_list = self.query_one("#device-list", DeviceOptionList)
         option_list.clear_options()
         devices = self.app.store.list()
-        for device in devices:
-            option_list.add_option(Option(device.name, id=device.id))
+        for i, device in enumerate(devices):
+            option_list.add_option(Option(f"{i + 1}. {device.name}", id=device.id))
+        option_list.device_count = len(devices)
         if devices:
             option_list.add_option(None)  # divider between devices and the add row
         option_list.add_option(Option("+ Add", id=ADD_ID))
@@ -123,6 +125,10 @@ class ConfirmDeleteScreen(ModalScreen[bool]):
         ("left", "focus_previous", "Previous"),
         ("down", "focus_next", "Next"),
         ("right", "focus_next", "Next"),
+        Binding("k", "focus_previous", "Previous", show=False),
+        Binding("h", "focus_previous", "Previous", show=False),
+        Binding("j", "focus_next", "Next", show=False),
+        Binding("l", "focus_next", "Next", show=False),
     ]
 
     def __init__(self, device_name: str) -> None:
