@@ -52,6 +52,12 @@ class UniversalRemoteApp(App[None]):
     #connect-error { text-align: center; margin-bottom: 1; }
     #connecting Button { width: 16; margin-top: 1; }
     #cancel-row { width: 100%; }  /* full width so its centered button centers in the box */
+    /* pairing: dim the device selection behind a centered dialog box */
+    PairingScreen { align: center middle; background: $background 60%; }
+    #pairing {
+        width: auto; height: auto; padding: 1 2;
+        border: thick $primary; background: $surface;
+    }
     /* PIN entry: hidden until an adapter (e.g. Apple TV) asks for a PIN */
     #pin-entry { display: none; width: auto; height: auto; align: center middle; }
     #pin-entry Input { width: 24; margin-top: 1; }

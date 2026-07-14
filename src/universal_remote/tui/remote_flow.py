@@ -151,7 +151,7 @@ class UseRemoteScreen(Screen[None]):
         self.app.pop_screen()
 
 
-class PairingScreen(Screen[Device | None]):
+class PairingScreen(ModalScreen[Device | None]):
     """Pairs in a worker with on-screen guidance; cancellable via Esc/button.
 
     Pairs and stores the credential only, then dismisses with the device on
@@ -169,7 +169,6 @@ class PairingScreen(Screen[Device | None]):
         self._pin_future: asyncio.Future[str] | None = None
 
     def compose(self) -> ComposeResult:
-        yield Header()
         with Vertical(id="pairing"):
             yield Label("Pairing…", id="pairing-title")
             yield Label(
@@ -180,7 +179,6 @@ class PairingScreen(Screen[Device | None]):
                 yield Input(id="pin-input")
                 yield Button("Submit", id="submit")
             yield Button("Cancel", id="cancel")
-        yield Footer()
 
     def on_mount(self) -> None:
         self._worker = self.run_worker(self._pair(), exclusive=True)
