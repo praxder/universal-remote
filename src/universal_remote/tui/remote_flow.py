@@ -130,7 +130,10 @@ class UseRemoteScreen(Screen[None]):
         )
         if device is None:
             return
-        if device.credential is None:
+        # An adapter may declare it needs no pairing (e.g. Roku's unauthenticated
+        # ECP); such a device connects directly even without a stored credential.
+        adapter = self.app.registry.resolve(device.platform)
+        if device.credential is None and getattr(adapter, "requires_pairing", True):
             self.app.push_screen(PairingScreen(device), self._after_pairing)
         else:
             self._connect(device)

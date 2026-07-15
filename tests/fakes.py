@@ -123,6 +123,46 @@ class FakeWebOsClient:
         self.disconnected = True
 
 
+class FakeClientSession:
+    """Stands in for `aiohttp.ClientSession`; records only that it was closed."""
+
+    def __init__(self) -> None:
+        self.closed = False
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+class FakeRoku:
+    """Stands in for `rokuecp.Roku`; records sends and answers the reachability check."""
+
+    def __init__(self, host: str, session: object | None = None, **_kwargs) -> None:
+        self.host = host
+        self.session = session  # the aiohttp session the client was built for
+        self.sent_keys: list[str] = []
+        self.sent_text: list[str] = []
+        self.updated = False
+        # When set, the reachability check (update) raises it — stands in for an
+        # unreachable, refused, or timed-out device.
+        self.update_error: Exception | None = None
+        # When True, literal text entry raises — stands in for an unfocused keyboard.
+        self.reject_text = False
+
+    async def update(self, full_update: bool = False) -> object:
+        if self.update_error is not None:
+            raise self.update_error
+        self.updated = True
+        return object()
+
+    async def remote(self, key: str) -> None:
+        self.sent_keys.append(key)
+
+    async def literal(self, text: str) -> None:
+        if self.reject_text:
+            raise RuntimeError("keyboard not focused")
+        self.sent_text.append(text)
+
+
 class _MethodRecorder:
     """Spy for a `pyatv` interface: records the names of async methods called on it.
 
@@ -260,9 +300,11 @@ class FakeAdapter:
         display_name: str | None = None,
         prompt_message: str | None = None,
         pair_identifier: str | None = None,
+        requires_pairing: bool = True,
     ) -> None:
         self.platform = platform
         self.display_name = display_name or platform
+        self.requires_pairing = requires_pairing
         self._capabilities = capabilities or Capabilities(
             keys=frozenset(Key), text=True
         )

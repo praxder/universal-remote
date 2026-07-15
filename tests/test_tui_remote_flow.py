@@ -2,9 +2,11 @@ import asyncio
 
 from textual.widgets import Button, Input, Label, OptionList
 
-from tests.fakes import FakeAdapter
+from tests.fakes import FakeAdapter, FakeSession
+from universal_remote.capabilities import Capabilities
 from universal_remote.devices.models import Device
 from universal_remote.devices.store import DeviceStore
+from universal_remote.keys import Key
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
 from universal_remote.tui.menu import MenuScreen
@@ -14,6 +16,30 @@ from universal_remote.tui.remote_flow import (
     UseRemoteScreen,
 )
 from universal_remote.tui.remote_screen import RemoteScreen
+
+
+class _NoAttrAdapter:
+    """An adapter that declares no `requires_pairing` — the getattr default applies.
+
+    Its pairing blocks on an unset event so a test can assert PairingScreen mounted
+    rather than racing past it once pairing completes.
+    """
+
+    platform = "fake-tv"
+    display_name = "Fake"
+
+    def __init__(self) -> None:
+        self._caps = Capabilities(keys=frozenset(Key), text=True)
+
+    def capabilities(self) -> Capabilities:
+        return self._caps
+
+    async def pair(self, device, *, prompt=None) -> str:
+        await asyncio.Event().wait()  # never resolves; parks the flow in pairing
+        return "tok"
+
+    async def connect(self, device) -> FakeSession:
+        return FakeSession(self._caps)
 
 
 def _app(store, adapter=None):
@@ -356,6 +382,70 @@ class TestPairingPinEntry:
         saved = store.list()[0]
         assert saved.credential is None
         assert saved.identifier is None
+
+
+class TestUseRemoteNoPairing:
+    def test_given_a_no_pairing_adapter_and_no_credential_when_selected_then_it_connects_directly(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Roku"))  # no credential stored
+        adapter = FakeAdapter(platform="fake-tv", requires_pairing=False)
+
+        async def scenario():
+            adapter.connect_gate = asyncio.Event()  # hold the connect mid-flight
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                await pilot.press("enter")
+                await _settle(pilot)
+                # goes straight to connecting, never mounting PairingScreen
+                assert isinstance(app.screen, ConnectingModal)
+                adapter.connect_gate.set()
+                await _settle(pilot)
+                assert isinstance(app.screen, RemoteScreen)
+
+        asyncio.run(scenario())
+
+        assert adapter.paired_devices == []  # pairing was never run
+        assert store.list()[0].credential is None
+
+    def test_given_a_pairing_adapter_and_no_credential_when_selected_then_pairing_runs(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="TV"))  # no credential stored
+        # Default FakeAdapter requires pairing; prompt_message parks it in pairing.
+        adapter = FakeAdapter(platform="fake-tv", prompt_message="Enter the PIN")
+
+        async def scenario():
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                await pilot.press("enter")
+                await _settle(pilot)
+                assert isinstance(app.screen, PairingScreen)
+
+        asyncio.run(scenario())
+
+    def test_given_an_adapter_declaring_nothing_when_selected_then_pairing_runs(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="TV"))  # no credential stored
+
+        async def scenario():
+            app = _app(store, adapter=_NoAttrAdapter())
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                await pilot.press("enter")
+                await _settle(pilot)
+                assert isinstance(app.screen, PairingScreen)
+
+        asyncio.run(scenario())
 
 
 class TestUseRemoteExit:

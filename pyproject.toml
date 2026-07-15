@@ -6,9 +6,11 @@ readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "textual>=0.80",
+    "aiohttp>=3.9",
     "samsungtvws[async]",
     "aiowebostv>=0.7",
     "pyatv>=0.18.0",
+    "rokuecp>=0.19",
 ]
 
 [project.scripts]

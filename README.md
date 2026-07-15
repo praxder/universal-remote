@@ -1,9 +1,9 @@
 # universal-remote
 
 A local, terminal-based universal TV remote. Pretty, mouse-clickable, and fully
-keyboard-drivable. Ships with Samsung Tizen, LG WebOS, and Apple TV adapters; the
-architecture is platform-agnostic so new TV platforms are "one new adapter
-module + register it."
+keyboard-drivable. Ships with Samsung Tizen, LG WebOS, Apple TV, and Roku
+adapters; the architecture is platform-agnostic so new TV platforms are "one new
+adapter module + register it."
 
 ## Requirements
 
@@ -26,12 +26,13 @@ menus and lists alongside the arrow keys.
 
 1. From the menu choose **Manage Devices** (`d`), then **Add** (`a`).
 2. When more than one platform is available, pick the TV's **platform**
-   (Samsung Tizen, LG WebOS, or Apple TV) from the selector. With a single adapter
-   installed the selector is hidden and that platform is used automatically.
+   (Samsung Tizen, LG WebOS, Apple TV, or Roku) from the selector. With a single
+   adapter installed the selector is hidden and that platform is used automatically.
 3. Enter the TV's IP address and press **Probe** — the app queries the TV's info
    endpoint (`http://<ip>:8001/api/v2/`) and pre-fills name, model, and MAC.
    If the probe fails, fill the fields in manually; adding is never blocked.
-   Probe targets the Samsung info endpoint, so **LG and Apple TV use manual entry**.
+   Probe targets the Samsung info endpoint, so **LG, Apple TV, and Roku use
+   manual entry**.
 4. **Save**.
 
 ## Pair and control
@@ -40,7 +41,9 @@ menus and lists alongside the arrow keys.
 2. First time only: Samsung and LG show an **authorization popup** — accept it.
    **Apple TV** instead displays a **PIN** on the TV screen; type it into the app
    when prompted. The credential is saved so later sessions connect without
-   re-pairing. Pairing is cancellable (Esc).
+   re-pairing. Pairing is cancellable (Esc). **Roku needs no pairing** — its
+   control protocol is unauthenticated, so it connects directly with no popup,
+   PIN, or stored credential.
 3. The remote appears. Control it by mouse (click any button) or keyboard:
 
    | Key | Action |
@@ -86,6 +89,20 @@ menus and lists alongside the arrow keys.
 - **Text is best-effort**, as with the other platforms: keyboard entry depends on
   a focused text field, and a failed send reports "not supported" rather than
   silently dropping input.
+
+## Caveats (Roku reality)
+
+- **No pairing.** Roku's External Control Protocol is an unauthenticated HTTP API
+  on the LAN, so there is no popup, no PIN, and no saved credential — Use Remote
+  connects directly. Add a Roku by **manual IP entry** (the probe is
+  Samsung-only), and connect verifies the device is reachable first.
+- **Some keys are unavailable.** Roku's protocol exposes only a single
+  **play/pause** toggle (no discrete play, pause, or stop), has **no number pad**,
+  and has **no menu** key — those on-screen buttons are shown disabled for Roku.
+  Volume, mute, channel up/down, rewind, and fast-forward are available.
+- **Text is best-effort**, as with the other platforms: literal entry depends on
+  a focused on-screen keyboard, and a failed send reports "not supported" rather
+  than silently dropping input.
 
 ## Storage
 

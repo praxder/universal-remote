@@ -15,6 +15,11 @@ if TYPE_CHECKING:
 Prompt = Callable[[str], Awaitable[str]]
 
 
+# An adapter may optionally declare `requires_pairing = False` (e.g. Roku, whose
+# ECP is unauthenticated and issues no credential); the Use-Remote flow then
+# connects directly instead of running pairing. Adapters that omit it are treated
+# as requiring pairing (read via `getattr(adapter, "requires_pairing", True)`), so
+# the popup/PIN adapters need not declare anything.
 @runtime_checkable
 class Adapter(Protocol):
     """Builds sessions for one TV platform; pairing is distinct from connecting."""
