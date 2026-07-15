@@ -138,8 +138,11 @@ class RemoteScreen(Screen[None]):
                 yield self._key_button(Key.FAST_FORWARD, "▶▶")
             with Horizontal(id="numpad-row"):
                 with Grid(id="numpad"):
-                    for digit in (1, 2, 3, 4, 5, 6, 7, 8, 9, 0):
+                    for digit in (1, 2, 3, 4, 5, 6, 7, 8, 9):
                         yield self._key_button(Key[f"NUM_{digit}"], str(digit))
+                    # Empty first cell of the last row so 0 sits centered under 8.
+                    yield Label("", id="numpad-spacer")
+                    yield self._key_button(Key.NUM_0, "0")
             yield TextField(placeholder="Press 't' to type…", id="text", disabled=True)
             yield Label("", id="text-status")
         yield Footer()
