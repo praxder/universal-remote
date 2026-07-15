@@ -53,6 +53,19 @@ The Fire TV adapter SHALL translate each supported generic key into the correspo
 - **WHEN** a caller sends a key the adapter does not declare
 - **THEN** the session reports the key as unsupported and does not send an arbitrary substitute
 
+### Requirement: Low-latency key dispatch with fallback
+The Fire TV adapter SHALL prefer a faster device input path for keys that support it, and SHALL fall back to the standard key-event path for any other key or when the faster path is unavailable, without changing which action a key sends.
+
+#### Scenario: Fast path used when available
+- **WHEN** a key the faster input path supports is sent over a session to a device that exposes that path
+- **THEN** the adapter dispatches it over the faster path
+- **AND** the action sent is the one that key maps to
+
+#### Scenario: Fallback preserves behaviour
+- **WHEN** a key has no faster-path mapping, or the device exposes no faster path
+- **THEN** the adapter dispatches it over the standard key-event path
+- **AND** the key still sends its mapped action
+
 ### Requirement: Best-effort text entry
 The Fire TV adapter SHALL attempt to send text to the device as literal characters, and SHALL report text as unsupported when the attempt fails, rather than silently discarding the text.
 

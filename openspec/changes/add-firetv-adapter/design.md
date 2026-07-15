@@ -38,6 +38,17 @@ ADB key events cover the whole generic vocabulary. Fire TV declares: the directi
 ### Decision: Connect verifies reachability via the ADB handshake; no identity check
 ADB `connect()` to `<ip>:5555` performs a TCP connect and auth handshake, so a successful connect is itself the reachability check. `connect()` raises `ConnectionFailedError` on any failure (unreachable, refused, timeout, auth rejected) — matching Samsung/LG/Roku. Like Roku there is no identifier to verify: the user supplied the IP directly and ADB carries no device identity the seam persists.
 
+### Decision: Fast `sendevent` key path with an `input keyevent` fallback
+Hardware measurement showed `adb shell input keyevent` costs ~1.2s/key on Fire TV — the `input` binary cold-starts an ART VM every invocation, so it lags ~6× behind the WebSocket/ECP/Companion adapters (~200ms). Two faster paths were tested against the device with objective readback (wakefulness, focus via `uiautomator dump`, resumed-activity): `cmd input keyevent` returns in ~50ms but **does not inject** (a silent no-op — rejected), while `sendevent` to the remote's `/dev/input` node injects correctly at ~290ms and reaches the focused window like the physical remote.
+
+The adapter therefore dispatches most keys via `sendevent`:
+- At connect it discovers the remote input node once (`getevent -lp`, the first node advertising the d-pad keys) and fixes routing for the session. Per-key `sendevent` to an undeclared code can silently no-op, so routing is decided at connect, never per keypress.
+- `EVDEV_KEYS` maps the generic keys the node supports — d-pad, OK (`DPAD_CENTER`), back, volume, mute, and the number pad — to Linux evdev scancodes (from Fire OS's `Generic.kl`). These dispatch as `sendevent <node> …` at ~290ms.
+- Keys the remote node has no evdev entry for — **home** (`Generic.kl` maps only `MOVE_HOME`, not the home button), **menu**, and the media-transport keys — fall back to `input keyevent` at ~1.2s.
+- If no suitable node is found or `sendevent` is unavailable, the whole session falls back to `input keyevent`, i.e. today's working behaviour.
+
+This is a best-effort latency optimisation layered over the unchanged `input keyevent` path; it changes no observable contract (each key still sends the same action) and degrades safely on a device that does not fit. Correctness of each fast key was verified on hardware, not just that a command was emitted.
+
 ## Risks / Trade-offs
 
 - **`adb-shell` API shape is unverified from planning.** → Confirm the entry points against the pinned version in task 1.2 (mirroring how the Roku change confirmed `rokuecp`): `keygen`/`PythonRSASigner`, `AdbDeviceTcpAsync(host, port)`, the `connect(rsa_keys=..., auth_timeout_s=...)` signature, `shell(cmd)`, `close()`, the exact ADB key-event codes, and the error types raised on failure. Every call is isolated behind an injected factory; tests use a fake.

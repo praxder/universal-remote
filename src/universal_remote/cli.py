@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .adapters.appletv import register as register_appletv
+from .adapters.firetv import register as register_firetv
 from .adapters.lg import register as register_lg
 from .adapters.roku import register as register_roku
 from .adapters.samsung import register as register_samsung
@@ -17,6 +18,7 @@ def build_app(store: DeviceStore | None = None) -> UniversalRemoteApp:
     register_lg(registry)
     register_appletv(registry)
     register_roku(registry)
+    register_firetv(registry)
     return UniversalRemoteApp(store=store, registry=registry)
 
 

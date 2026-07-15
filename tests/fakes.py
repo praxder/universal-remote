@@ -163,6 +163,78 @@ class FakeRoku:
         self.sent_text.append(text)
 
 
+class FakeAdbSigner:
+    """Stands in for `PythonRSASigner`; records the key material it was built from.
+
+    A fresh pair builds it with a public key (so the TV can whitelist it); a
+    connect replay builds it with the private key only, so a test can tell the
+    two flows apart by whether `pub` is present.
+    """
+
+    def __init__(self, pub: str | None = None, priv: str | None = None) -> None:
+        self.pub = pub
+        self.priv = priv
+
+
+def fake_keygen() -> tuple[str, str]:
+    """Deterministic ADB keypair stand-in, returning (public, private) contents."""
+    return "fake-public-key", "fake-private-pem"
+
+
+# A `getevent -lp` listing with a d-pad-capable input node, so node discovery
+# finds one and the fast `sendevent` path is exercised by default.
+FAKE_GETEVENT_LP = """add device 1: /dev/input/event4
+  name:     "amzkeyboard"
+    KEY (0001): KEY_UP KEY_DOWN KEY_LEFT KEY_RIGHT KEY_ENTER KEY_SELECT KEY_BACK
+add device 2: /dev/input/event3
+  name:     "kcmouse"
+    KEY (0001): BTN_MOUSE
+"""
+
+
+class FakeAdbDevice:
+    """Stands in for `AdbDeviceTcpAsync`; records connects and dispatched commands."""
+
+    def __init__(
+        self,
+        host: str,
+        port: int = 5555,
+        getevent_lp: str = FAKE_GETEVENT_LP,
+        **_kwargs,
+    ) -> None:
+        self.host = host
+        self.port = port
+        # `getevent -lp` output used for input-node discovery at connect time.
+        self.getevent_lp = getevent_lp
+        # Each connect records the signer keys and auth timeout it was called with,
+        # so a test can distinguish pair-time (public key present) from connect-time.
+        self.connects: list[dict] = []
+        self.commands: list[str] = []
+        self.closed = False
+        # When set, the connect handshake raises it — stands in for an unreachable,
+        # refused, timed-out, or auth-rejected device.
+        self.connect_error: Exception | None = None
+        # When True, `input text` raises — stands in for an unfocused text field.
+        self.reject_text = False
+
+    async def connect(self, rsa_keys=None, auth_timeout_s=None, **_kwargs) -> bool:
+        if self.connect_error is not None:
+            raise self.connect_error
+        self.connects.append({"rsa_keys": rsa_keys, "auth_timeout_s": auth_timeout_s})
+        return True
+
+    async def shell(self, command: str, **_kwargs) -> str:
+        if command == "getevent -lp":
+            return self.getevent_lp  # discovery probe, not a dispatched key
+        if self.reject_text and command.startswith("input text"):
+            raise RuntimeError("no focused text field")
+        self.commands.append(command)
+        return ""
+
+    async def close(self) -> None:
+        self.closed = True
+
+
 class _MethodRecorder:
     """Spy for a `pyatv` interface: records the names of async methods called on it.
 

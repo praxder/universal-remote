@@ -1,9 +1,9 @@
 # universal-remote
 
 A local, terminal-based universal TV remote. Pretty, mouse-clickable, and fully
-keyboard-drivable. Ships with Samsung Tizen, LG WebOS, Apple TV, and Roku
-adapters; the architecture is platform-agnostic so new TV platforms are "one new
-adapter module + register it."
+keyboard-drivable. Ships with Samsung Tizen, LG WebOS, Apple TV, Roku, and Fire
+TV adapters; the architecture is platform-agnostic so new TV platforms are "one
+new adapter module + register it."
 
 ## Requirements
 
@@ -26,24 +26,25 @@ menus and lists alongside the arrow keys.
 
 1. From the menu choose **Manage Devices** (`d`), then **Add** (`a`).
 2. When more than one platform is available, pick the TV's **platform**
-   (Samsung Tizen, LG WebOS, Apple TV, or Roku) from the selector. With a single
-   adapter installed the selector is hidden and that platform is used automatically.
+   (Samsung Tizen, LG WebOS, Apple TV, Roku, or Fire TV) from the selector. With
+   a single adapter installed the selector is hidden and that platform is used
+   automatically.
 3. Enter the TV's IP address and press **Probe** — the app queries the TV's info
    endpoint (`http://<ip>:8001/api/v2/`) and pre-fills name, model, and MAC.
    If the probe fails, fill the fields in manually; adding is never blocked.
-   Probe targets the Samsung info endpoint, so **LG, Apple TV, and Roku use
-   manual entry**.
+   Probe targets the Samsung info endpoint, so **LG, Apple TV, Roku, and Fire TV
+   use manual entry**.
 4. **Save**.
 
 ## Pair and control
 
 1. From the menu choose **Use Remote** (`r`) and pick your TV.
-2. First time only: Samsung and LG show an **authorization popup** — accept it.
-   **Apple TV** instead displays a **PIN** on the TV screen; type it into the app
-   when prompted. The credential is saved so later sessions connect without
-   re-pairing. Pairing is cancellable (Esc). **Roku needs no pairing** — its
-   control protocol is unauthenticated, so it connects directly with no popup,
-   PIN, or stored credential.
+2. First time only: Samsung, LG, and Fire TV show an **authorization popup** —
+   accept it. **Apple TV** instead displays a **PIN** on the TV screen; type it
+   into the app when prompted. The credential is saved so later sessions connect
+   without re-pairing. Pairing is cancellable (Esc). **Roku needs no pairing** —
+   its control protocol is unauthenticated, so it connects directly with no
+   popup, PIN, or stored credential.
 3. The remote appears. Control it by mouse (click any button) or keyboard:
 
    | Key | Action |
@@ -104,6 +105,28 @@ menus and lists alongside the arrow keys.
   a focused on-screen keyboard, and a failed send reports "not supported" rather
   than silently dropping input.
 
+## Caveats (Fire TV reality)
+
+- **Enable ADB debugging first.** Fire OS exposes no companion or PIN-paired
+  remote protocol, so control runs over ADB. On the TV, go to **Settings →
+  My Fire TV → Developer Options** and turn **ADB debugging** on before pairing.
+- **Authorization popup.** First connect shows an "Allow ADB debugging?" dialog
+  on the TV; accept it and tick **"Always allow from this computer"** so later
+  connections skip the dialog. The app generates a per-device key and saves its
+  private key as the credential; without the "always allow" tick the dialog
+  reappears each connect.
+- **No channel keys.** A Fire TV streamer has no tuner, so **channel up/down are
+  unavailable** — those on-screen buttons are shown disabled for Fire TV.
+- **Key latency varies by key.** The d-pad, OK, back, volume, mute, and number
+  pad use a fast native input path (~kernel `sendevent`) and respond promptly.
+  Home, menu, and the media-transport keys have no native mapping on the remote
+  input device, so they use `adb shell input keyevent`, which cold-starts a
+  runtime on Fire OS and lags ~1s — an inherent limit of that path. On a device
+  where the fast path is unavailable, all keys use the slower path.
+- **Text and key codes are best-effort**, as with the other platforms: key
+  events and `input text` are sent over ADB, and a failed text send reports
+  "not supported" rather than silently dropping input.
+
 ## Storage
 
 Devices and pairing credentials are stored in
@@ -113,7 +136,9 @@ owner-only (`0600`) permissions since it holds secrets.
 ## Development
 
 ```sh
-uv run pytest        # full suite; no real TV required (fakes + mocked transport)
+uv run pytest        # full suite; runs across all cores (add -n0 for a serial run)
 uv run ruff format   # format
 uv run ruff check    # lint
 ```
+
+Tests need no real TV — adapters run against in-memory fakes and mocked transport.

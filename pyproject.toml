@@ -11,6 +11,7 @@ dependencies = [
     "aiowebostv>=0.7",
     "pyatv>=0.18.0",
     "rokuecp>=0.19",
+    "adb-shell[async]>=0.4.4",
 ]
 
 [project.scripts]
@@ -19,6 +20,7 @@ universal-remote = "universal_remote.cli:main"
 [dependency-groups]
 dev = [
     "pytest>=8.0",
+    "pytest-xdist>=3.6",
     "ruff>=0.15.21",
 ]
 
@@ -31,3 +33,6 @@ packages = ["src/universal_remote"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Run across all cores; the suite is TUI-heavy and tests are process-isolated.
+# Override with `-n0` for a serial run (debugging, pdb).
+addopts = "-n auto"
