@@ -15,6 +15,7 @@ from textual.widgets import (
     Label,
     LoadingIndicator,
     OptionList,
+    Static,
 )
 from textual.widgets.option_list import Option
 
@@ -23,6 +24,12 @@ from ..errors import ConnectionFailedError, PairingCancelledError
 from ..session import Session
 from .device_option_list import DeviceOptionList
 from .remote_screen import RemoteScreen
+
+TITLE_ART = r""" ____       _           _     ____             _
+/ ___|  ___| | ___  ___| |_  |  _ \  _____   _(_) ___ ___
+\___ \ / _ \ |/ _ \/ __| __| | | | |/ _ \ \ / / |/ __/ _ \
+ ___) |  __/ |  __/ (__| |_  | |_| |  __/\ V /| | (_|  __/
+|____/ \___|_|\___|\___|\__| |____/ \___| \_/ |_|\___\___|"""
 
 
 class ConnectingModal(ModalScreen[Session | None]):
@@ -97,7 +104,7 @@ class UseRemoteScreen(Screen[None]):
     def compose(self) -> ComposeResult:
         yield Header()
         with Vertical(id="use-remote"):
-            yield Label("Use Remote", id="use-remote-title")
+            yield Static(TITLE_ART, id="use-remote-title")
             yield DeviceOptionList(id="device-picker")
             yield Label("", id="no-devices")
         yield Footer()

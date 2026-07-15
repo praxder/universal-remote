@@ -28,6 +28,8 @@ class UniversalRemoteApp(App[None]):
     #devices-title { width: 36; text-align: left; margin: 1 0 1 0; }
     /* wider than #devices-title so the "Add/Edit Device" banner never wraps */
     #add-title { width: 52; text-align: left; margin: 1 0 2 0; }
+    /* wide enough for the "Select Device" banner; padded above and below */
+    #use-remote-title { width: 58; text-align: left; margin: 1 0 1 0; }
     /* slight left indent on Save to offset it from the fields above */
     #add-device #save { margin: 1 0 0 1; }
     /* duplicate-save error: hidden until there is a message, then shown in red */
