@@ -78,6 +78,32 @@ class TestRemoteSurface:
 
         asyncio.run(scenario())
 
+    def test_given_bordered_buttons_when_shown_then_their_fill_does_not_bleed_past_the_border(
+        self, tmp_path
+    ):
+        # Regression: a solid button fill paints the border cells too, so the thin
+        # round border glyph sat inside a filled cell and the fill showed on the
+        # outer half of every border cell — a grey halo around each button. A
+        # transparent fill removes it; the border alone bounds the button. Both
+        # enabled and disabled keys must stay transparent — disabled once carried
+        # an opaque $panel fill that bled the same way (a dimmed label is the cue).
+        store = _store_with_device(tmp_path)
+        caps = Capabilities(keys=frozenset(Key) - {Key.NUM_5}, text=True)
+        adapter = FakeAdapter(platform="fake-tv", capabilities=caps)
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                enabled = app.screen.query_one("#key-menu", Button)
+                disabled = app.screen.query_one("#key-num_5", Button)
+                assert disabled.disabled
+                # alpha 0 == fully transparent: no fill to bleed past the border.
+                assert enabled.styles.background.a == 0
+                assert disabled.styles.background.a == 0
+
+        asyncio.run(scenario())
+
     def test_given_the_number_pad_when_shown_then_digits_are_not_clipped(
         self, tmp_path
     ):

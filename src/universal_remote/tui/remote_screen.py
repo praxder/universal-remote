@@ -41,17 +41,22 @@ class RemoteScreen(Screen[None]):
     # `Button.-default`), whose class specificity beats a plain `RemoteScreen
     # Button` — so the `round` border only wins from an id-scoped selector.
     # A dimmed disabled look is set explicitly (Apple TV shows many disabled keys);
-    # `!important` beats Textual's built-in disabled text-opacity (0.6), and the
-    # panel background is a second cue.
+    # `!important` beats Textual's built-in disabled text-opacity (0.6).
+    # The fill is transparent, not Textual's default `$surface`: a solid fill
+    # paints the border cells too, so the thin `round` glyph sits in a filled cell
+    # and the fill shows on the outer half of every border cell — a halo bleeding
+    # past the outline. Transparent leaves the border alone to bound each button.
+    # Disabled keys inherit that transparent fill (a dimmed label is their cue).
     # The fuller, bigger button set no longer fits a minimal 80×24 terminal — the
     # remote sizes to its content and the screen scrolls on very short terminals,
     # while filling a normal one. `test_..._does_not_scroll` pins the supported
     # baseline size.
     DEFAULT_CSS = """
     #remote Button {
-        height: 3; border: round $primary; min-width: 0; padding: 0 1; margin: 0 1;
+        height: 3; border: round $primary; background: transparent;
+        min-width: 0; padding: 0 1; margin: 0 1;
     }
-    #remote Button:disabled { text-opacity: 40% !important; background: $panel; }
+    #remote Button:disabled { text-opacity: 40% !important; }
     /* Auto heights so the button set sizes to its content: if it exceeds the
        terminal the screen scrolls (a visible, testable signal) rather than the
        rows silently compressing. The row containers default to 1fr and would
