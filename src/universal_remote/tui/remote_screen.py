@@ -68,6 +68,9 @@ class RemoteScreen(Screen[None]):
     #row-top, #row-chan-vol, #row-media, #numpad-row, #dpad {
         align-horizontal: center; margin-bottom: 1;
     }
+    /* Channel/volume and media transport sit flush as one cluster, so the
+       channel/volume row drops the gap the shared rule adds below it. */
+    #row-chan-vol { margin-bottom: 0; }
     /* D-pad forms a centered cross: each of the three rows centers its own
        content, so ▲/▼ line up over OK. (align-horizontal on the vertical #dpad
        would center the block but left-pack the narrow ▲/▼.) A uniform button
