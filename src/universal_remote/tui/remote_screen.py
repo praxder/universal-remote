@@ -46,14 +46,24 @@ class RemoteScreen(Screen[None]):
     # Textual's built-in disabled text-opacity (0.6), and the panel background is
     # a second, border-independent cue.
     DEFAULT_CSS = """
-    #remote Button { height: 1; border: none; min-width: 0; }
+    #remote Button { height: 1; border: none; min-width: 0; margin: 0 1; }
     #remote Button:disabled { text-opacity: 40% !important; background: $panel; }
     /* Auto heights so the button set sizes to its content: if it ever exceeds the
        terminal the screen scrolls (a visible, testable signal) rather than the
        rows silently compressing into an unreadable smear. The row containers
-       default to 1fr and would otherwise stretch to fill. */
+       default to 1fr and would otherwise stretch to fill. Center the stack so it
+       reads like a physical remote instead of a left-packed list. */
     #remote, RemoteScreen Horizontal, RemoteScreen Vertical { height: auto; }
-    #numpad { grid-size: 3; grid-rows: 1; grid-columns: 5; width: auto; height: auto; }
+    /* Every group is a full-width row whose content is centered, so narrow groups
+       (D-pad, number pad) sit centered rather than packed to the left edge. */
+    #row-top, #row-chan-vol, #row-media, #numpad-row, #dpad {
+        align-horizontal: center; margin-bottom: 1;
+    }
+    /* D-pad forms a centered cross: each of the three rows centers its own
+       content, so ▲/▼ line up over OK. (align-horizontal on the vertical #dpad
+       would center the block but left-pack the narrow ▲/▼.) */
+    #dpad-up, #dpad-mid, #dpad-down { align-horizontal: center; }
+    #numpad { grid-size: 3; grid-rows: 1; grid-columns: 5; grid-gutter: 0 1; width: auto; height: auto; }
     """
 
     BINDINGS = [
@@ -97,12 +107,14 @@ class RemoteScreen(Screen[None]):
                 yield self._key_button(Key.HOME, "⌂ Home")
                 yield self._key_button(Key.BACK, "↩ Back")
             with Vertical(id="dpad"):
-                yield self._key_button(Key.UP, "▲")
-                with Horizontal():
+                with Horizontal(id="dpad-up"):
+                    yield self._key_button(Key.UP, "▲")
+                with Horizontal(id="dpad-mid"):
                     yield self._key_button(Key.LEFT, "◀")
                     yield self._key_button(Key.OK, "OK")
                     yield self._key_button(Key.RIGHT, "▶")
-                yield self._key_button(Key.DOWN, "▼")
+                with Horizontal(id="dpad-down"):
+                    yield self._key_button(Key.DOWN, "▼")
             with Horizontal(id="row-chan-vol"):
                 yield self._key_button(Key.CH_UP, "Ch +")
                 yield self._key_button(Key.CH_DOWN, "Ch −")
@@ -116,9 +128,10 @@ class RemoteScreen(Screen[None]):
                 yield self._key_button(Key.PLAY_PAUSE, "▶❚❚")
                 yield self._key_button(Key.STOP, "■")
                 yield self._key_button(Key.FAST_FORWARD, "▶▶")
-            with Grid(id="numpad"):
-                for digit in (1, 2, 3, 4, 5, 6, 7, 8, 9, 0):
-                    yield self._key_button(Key[f"NUM_{digit}"], str(digit))
+            with Horizontal(id="numpad-row"):
+                with Grid(id="numpad"):
+                    for digit in (1, 2, 3, 4, 5, 6, 7, 8, 9, 0):
+                        yield self._key_button(Key[f"NUM_{digit}"], str(digit))
             yield TextField(placeholder="Press 't' to type…", id="text", disabled=True)
             yield Label("", id="text-status")
         yield Footer()

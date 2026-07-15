@@ -72,6 +72,30 @@ class TestRemoteSurface:
 
         asyncio.run(scenario())
 
+    def test_given_the_dpad_when_shown_then_it_forms_a_centered_cross(self, tmp_path):
+        # The D-pad should read like a physical remote: Up and Down centered over
+        # OK, with Left and Right symmetric around it — not left-packed in a column.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        def center(button):
+            return button.region.x + button.region.width / 2
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=(80, 24)) as pilot:
+                await _goto_remote(app, pilot)
+                q = app.screen.query_one
+                up, ok, down = (q(f"#key-{k}", Button) for k in ("up", "ok", "down"))
+                left, right = q("#key-left", Button), q("#key-right", Button)
+                # Up and Down sit over OK (within a cell), forming the vertical bar.
+                assert abs(center(up) - center(ok)) <= 1
+                assert abs(center(down) - center(ok)) <= 1
+                # Left and Right flank OK symmetrically, forming the horizontal bar.
+                assert center(left) < center(ok) < center(right)
+
+        asyncio.run(scenario())
+
     def test_given_the_remote_when_shown_then_every_key_has_a_button(self, tmp_path):
         store = _store_with_device(tmp_path)
         adapter = FakeAdapter(platform="fake-tv")
