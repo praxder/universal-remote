@@ -2,7 +2,7 @@
 
 ### Requirement: On-screen remote surface
 
-The Use Remote mode SHALL present a remote resembling a physical remote with a menu key, a D-pad (up, down, left, right), OK, Back, Home, volume up, volume down, mute, channel up and channel down, the media-transport keys play, pause, play/pause, rewind, and fast-forward and stop, a number pad for the digits 0 through 9, and a text field. Every button MUST be clickable with the mouse. The rewind and fast-forward buttons SHALL use scan-style icons. The remote SHALL lay out so that its full button set fits a standard 80×24 terminal without scrolling.
+The Use Remote mode SHALL present a remote resembling a physical remote with a menu key, a D-pad (up, down, left, right), OK, Back, Home, volume up, volume down, mute, channel up and channel down, the media-transport keys play, pause, play/pause, rewind, and fast-forward and stop, a number pad for the digits 0 through 9, and a text field. Every button MUST be clickable with the mouse. The rewind and fast-forward buttons SHALL use scan-style icons. The remote's buttons SHALL be bordered and sized for comfortable reading, laid out to resemble a physical remote (centered groups, the D-pad as a cross). The remote SHALL size to its content; on a terminal too short to show the full set it SHALL scroll so every button stays reachable rather than clipping.
 
 #### Scenario: Remote renders the button set
 
@@ -14,10 +14,15 @@ The Use Remote mode SHALL present a remote resembling a physical remote with a m
 - **WHEN** the user clicks an enabled remote button
 - **THEN** the corresponding key is sent to the selected device
 
-#### Scenario: Full remote fits without scrolling
+#### Scenario: Full remote fits a standard-height terminal
 
-- **WHEN** the user opens Use Remote on a standard 80×24 terminal
-- **THEN** the full button set is visible without scrolling the remote
+- **WHEN** the user opens Use Remote on a terminal at least the supported baseline height
+- **THEN** the full button set is visible without scrolling
+
+#### Scenario: Short terminal scrolls rather than clips
+
+- **WHEN** the terminal is too short to show the full remote
+- **THEN** the remote scrolls so every button remains reachable rather than being clipped
 
 ### Requirement: Keyboard control of the remote
 

@@ -11,6 +11,10 @@ from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
 from universal_remote.tui.remote_screen import RemoteScreen, TextField
 
+# The bordered remote is taller than a minimal 80×24 terminal; this is the
+# supported baseline the full button set fits without scrolling.
+_FIT_SIZE = (80, 45)
+
 
 def _app(store, adapter):
     registry = AdapterRegistry()
@@ -33,7 +37,7 @@ async def _goto_remote(app, pilot):
 
 
 class TestRemoteSurface:
-    def test_given_the_full_button_set_on_an_80x24_terminal_then_the_remote_does_not_scroll(
+    def test_given_the_full_button_set_at_the_baseline_size_then_the_remote_does_not_scroll(
         self, tmp_path
     ):
         # Arrange: a full-capability adapter so every button renders.
@@ -42,33 +46,54 @@ class TestRemoteSurface:
 
         async def scenario():
             app = _app(store, adapter)
-            async with app.run_test(size=(80, 24)) as pilot:
+            async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
 
                 # Assert: the whole screen fits — no vertical scroll range. The
                 # remote sizes to its content (`#remote` is height:auto), so a
-                # button set taller than 80×24 makes the screen scroll and this
-                # fires; compact one-row buttons keep it at zero.
+                # button set taller than the baseline makes the screen scroll and
+                # this fires; at the supported baseline it stays at zero.
                 assert app.screen.max_scroll_y == 0
 
         asyncio.run(scenario())
 
-    def test_given_the_compact_style_when_shown_then_buttons_render_a_visible_row(
+    def test_given_the_bordered_style_when_shown_then_buttons_render_full_height(
         self, tmp_path
     ):
-        # Regression: the borderless compact style must leave each button one row
-        # tall. If `border: none` fails to win, box-sizing collapses the content
-        # to zero rows and every button renders blank (no label).
+        # Regression: bordered buttons must render their full box — border plus a
+        # visible content row. outer_size is the whole box (3); size is the content
+        # region inside the border (1). If the border rule fails to win, box-sizing
+        # collapses the content and buttons render blank.
         store = _store_with_device(tmp_path)
         adapter = FakeAdapter(platform="fake-tv")
 
         async def scenario():
             app = _app(store, adapter)
-            async with app.run_test(size=(80, 24)) as pilot:
+            async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
                 for key in (Key.MENU, Key.OK, Key.VOL_UP, Key.NUM_0):
                     button = app.screen.query_one(f"#key-{key.name.lower()}", Button)
-                    assert button.size.height == 1
+                    assert button.outer_size.height == 3  # border + content row
+                    assert button.size.height == 1  # content not collapsed
+
+        asyncio.run(scenario())
+
+    def test_given_the_number_pad_when_shown_then_digits_are_not_clipped(
+        self, tmp_path
+    ):
+        # Regression: a grid cell minus the button's side margin once left zero
+        # content width, so the digit rendered blank. Each digit needs a visible
+        # content column.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                for digit in range(10):
+                    button = app.screen.query_one(f"#key-num_{digit}", Button)
+                    assert button.size.width >= 1  # digit not clipped away
 
         asyncio.run(scenario())
 
@@ -83,7 +108,7 @@ class TestRemoteSurface:
 
         async def scenario():
             app = _app(store, adapter)
-            async with app.run_test(size=(80, 24)) as pilot:
+            async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
                 q = app.screen.query_one
                 up, ok, down = (q(f"#key-{k}", Button) for k in ("up", "ok", "down"))
@@ -102,7 +127,7 @@ class TestRemoteSurface:
 
         async def scenario():
             app = _app(store, adapter)
-            async with app.run_test() as pilot:
+            async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
                 ids = {button.id for button in app.screen.query(Button)}
                 expected = {f"key-{key.name.lower()}" for key in Key}
@@ -118,7 +143,7 @@ class TestRemoteSurface:
 
         async def scenario():
             app = _app(store, adapter)
-            async with app.run_test() as pilot:
+            async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
                 await pilot.click("#key-menu")
                 await pilot.click("#key-ch_up")
@@ -137,7 +162,7 @@ class TestRemoteSurface:
 
         async def scenario():
             app = _app(store, adapter)
-            async with app.run_test() as pilot:
+            async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
                 for key in (
                     Key.REWIND,
@@ -167,7 +192,7 @@ class TestRemoteSurface:
 
         async def scenario():
             app = _app(store, adapter)
-            async with app.run_test() as pilot:
+            async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
                 await pilot.click("#key-mute")
                 await pilot.pause()
@@ -184,7 +209,7 @@ class TestRemoteSurface:
 
         async def scenario():
             app = _app(store, adapter)
-            async with app.run_test() as pilot:
+            async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
                 await pilot.press("up")
                 await pilot.press("left")
@@ -209,7 +234,7 @@ class TestRemoteSurface:
 
         async def scenario():
             app = _app(store, adapter)
-            async with app.run_test() as pilot:
+            async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
                 await pilot.press("h")
                 await pilot.press("j")
@@ -232,7 +257,7 @@ class TestRemoteSurface:
 
         async def scenario():
             app = _app(store, adapter)
-            async with app.run_test() as pilot:
+            async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
                 await pilot.press("space")
                 await pilot.pause()
@@ -249,7 +274,7 @@ class TestRemoteSurface:
 
         async def scenario():
             app = _app(store, adapter)
-            async with app.run_test() as pilot:
+            async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
                 await pilot.press("t")  # enter the text field
                 await pilot.pause()
@@ -269,7 +294,7 @@ class TestRemoteSurface:
 
         async def scenario():
             app = _app(store, adapter)
-            async with app.run_test() as pilot:
+            async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
                 await pilot.click("#key-num_5")
                 await pilot.pause()
@@ -286,7 +311,7 @@ class TestRemoteSurface:
 
         async def scenario():
             app = _app(store, adapter)
-            async with app.run_test() as pilot:
+            async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
                 for digit in range(10):
                     await pilot.press(str(digit))
@@ -304,7 +329,7 @@ class TestRemoteSurface:
 
         async def scenario():
             app = _app(store, adapter)
-            async with app.run_test() as pilot:
+            async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
                 await pilot.press("t")  # enter the text field
                 await pilot.pause()
@@ -329,7 +354,7 @@ class TestRemoteSurface:
 
         async def scenario():
             app = _app(store, adapter)
-            async with app.run_test() as pilot:
+            async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
                 await pilot.press("5")
                 await pilot.pause()
@@ -349,7 +374,7 @@ class TestRemoteSurface:
 
         async def scenario():
             app = _app(store, adapter)
-            async with app.run_test() as pilot:
+            async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
                 adapter.sessions[0].dispatch_error = RuntimeError("device dropped")
 

@@ -35,24 +35,28 @@ class TextField(Input):
 class RemoteScreen(Screen[None]):
     """A physical-remote-like surface driven by clicks and by the keyboard."""
 
-    # Compact one-row buttons so the fuller button set fits an 80×24 terminal
-    # without scrolling. The `#remote` id scope is deliberate: Textual sets
-    # Button borders per-variant (e.g. `Button.-default`), whose class specificity
-    # beats a plain `RemoteScreen Button` — so `border: none` only wins from an
-    # id-scoped selector. Without the border removed, box-sizing eats the single
-    # row and the label renders on zero rows (blank buttons).
-    # Borderless removes Textual's default disabled cue, so a dimmed disabled look
-    # is set explicitly (Apple TV shows many disabled keys); `!important` beats
-    # Textual's built-in disabled text-opacity (0.6), and the panel background is
-    # a second, border-independent cue.
+    # Bordered buttons (three rows tall, padded) so the remote reads at a
+    # comfortable size rather than a cramped one-row list. The `#remote` id scope
+    # is deliberate: Textual sets Button borders per-variant (e.g.
+    # `Button.-default`), whose class specificity beats a plain `RemoteScreen
+    # Button` — so the `round` border only wins from an id-scoped selector.
+    # A dimmed disabled look is set explicitly (Apple TV shows many disabled keys);
+    # `!important` beats Textual's built-in disabled text-opacity (0.6), and the
+    # panel background is a second cue.
+    # The fuller, bigger button set no longer fits a minimal 80×24 terminal — the
+    # remote sizes to its content and the screen scrolls on very short terminals,
+    # while filling a normal one. `test_..._does_not_scroll` pins the supported
+    # baseline size.
     DEFAULT_CSS = """
-    #remote Button { height: 1; border: none; min-width: 0; margin: 0 1; }
+    #remote Button {
+        height: 3; border: round $primary; min-width: 0; padding: 0 1; margin: 0 1;
+    }
     #remote Button:disabled { text-opacity: 40% !important; background: $panel; }
-    /* Auto heights so the button set sizes to its content: if it ever exceeds the
+    /* Auto heights so the button set sizes to its content: if it exceeds the
        terminal the screen scrolls (a visible, testable signal) rather than the
-       rows silently compressing into an unreadable smear. The row containers
-       default to 1fr and would otherwise stretch to fill. Center the stack so it
-       reads like a physical remote instead of a left-packed list. */
+       rows silently compressing. The row containers default to 1fr and would
+       otherwise stretch to fill. Center the stack so it reads like a physical
+       remote instead of a left-packed list. */
     #remote, RemoteScreen Horizontal, RemoteScreen Vertical { height: auto; }
     /* Every group is a full-width row whose content is centered, so narrow groups
        (D-pad, number pad) sit centered rather than packed to the left edge. */
@@ -63,7 +67,10 @@ class RemoteScreen(Screen[None]):
        content, so ▲/▼ line up over OK. (align-horizontal on the vertical #dpad
        would center the block but left-pack the narrow ▲/▼.) */
     #dpad-up, #dpad-mid, #dpad-down { align-horizontal: center; }
-    #numpad { grid-size: 3; grid-rows: 1; grid-columns: 5; grid-gutter: 0 1; width: auto; height: auto; }
+    #numpad { grid-size: 3; grid-rows: 3; grid-columns: 7; grid-gutter: 0 1; width: auto; height: auto; }
+    /* Fill the grid cell (no side margin) so the digit is not clipped: a grid
+       cell minus the button's own margin left zero content width. */
+    #numpad Button { margin: 0; width: 100%; }
     """
 
     BINDINGS = [
@@ -99,8 +106,9 @@ class RemoteScreen(Screen[None]):
         self._device = device
 
     def compose(self) -> ComposeResult:
+        # The device name lives in the header (see on_mount), not a separate row,
+        # so the button set gets that row back.
         yield Header()
-        yield Label(f"Remote — {self._device.name}", id="remote-title")
         with Container(id="remote"):
             with Horizontal(id="row-top"):
                 yield self._key_button(Key.MENU, "☰ Menu")
@@ -137,11 +145,18 @@ class RemoteScreen(Screen[None]):
         yield Footer()
 
     def on_mount(self) -> None:
+        # Show the device in the header instead of a dedicated title row; restore
+        # the app title when the remote closes so other screens are unaffected.
+        self._previous_title = self.app.title
+        self.app.title = f"Remote — {self._device.name}"
         for key in Key:
             if not self._capabilities.supports(key):
                 self.query_one(f"#key-{key.name.lower()}", Button).disabled = True
         if not self._capabilities.text:
             self._status("Text entry is not supported on this device")
+
+    def on_unmount(self) -> None:
+        self.app.title = self._previous_title
 
     def _status(self, message: str) -> None:
         self.query_one("#text-status", Label).update(message)
