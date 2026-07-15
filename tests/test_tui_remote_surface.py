@@ -113,11 +113,16 @@ class TestRemoteSurface:
                 q = app.screen.query_one
                 up, ok, down = (q(f"#key-{k}", Button) for k in ("up", "ok", "down"))
                 left, right = q("#key-left", Button), q("#key-right", Button)
-                # Up and Down sit over OK (within a cell), forming the vertical bar.
-                assert abs(center(up) - center(ok)) <= 1
-                assert abs(center(down) - center(ok)) <= 1
+                # Up and Down sit exactly over OK (uniform D-pad button width),
+                # forming the vertical bar.
+                assert center(up) == center(ok)
+                assert center(down) == center(ok)
                 # Left and Right flank OK symmetrically, forming the horizontal bar.
                 assert center(left) < center(ok) < center(right)
+                # Single-glyph labels (OK is a ⏎ icon, not "OK") so each centers
+                # exactly in the odd-width button; a 2-char label would sit left.
+                for button in (up, down, left, right, ok):
+                    assert len(str(button.label)) == 1
 
         asyncio.run(scenario())
 

@@ -65,8 +65,11 @@ class RemoteScreen(Screen[None]):
     }
     /* D-pad forms a centered cross: each of the three rows centers its own
        content, so ▲/▼ line up over OK. (align-horizontal on the vertical #dpad
-       would center the block but left-pack the narrow ▲/▼.) */
+       would center the block but left-pack the narrow ▲/▼.) A uniform button
+       width makes ▲/▼/OK center identically — a 1-char arrow and 2-char OK would
+       otherwise round to slightly different centers. */
     #dpad-up, #dpad-mid, #dpad-down { align-horizontal: center; }
+    #dpad Button { width: 7; }
     #numpad { grid-size: 3; grid-rows: 3; grid-columns: 7; grid-gutter: 0 1; width: auto; height: auto; }
     /* Fill the grid cell (no side margin) so the digit is not clipped: a grid
        cell minus the button's own margin left zero content width. */
@@ -119,7 +122,7 @@ class RemoteScreen(Screen[None]):
                     yield self._key_button(Key.UP, "▲")
                 with Horizontal(id="dpad-mid"):
                     yield self._key_button(Key.LEFT, "◀")
-                    yield self._key_button(Key.OK, "OK")
+                    yield self._key_button(Key.OK, "⏎")
                     yield self._key_button(Key.RIGHT, "▶")
                 with Horizontal(id="dpad-down"):
                     yield self._key_button(Key.DOWN, "▼")
