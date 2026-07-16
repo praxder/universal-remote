@@ -15,7 +15,7 @@ The application SHALL launch into a menu offering two modes: Manage Devices and 
 - **THEN** the application navigates to that mode
 
 ### Requirement: Device management screens
-The Manage Devices mode SHALL present a "Devices" ASCII-art banner, the saved devices, and an always-present add entry as the last row of the list, backed by the device store and exposing add, edit, and delete. When one or more devices are saved, the mode SHALL list the devices first, then a separator, then the add entry; when no devices are saved, the list SHALL show only the add entry. Selecting the add entry — by Enter or by mouse click — SHALL open the add flow. Selecting a device row — by Enter or by mouse click — SHALL open that device for editing. Deleting a device SHALL be triggered by the Backspace key while a device row is highlighted, and SHALL require the user to confirm before the device is removed: the system SHALL present a confirmation prompt naming the device, remove the device only when the user confirms, and leave the store unchanged when the user cancels. The confirmation prompt SHALL default keyboard focus to its cancel action and SHALL let the user move focus between its confirm and cancel actions with the arrow keys. Pressing Backspace while the add entry is highlighted SHALL do nothing. The add and edit screen SHALL present an ASCII-art banner titled "Add Device" when adding and "Edit Device" when editing, styled with the same top and bottom margin as the "Devices" banner. The add and edit screen SHALL order its cells as device type, then name, then IP address. When adding, the device type SHALL be a selector offering the registered platforms by their human-readable names and defaulting to the first; when editing, the device type SHALL be shown as a read-only cell while the name and IP address remain editable. The device-type cell, the name and IP address cells, and the Save button SHALL be reachable both by Tab and by the Up and Down arrow keys — Up moves focus to the previous cell and Down to the next — while the Left and Right arrows continue to move the text cursor within a focused input. Because the Up and Down arrows navigate between cells, the device-type dropdown SHALL open on Enter or Space rather than on an arrow key. The Save button's left edge SHALL be aligned with the cells above it.
+The Manage Devices mode SHALL present a "Devices" ASCII-art banner, the saved devices, and an always-present add entry as the last row of the list, backed by the device store and exposing add, edit, and delete. When one or more devices are saved, the mode SHALL list the devices first, then a separator, then the add entry; when no devices are saved, the list SHALL show only the add entry. Selecting the add entry — by Enter or by mouse click — SHALL open device discovery (see the "Add device via discovery" requirement). Selecting a device row — by Enter or by mouse click — SHALL open that device for editing. Deleting a device SHALL be triggered by the Backspace key while a device row is highlighted, and SHALL require the user to confirm before the device is removed: the system SHALL present a confirmation prompt naming the device, remove the device only when the user confirms, and leave the store unchanged when the user cancels. The confirmation prompt SHALL default keyboard focus to its cancel action and SHALL let the user move focus between its confirm and cancel actions with the arrow keys. Pressing Backspace while the add entry is highlighted SHALL do nothing. The add and edit screen SHALL present an ASCII-art banner titled "Add Device" when adding and "Edit Device" when editing, styled with the same top and bottom margin as the "Devices" banner. The add and edit screen SHALL order its cells as device type, then name, then IP address. When adding, the device type SHALL be a selector offering the registered platforms by their human-readable names and defaulting to the first; when editing, the device type SHALL be shown as a read-only cell while the name and IP address remain editable. The device-type cell, the name and IP address cells, and the Save button SHALL be reachable both by Tab and by the Up and Down arrow keys — Up moves focus to the previous cell and Down to the next — while the Left and Right arrows continue to move the text cursor within a focused input. Because the Up and Down arrows navigate between cells, the device-type dropdown SHALL open on Enter or Space rather than on an arrow key. The Save button's left edge SHALL be aligned with the cells above it.
 
 #### Scenario: Devices listed above the add row
 - **WHEN** the user opens Manage Devices with one or more saved devices
@@ -25,9 +25,9 @@ The Manage Devices mode SHALL present a "Devices" ASCII-art banner, the saved de
 - **WHEN** the user opens Manage Devices with no saved devices
 - **THEN** the list shows only the add entry as its single row
 
-#### Scenario: Add entry opens the add flow
+#### Scenario: Add entry opens device discovery
 - **WHEN** the user selects the add entry by Enter or by mouse click
-- **THEN** the application presents the manual entry and confirmation flow and saves the result
+- **THEN** the application opens the device discovery screen and a scan begins
 
 #### Scenario: Selecting a device edits it
 - **WHEN** the user selects a device row by Enter or by mouse click
@@ -308,4 +308,32 @@ The Use Remote device picker SHALL display a reachability indicator next to each
 #### Scenario: Unreachable device remains selectable
 - **WHEN** a device shown with a red indicator is selected
 - **THEN** the application begins the connect/pair flow for it exactly as for any other device
+
+### Requirement: Add device via discovery
+The Manage Devices add entry SHALL open a device discovery screen that lists devices discovered on the local network — each row showing the device's name, its human-readable platform, and its IP address — and presents "+ Add manually" as the last row. The screen SHALL indicate while a scan is in progress and SHALL populate discovered rows as scans answer rather than waiting for all scans to finish. The "+ Add manually" row SHALL be present and selectable before the scan completes, and selecting it SHALL open the existing manual add flow. Selecting a discovered row SHALL save that device to the store — without manual entry and without pairing — persisting its name, platform, IP address, and any adapter-provided reconnection identifier, then return to the saved-device list. The screen SHALL be dismissible, returning to the saved-device list, while a scan is still in progress.
+
+#### Scenario: Discovered device shows name, type, and IP
+- **WHEN** a device has been discovered
+- **THEN** its row shows the device name, its human-readable platform, and its IP address
+
+#### Scenario: Rows stream in during the scan
+- **WHEN** a scan is in progress and a device is discovered
+- **THEN** its row appears without waiting for the scan to finish
+
+#### Scenario: Manual entry is available before the scan finishes
+- **WHEN** the discovery screen is shown and the scan has not finished
+- **THEN** "+ Add manually" is present as the last row and is selectable
+
+#### Scenario: Manual row opens the manual add flow
+- **WHEN** the user selects "+ Add manually"
+- **THEN** the existing manual entry and confirmation flow opens
+
+#### Scenario: Selecting a discovered device adds it
+- **WHEN** the user selects a discovered row
+- **THEN** the device is saved to the store with its name, platform, and IP address, and its reconnection identifier when the scan provided one
+- **AND** the screen returns to the saved-device list showing the newly added device
+
+#### Scenario: Screen is dismissible while scanning
+- **WHEN** a scan is in progress and the user dismisses the discovery screen
+- **THEN** the application returns to the saved-device list without error
 
