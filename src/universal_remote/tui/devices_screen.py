@@ -246,6 +246,7 @@ class AddDeviceScreen(Screen[None]):
             error.update(conflict)
             error.display = True
             return
+        added = self._existing is None
         if self._existing is not None:
             self._existing.name = name
             self._existing.ip = ip
@@ -255,6 +256,8 @@ class AddDeviceScreen(Screen[None]):
                 Device(name=name, platform=self._selected_platform(), ip=ip)
             )
         self.app.pop_screen()
+        if added:
+            self.app.notify(f'Added "{name}".')
 
     def action_focus_previous(self) -> None:
         self.focus_previous()

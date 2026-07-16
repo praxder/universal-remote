@@ -167,6 +167,41 @@ class TestSelectDiscovered:
             ("Bedroom", "apple-tv", "10.0.0.42", "atv-9")
         ]
 
+    def test_given_a_discovered_row_when_saved_then_a_success_toast_is_shown(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        registry = _registry(
+            FakeDiscoverAdapter(
+                platform="apple-tv",
+                display_name="Apple TV",
+                devices=[
+                    DiscoveredDevice(
+                        name="Bedroom",
+                        platform="apple-tv",
+                        ip="10.0.0.42",
+                        identifier="atv-9",
+                    )
+                ],
+            )
+        )
+
+        async def scenario():
+            app = UniversalRemoteApp(store=store, registry=registry)
+            async with app.run_test() as pilot:
+                app.push_screen(DiscoverScreen())
+                await pilot.pause()
+                await pilot.pause()
+                picker = app.screen.query_one("#discover-list", OptionList)
+                picker.highlighted = 0  # the discovered row
+                await pilot.pause()
+                await pilot.press("enter")
+                await pilot.pause()
+                messages = [n.message for n in app._notifications]
+                assert 'Added "Bedroom".' in messages
+
+        asyncio.run(scenario())
+
 
 class TestDivider:
     def test_given_discovered_devices_when_shown_then_a_divider_sits_above_the_manual_row(

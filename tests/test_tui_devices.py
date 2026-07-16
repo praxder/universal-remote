@@ -284,6 +284,26 @@ class TestAddDevice:
         assert saved[0].ip == "10.0.0.9"
         assert saved[0].platform == "fake-tv"
 
+    def test_given_a_manual_device_when_saved_then_a_success_toast_is_shown(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                app.screen.query_one("#ip", Input).value = "10.0.0.9"
+                app.screen.query_one("#name", Input).value = "Bedroom TV"
+                await pilot.click("#save")
+                await pilot.pause()
+                messages = [n.message for n in app._notifications]
+                assert 'Added "Bedroom TV".' in messages
+
+        asyncio.run(scenario())
+
     def test_given_the_add_flow_when_opened_then_cells_are_ordered_type_name_ip(
         self, tmp_path
     ):
@@ -601,6 +621,27 @@ class TestEditAndDelete:
         remaining = store.list()
         assert len(remaining) == 1
         assert remaining[0].name == "New"
+
+    def test_given_a_selected_device_when_edited_then_no_added_toast_is_shown(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Old", platform="fake-tv", ip="1.1.1.1"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                app.screen.query_one("#name", Input).value = "New"
+                await pilot.click("#save")
+                await pilot.pause()
+                messages = [n.message for n in app._notifications]
+                assert not any("Added" in m for m in messages)
+
+        asyncio.run(scenario())
 
     def test_given_two_devices_when_one_is_deleted_then_only_it_is_removed(
         self, tmp_path

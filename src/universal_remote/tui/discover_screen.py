@@ -120,6 +120,7 @@ class DiscoverScreen(Screen[None]):
             )
         )
         self.app.pop_screen()
+        self.app.notify(f'Added "{device.name}".')
 
     def action_back(self) -> None:
         self.app.pop_screen()
