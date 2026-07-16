@@ -56,8 +56,9 @@ class ConnectingModal(ModalScreen[Session | None]):
                     yield Button("Cancel", id="cancel")
             with Vertical(id="connecting-error"):
                 yield Label("", id="connect-error")
-                yield Button("Retry", id="retry")
-                yield Button("Back", id="back")
+                with Center(id="error-buttons"):
+                    yield Button("Retry", id="retry")
+                    yield Button("Back", id="back")
 
     def on_mount(self) -> None:
         self._start()

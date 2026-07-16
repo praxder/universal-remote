@@ -54,6 +54,7 @@ class UniversalRemoteApp(App[None]):
     #connect-error { text-align: center; margin-bottom: 1; }
     #connecting Button { width: 16; margin-top: 1; }
     #cancel-row { width: 100%; }  /* full width so its centered button centers in the box */
+    #error-buttons { width: 100%; }  /* full width so the retry/back column centers in the box */
     /* pairing: dim the device selection behind a centered dialog box */
     PairingScreen { align: center middle; background: $background 60%; }
     #pairing {
