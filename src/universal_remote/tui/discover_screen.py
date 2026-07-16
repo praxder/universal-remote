@@ -9,9 +9,9 @@ the scan finishes. Selecting a discovered row saves it directly (no pairing here
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import Footer, Header, Label, OptionList, Static
+from textual.widgets import Footer, Header, Label, LoadingIndicator, OptionList, Static
 from textual.widgets.option_list import Option
 
 from ..devices.models import Device
@@ -48,7 +48,9 @@ class DiscoverScreen(Screen[None]):
         with Vertical(id="discover"):
             yield Static(TITLE_ART, id="discover-title")
             yield DeviceOptionList(id="discover-list")
-            yield Label("Searching…", id="discover-status")
+            with Horizontal(id="discover-status"):
+                yield LoadingIndicator()
+                yield Label("Searching for devices…", id="discover-status-text")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -72,7 +74,7 @@ class DiscoverScreen(Screen[None]):
             self._finish_scan()
 
     def _finish_scan(self) -> None:
-        self.query_one("#discover-status", Label).display = False
+        self.query_one("#discover-status").display = False
 
     def _reload(self) -> None:
         picker = self.query_one("#discover-list", DeviceOptionList)
@@ -83,6 +85,8 @@ class DiscoverScreen(Screen[None]):
         for index, device in enumerate(devices):
             picker.add_option(Option(self._row_prompt(index, device), id=device.ip))
         picker.device_count = len(devices)
+        if devices:  # a divider separates discovered rows from the manual fallback
+            picker.add_option(None)
         picker.add_option(Option("+ Add manually", id=ADD_MANUAL_ID))
         picker.highlighted = (
             0 if previous is None else min(previous, picker.option_count - 1)

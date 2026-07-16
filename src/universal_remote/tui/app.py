@@ -32,8 +32,13 @@ class UniversalRemoteApp(App[None]):
     #use-remote-title { width: 58; text-align: left; margin: 1 0 1 0; }
     /* wide enough for the "Discover" banner; padded like the Devices banner */
     #discover-title { width: 40; text-align: left; margin: 1 0 1 0; }
-    /* the "searching" indicator, dimmed and hidden once every scan is done */
-    #discover-status { margin-top: 1; color: $text-muted; }
+    /* the "searching" indicator: an animated spinner + bold text, hidden once done */
+    #discover-status { height: 1; margin-top: 1; }
+    #discover-status LoadingIndicator { width: 8; height: 1; color: $accent; }
+    #discover-status-text {
+        width: auto; height: 1; margin-left: 2;
+        text-style: bold; color: $accent;
+    }
     /* slight left indent on Save to offset it from the fields above */
     #add-device #save { margin: 1 0 0 1; }
     /* duplicate-save error: hidden until there is a message, then shown in red */

@@ -8,7 +8,7 @@ from universal_remote.discovery import DiscoveredDevice
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
 from universal_remote.tui.devices_screen import AddDeviceScreen, DeviceListScreen
-from universal_remote.tui.discover_screen import DiscoverScreen
+from universal_remote.tui.discover_screen import ADD_MANUAL_ID, DiscoverScreen
 
 
 def _registry(*adapters: FakeDiscoverAdapter) -> AdapterRegistry:
@@ -166,6 +166,76 @@ class TestSelectDiscovered:
         assert [(d.name, d.platform, d.ip, d.identifier) for d in saved] == [
             ("Bedroom", "apple-tv", "10.0.0.42", "atv-9")
         ]
+
+
+class TestDivider:
+    def test_given_discovered_devices_when_shown_then_a_divider_sits_above_the_manual_row(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        registry = _registry(
+            FakeDiscoverAdapter(
+                platform="roku",
+                display_name="Roku",
+                devices=[
+                    DiscoveredDevice(name="Living Room", platform="roku", ip="10.0.0.5")
+                ],
+            )
+        )
+
+        async def scenario():
+            app = UniversalRemoteApp(store=store, registry=registry)
+            async with app.run_test() as pilot:
+                app.push_screen(DiscoverScreen())
+                await pilot.pause()
+                await pilot.pause()
+                picker = app.screen.query_one("#discover-list", OptionList)
+                # the last device (the row just above the manual one) draws the divider
+                last_device = picker.get_option_at_index(picker.option_count - 2)
+                assert last_device._divider is True
+
+        asyncio.run(scenario())
+
+    def test_given_no_discovered_devices_when_only_manual_row_then_there_is_no_divider(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        registry = _registry(FakeDiscoverAdapter(platform="roku", devices=[]))
+
+        async def scenario():
+            app = UniversalRemoteApp(store=store, registry=registry)
+            async with app.run_test() as pilot:
+                app.push_screen(DiscoverScreen())
+                await pilot.pause()
+                await pilot.pause()
+                picker = app.screen.query_one("#discover-list", OptionList)
+                assert picker.option_count == 1
+                manual = picker.get_option_at_index(0)
+                assert manual.id == ADD_MANUAL_ID
+                assert manual._divider is False
+
+        asyncio.run(scenario())
+
+
+class TestSearchingIndicator:
+    def test_given_a_scan_in_flight_when_shown_then_an_animated_spinner_is_visible(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        gate = asyncio.Event()  # never set: the scan stays in flight
+        registry = _registry(FakeDiscoverAdapter(platform="roku", gate=gate))
+
+        async def scenario():
+            app = UniversalRemoteApp(store=store, registry=registry)
+            async with app.run_test() as pilot:
+                app.push_screen(DiscoverScreen())
+                await pilot.pause()
+                status = app.screen.query_one("#discover-status")
+                assert status.display is True
+                # an animated loading spinner accompanies the searching text
+                assert app.screen.query_one("#discover-status LoadingIndicator")
+
+        asyncio.run(scenario())
 
 
 class TestDismiss:
