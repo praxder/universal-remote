@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 from ipaddress import ip_address
 
+from pyatv.const import Protocol
+
 from universal_remote.capabilities import Capabilities
 from universal_remote.errors import PairingCancelledError
 from universal_remote.keys import Key
@@ -292,11 +294,20 @@ class FakeAppleTvConfig:
         identifier: str = "atv-id-123",
         name: str = "Apple TV",
         address: str = "10.0.0.5",
+        has_companion: bool = True,
     ) -> None:
         self.identifier = identifier
         self.name = name
         self.address = ip_address(address)
         self.applied_credentials: dict[object, str] = {}
+        # A genuine Apple TV exposes Companion; an AirPlay-only device (an LG/Samsung
+        # TV answering pyatv's scan via AirPlay 2) does not.
+        self._has_companion = has_companion
+
+    def get_service(self, protocol: object) -> object | None:
+        if protocol is Protocol.Companion and self._has_companion:
+            return object()
+        return None
 
     def set_credentials(self, protocol: object, credentials: str) -> bool:
         self.applied_credentials[protocol] = credentials

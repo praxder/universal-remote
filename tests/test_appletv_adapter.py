@@ -219,6 +219,17 @@ class TestAppleTvDiscovery:
             )
         ]
 
+    def test_given_an_airplay_only_device_when_discovering_then_it_is_excluded(self):
+        # LG/Samsung TVs answer pyatv's scan via AirPlay 2 but expose no Companion —
+        # the only protocol this adapter pairs and controls over — so listing them
+        # would mislabel a WebOS TV as an Apple TV it cannot drive.
+        fake = FakePyatv(config=FakeAppleTvConfig(has_companion=False))
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        found = run(adapter.discover(timeout=3))
+
+        assert found == []
+
     def test_given_discovery_when_scanning_then_it_is_network_wide_with_no_hosts(self):
         fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-1"))
         adapter = AppleTvAdapter(pyatv_api=fake)

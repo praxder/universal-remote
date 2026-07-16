@@ -28,11 +28,15 @@ The system SHALL treat discovery as best-effort. A platform that is not discover
 - **AND** no error is surfaced to the user
 
 ### Requirement: Resolve multi-protocol collisions by fixed platform priority
-When one device is discovered under more than one platform — identified by a shared IP address — the system SHALL report it exactly once, keeping the highest-priority platform. The priority order SHALL rank Fire TV above Android TV. Other supported platforms use distinct, vendor-specific discovery targets and do not collide.
+When one device is discovered under more than one platform — identified by a shared IP address — the system SHALL report it exactly once, keeping the highest-priority platform. The priority order SHALL rank Fire TV above Android TV. The SSDP-based platforms use distinct, vendor-specific discovery targets and do not cross-claim. The Apple TV scan is the exception: AirPlay 2 makes it answer for many third-party TVs (LG, Samsung), so the Apple TV scan SHALL report only devices that expose the Companion protocol it pairs and controls over, so an AirPlay-capable non-Apple TV is not reported as an Apple TV.
 
 #### Scenario: Fire TV wins over Android TV
 - **WHEN** a single IP address is discovered as both a Fire TV and an Android TV
 - **THEN** a single entry is reported for that IP with the Fire TV platform
+
+#### Scenario: An AirPlay-only TV is not reported as an Apple TV
+- **WHEN** a non-Apple TV that supports AirPlay 2 but not the Companion protocol answers the Apple TV scan
+- **THEN** it is not reported as an Apple TV, leaving its own platform's scan to report it under the correct platform
 
 #### Scenario: Distinct devices are both reported
 - **WHEN** two different IP addresses are discovered

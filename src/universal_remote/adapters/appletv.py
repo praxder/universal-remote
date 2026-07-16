@@ -96,6 +96,9 @@ class AppleTvAdapter:
     async def discover(self, timeout: float) -> list[DiscoveredDevice]:
         # A network-wide scan (no `hosts`) so pyatv finds every Apple TV; each
         # config already carries the name, address, and identifier we persist.
+        # AirPlay 2 makes pyatv's scan promiscuous — LG/Samsung TVs answer it too —
+        # so keep only devices exposing Companion, the protocol this adapter pairs
+        # and controls over; anything else it could list but never drive.
         loop = asyncio.get_running_loop()
         configs = await self._pyatv.scan(loop, timeout=int(timeout))
         return [
@@ -106,6 +109,7 @@ class AppleTvAdapter:
                 identifier=config.identifier,
             )
             for config in configs
+            if config.get_service(Protocol.Companion) is not None
         ]
 
     async def pair(self, device: "Device", *, prompt=None) -> str:
