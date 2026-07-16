@@ -12,6 +12,7 @@ dependencies = [
     "pyatv>=0.18.0",
     "rokuecp>=0.19",
     "adb-shell[async]>=0.4.4",
+    "androidtvremote2>=0.3.1",
 ]
 
 [project.scripts]

@@ -1,9 +1,9 @@
 # universal-remote
 
 A local, terminal-based universal TV remote. Pretty, mouse-clickable, and fully
-keyboard-drivable. Ships with Samsung Tizen, LG WebOS, Apple TV, Roku, and Fire
-TV adapters; the architecture is platform-agnostic so new TV platforms are "one
-new adapter module + register it."
+keyboard-drivable. Ships with Samsung Tizen, LG WebOS, Apple TV, Roku, Fire TV,
+and Android TV / Google TV adapters; the architecture is platform-agnostic so new
+TV platforms are "one new adapter module + register it."
 
 ## Requirements
 
@@ -26,25 +26,26 @@ menus and lists alongside the arrow keys.
 
 1. From the menu choose **Manage Devices** (`d`), then **Add** (`a`).
 2. When more than one platform is available, pick the TV's **platform**
-   (Samsung Tizen, LG WebOS, Apple TV, Roku, or Fire TV) from the selector. With
-   a single adapter installed the selector is hidden and that platform is used
-   automatically.
+   (Samsung Tizen, LG WebOS, Apple TV, Roku, Fire TV, or Android TV) from the
+   selector. With a single adapter installed the selector is hidden and that
+   platform is used automatically.
 3. Enter the TV's IP address and press **Probe** — the app queries the TV's info
    endpoint (`http://<ip>:8001/api/v2/`) and pre-fills name, model, and MAC.
    If the probe fails, fill the fields in manually; adding is never blocked.
-   Probe targets the Samsung info endpoint, so **LG, Apple TV, Roku, and Fire TV
-   use manual entry**.
+   Probe targets the Samsung info endpoint, so **LG, Apple TV, Roku, Fire TV, and
+   Android TV use manual entry**.
 4. **Save**.
 
 ## Pair and control
 
 1. From the menu choose **Use Remote** (`r`) and pick your TV.
 2. First time only: Samsung, LG, and Fire TV show an **authorization popup** —
-   accept it. **Apple TV** instead displays a **PIN** on the TV screen; type it
-   into the app when prompted. The credential is saved so later sessions connect
-   without re-pairing. Pairing is cancellable (Esc). **Roku needs no pairing** —
-   its control protocol is unauthenticated, so it connects directly with no
-   popup, PIN, or stored credential.
+   accept it. **Apple TV** instead displays a **PIN** on the TV screen, and
+   **Android TV / Google TV** a pairing **code**; type it into the app when
+   prompted. The credential is saved so later sessions connect without
+   re-pairing. Pairing is cancellable (Esc). **Roku needs no pairing** — its
+   control protocol is unauthenticated, so it connects directly with no popup,
+   PIN, or stored credential.
 3. The remote appears. Control it by mouse (click any button) or keyboard:
 
    | Key | Action |
@@ -125,6 +126,21 @@ menus and lists alongside the arrow keys.
 - **Text and key codes are best-effort**, as with the other platforms: key
   events and `input text` are sent over ADB, and a failed text send reports
   "not supported" rather than silently dropping input.
+
+## Caveats (Android TV / Google TV reality)
+
+- **Works out of the box — no developer mode.** Android TV / Google TV (Sony,
+  TCL, Nvidia Shield, Philips, Chromecast with Google TV) ships the native
+  Android TV Remote protocol v2, on by default, so unlike Fire TV there is no ADB
+  setup.
+- **Code pairing.** First connect shows a pairing **code** on the TV; type it
+  into the app to pair. A client certificate is saved as the credential and
+  replayed on later connections, so the code is not shown again.
+- **Full key set.** The d-pad, OK, back, home, menu, volume, **mute**, **channel
+  up/down**, the media-transport keys, and the number pad are all available.
+- **Text is best-effort**, as with the other platforms: entry depends on the
+  focused app's input field, and a failed send reports "not supported" rather
+  than silently dropping input.
 
 ## Storage
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .adapters.androidtv import register as register_androidtv
 from .adapters.appletv import register as register_appletv
 from .adapters.firetv import register as register_firetv
 from .adapters.lg import register as register_lg
@@ -19,6 +20,7 @@ def build_app(store: DeviceStore | None = None) -> UniversalRemoteApp:
     register_appletv(registry)
     register_roku(registry)
     register_firetv(registry)
+    register_androidtv(registry)
     return UniversalRemoteApp(store=store, registry=registry)
 
 

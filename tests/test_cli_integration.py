@@ -2,6 +2,7 @@ import asyncio
 
 from textual.widgets import Button
 
+from universal_remote.adapters.androidtv import PLATFORM as ANDROIDTV_PLATFORM
 from universal_remote.adapters.appletv import PLATFORM as APPLETV_PLATFORM
 from universal_remote.adapters.firetv import PLATFORM as FIRETV_PLATFORM
 from universal_remote.adapters.lg import PLATFORM as LG_PLATFORM
@@ -28,6 +29,7 @@ class TestCliWiring:
                 assert app.registry.is_supported(APPLETV_PLATFORM)
                 assert app.registry.is_supported(ROKU_PLATFORM)
                 assert app.registry.is_supported(FIRETV_PLATFORM)
+                assert app.registry.is_supported(ANDROIDTV_PLATFORM)
                 labels = {str(button.label) for button in app.screen.query(Button)}
                 assert {"Manage Devices", "Use Remote"} <= labels
 

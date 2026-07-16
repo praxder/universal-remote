@@ -359,6 +359,108 @@ class FakePyatv:
         return self.atv
 
 
+class FakeAndroidTvRemote:
+    """Stands in for `androidtvremote2.AndroidTVRemote`; drives pairing and records sends.
+
+    `async_generate_cert_if_missing` writes cert and key files to the constructed
+    paths exactly as the real library does, so the adapter's pair flow reads them
+    back to build the credential. Key and text sends are synchronous, matching the
+    library, and `disconnect` is idempotent.
+    """
+
+    def __init__(
+        self,
+        client_name: str,
+        certfile: str,
+        keyfile: str,
+        host: str,
+        connect_error: Exception | None = None,
+        reject_text: bool = False,
+    ) -> None:
+        self.client_name = client_name
+        self.certfile = certfile
+        self.keyfile = keyfile
+        self.host = host
+        self.cert_generated = False
+        self.pairing_started = False
+        self.finished_code: str | None = None
+        self.connected = False
+        self.disconnected = False
+        self.sent_keys: list[str] = []
+        self.sent_text: list[str] = []
+        # When set, async_connect raises it — an unreachable, refused, timed-out,
+        # or unauthorized device (the real library's CannotConnect/InvalidAuth).
+        self.connect_error = connect_error
+        # When True, send_text raises — stands in for an unfocused IME.
+        self.reject_text = reject_text
+
+    async def async_generate_cert_if_missing(self) -> bool:
+        # Multi-line PEM shape (like the real library), so a credential packed from
+        # it exercises real newline escaping when the store serializes it to JSON.
+        with open(self.certfile, "w") as cert_file:
+            cert_file.write(
+                "-----BEGIN CERTIFICATE-----\nZmFrZQ==\n-----END CERTIFICATE-----\n"
+            )
+        with open(self.keyfile, "w") as key_file:
+            key_file.write(
+                "-----BEGIN PRIVATE KEY-----\nZmFrZQ==\n-----END PRIVATE KEY-----\n"
+            )
+        self.cert_generated = True
+        return True
+
+    async def async_start_pairing(self) -> None:
+        self.pairing_started = True
+
+    async def async_finish_pairing(self, pairing_code: str) -> None:
+        self.finished_code = pairing_code
+
+    async def async_connect(self) -> None:
+        if self.connect_error is not None:
+            raise self.connect_error
+        self.connected = True
+
+    def send_key_command(self, key_code, direction=3) -> None:
+        self.sent_keys.append(key_code)
+
+    def send_text(self, text: str) -> None:
+        if self.reject_text:
+            raise RuntimeError("no focused IME")
+        self.sent_text.append(text)
+
+    def disconnect(self) -> None:
+        self.disconnected = True
+
+
+class FakeAndroidTvRemoteFactory:
+    """Builds `FakeAndroidTvRemote`s and records each, so tests inspect the flow.
+
+    Pairing and connect each construct one remote; `remotes[-1]` is the latest.
+    """
+
+    def __init__(
+        self,
+        connect_error: Exception | None = None,
+        reject_text: bool = False,
+    ) -> None:
+        self.connect_error = connect_error
+        self.reject_text = reject_text
+        self.remotes: list[FakeAndroidTvRemote] = []
+
+    def __call__(
+        self, *, client_name: str, certfile: str, keyfile: str, host: str, **_kwargs
+    ) -> FakeAndroidTvRemote:
+        remote = FakeAndroidTvRemote(
+            client_name,
+            certfile,
+            keyfile,
+            host,
+            connect_error=self.connect_error,
+            reject_text=self.reject_text,
+        )
+        self.remotes.append(remote)
+        return remote
+
+
 class FakeAdapter:
     """A configurable adapter double with a scriptable pair result."""
 
