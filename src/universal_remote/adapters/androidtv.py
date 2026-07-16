@@ -14,11 +14,12 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Awaitable, Callable
 
 from androidtvremote2 import AndroidTVRemote
 
 from ..capabilities import Capabilities
+from ..discovery import DiscoveredDevice, MdnsHit, browse_mdns
 from ..errors import (
     ConnectionFailedError,
     PairingCancelledError,
@@ -34,6 +35,8 @@ if TYPE_CHECKING:
 PLATFORM = "androidtv"
 CLIENT_NAME = "Universal Remote"  # the label the TV shows during pairing
 PAIR_PROMPT = "Enter the code shown on your Android TV"
+# The Remote v2 mDNS service; its instance name is the TV's friendly name.
+DISCOVERY_SERVICE = "_androidtvremote2._tcp.local."
 
 _CERTFILE = "cert.pem"
 _KEYFILE = "key.pem"
@@ -68,6 +71,9 @@ _CAPABILITIES = Capabilities(keys=frozenset(ANDROIDTV_KEYS), text=True)
 
 # A factory so tests inject a fake in place of the real library client.
 RemoteFactory = Callable[..., AndroidTVRemote]
+
+# The mDNS browse seam, injected so discovery is testable without a live network.
+MdnsBrowser = Callable[[str, float], Awaitable[list[MdnsHit]]]
 
 
 def _pack_credential(cert: str, key: str) -> str:
@@ -131,11 +137,25 @@ class AndroidTvAdapter:
     display_name = "Android TV"
     reachability_port = 6466  # Remote v2 api/command port
 
-    def __init__(self, remote_factory: RemoteFactory = AndroidTVRemote) -> None:
+    def __init__(
+        self,
+        remote_factory: RemoteFactory = AndroidTVRemote,
+        browse: MdnsBrowser = browse_mdns,
+    ) -> None:
         self._remote_factory = remote_factory
+        self._browse = browse
 
     def capabilities(self) -> Capabilities:
         return _CAPABILITIES
+
+    async def discover(self, timeout: float) -> list[DiscoveredDevice]:
+        # The mDNS instance name is the TV's friendly name; a blank one falls back
+        # to the IP inside DiscoveredDevice.
+        hits = await self._browse(DISCOVERY_SERVICE, timeout)
+        return [
+            DiscoveredDevice(name=hit.name, platform=PLATFORM, ip=hit.ip)
+            for hit in hits
+        ]
 
     async def pair(self, device: "Device", *, prompt=None) -> str:
         # A PIN adapter cannot pair without a way to ask for the code.

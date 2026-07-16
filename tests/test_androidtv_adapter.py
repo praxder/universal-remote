@@ -7,12 +7,14 @@ from androidtvremote2 import CannotConnect, InvalidAuth
 from tests.fakes import FakeAndroidTvRemoteFactory
 from universal_remote.adapters.androidtv import (
     ANDROIDTV_KEYS,
+    DISCOVERY_SERVICE,
     PLATFORM,
     AndroidTvAdapter,
     AndroidTvSession,
     register,
 )
 from universal_remote.devices.models import Device
+from universal_remote.discovery import DiscoveredDevice, MdnsHit
 from universal_remote.devices.store import DeviceStore
 from universal_remote.errors import (
     ConnectionFailedError,
@@ -325,3 +327,22 @@ class TestAndroidTvText:
                 await session.send_text("hello")
 
         run(scenario())
+
+
+class TestAndroidTvDiscovery:
+    def test_given_mdns_hits_when_discovering_then_they_map_to_discovered_devices(self):
+        # Arrange: a fake browse returns one responder for the Android TV service.
+        seen: list[str] = []
+
+        async def fake_browse(service_type, timeout):
+            seen.append(service_type)
+            return [MdnsHit(name="Living Room", ip="10.0.0.5", properties={})]
+
+        adapter = AndroidTvAdapter(browse=fake_browse)
+
+        found = run(adapter.discover(timeout=3))
+
+        assert found == [
+            DiscoveredDevice(name="Living Room", platform=PLATFORM, ip="10.0.0.5")
+        ]
+        assert seen == [DISCOVERY_SERVICE]

@@ -6,12 +6,13 @@ this adapter needs no pairing and issues no credential (`requires_pairing = Fals
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Awaitable, Callable
 
 from aiohttp import ClientSession
 from rokuecp import Roku, RokuError
 
 from ..capabilities import Capabilities
+from ..discovery import DiscoveredDevice, SsdpHit, search_ssdp
 from ..errors import ConnectionFailedError, PairingCancelledError, TextUnsupportedError
 from ..keys import Key
 from ..session import BaseSession
@@ -21,6 +22,8 @@ if TYPE_CHECKING:
     from ..registry import AdapterRegistry
 
 PLATFORM = "roku"
+# The Roku ECP SSDP search target; the friendly name comes from device-info.
+DISCOVERY_TARGET = "roku:ecp"
 
 # Generic key -> rokuecp remote token. `Roku.remote` lower-cases its argument and
 # looks it up in `rokuecp.const.VALID_REMOTE_KEYS`, whose keys are these snake_case
@@ -50,6 +53,20 @@ _CAPABILITIES = Capabilities(keys=frozenset(ROKU_KEYS), text=True)
 # Factories so tests can inject a fake client and session in place of the real ones.
 ClientFactory = Callable[..., Roku]
 SessionFactory = Callable[[], ClientSession]
+
+# Discovery seams, injected so discovery is testable without a live network.
+SsdpSearcher = Callable[[str, float], Awaitable[list[SsdpHit]]]
+NameResolver = Callable[[str], Awaitable[str | None]]
+
+
+async def _resolve_roku_name(ip: str) -> str | None:
+    """Read a Roku's friendly name from its ECP device-info (best-effort)."""
+    session = ClientSession()
+    try:
+        device = await Roku(host=ip, session=session).update()
+        return device.info.name
+    finally:
+        await session.close()
 
 
 class RokuSession(BaseSession):
@@ -91,12 +108,31 @@ class RokuAdapter:
         self,
         client_factory: ClientFactory = Roku,
         session_factory: SessionFactory = ClientSession,
+        search: SsdpSearcher = search_ssdp,
+        resolve_name: NameResolver = _resolve_roku_name,
     ) -> None:
         self._client_factory = client_factory
         self._session_factory = session_factory
+        self._search = search
+        self._resolve_name = resolve_name
 
     def capabilities(self) -> Capabilities:
         return _CAPABILITIES
+
+    async def discover(self, timeout: float) -> list[DiscoveredDevice]:
+        # SSDP finds Roku IPs; the friendly name is a separate best-effort ECP
+        # read, so a failed name resolution still yields the device (named by IP).
+        hits = await self._search(DISCOVERY_TARGET, timeout)
+        devices = []
+        for hit in hits:
+            try:
+                name = await self._resolve_name(hit.ip)
+            except Exception:
+                name = None
+            devices.append(
+                DiscoveredDevice(name=name or "", platform=PLATFORM, ip=hit.ip)
+            )
+        return devices
 
     async def pair(self, device: "Device", *, prompt=None) -> str:
         # Roku needs no pairing; the UI never calls this. Fail loudly if reached.

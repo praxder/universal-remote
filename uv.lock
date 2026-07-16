@@ -134,6 +134,21 @@ wheels = [
 ]
 
 [[package]]
+name = "async-upnp-client"
+version = "0.47.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "defusedxml" },
+    { name = "python-didl-lite" },
+    { name = "voluptuous" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fc/bf/d859564cd6691fe2fc8e6cab67c3a2f6c9d1b03344d82d057e4312c387ba/async_upnp_client-0.47.0.tar.gz", hash = "sha256:f4a3bc001bed786dd576947ceaf0075c3ed6f821a3c00866fc7e7e688ccef954", size = 97872, upload-time = "2026-04-19T20:22:14.619Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/88/27/37f09d39fb4a7617a5ded95d1013b3a498c25857ca9445f3d8661f6e0ac6/async_upnp_client-0.47.0-py3-none-any.whl", hash = "sha256:a879b1041b03b347dcf009c243e084b9ecb19e9c521c39bd435438229dd99602", size = 89417, upload-time = "2026-04-19T20:22:13.271Z" },
+]
+
+[[package]]
 name = "attrs"
 version = "26.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -272,6 +287,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/6c/a0/db537264e234f7273a73ec020873d6d6b39dfd8a53db78b550ca8320440e/cryptography-49.0.0-cp39-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:67e1d20ad9ef3a563c59ef22e7a8a0b8210bd26604369ea4a30a7c66aefe504e", size = 4834820, upload-time = "2026-06-12T20:01:51.847Z" },
     { url = "https://files.pythonhosted.org/packages/93/77/8df9eb486495979bccecd1062e2eaf435250e84437040295b57d09048b0b/cryptography-49.0.0-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:42b0684e0e40cf26122427802486f6d93aea593612603a94fbf260c7eb1e9c1b", size = 4967968, upload-time = "2026-06-12T20:02:12.524Z" },
     { url = "https://files.pythonhosted.org/packages/c2/e6/f60198ea8d9dfa15fff9ed4ca02ce362f6eadd9ba757dcc50634c4257b63/cryptography-49.0.0-cp39-abi3-win_amd64.whl", hash = "sha256:026ac7423e6fa66872d3bf889be5974507da3944f866f704fa200eadacd00001", size = 3785547, upload-time = "2026-06-12T20:02:26.847Z" },
+]
+
+[[package]]
+name = "defusedxml"
+version = "0.7.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0f/d5/c66da9b79e5bdb124974bfe172b4daf3c984ebd9c2a06e2b8a4dc7331c72/defusedxml-0.7.1.tar.gz", hash = "sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69", size = 75520, upload-time = "2021-03-08T10:59:26.269Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/07/6c/aa3f2f849e01cb6a001cd8554a88d4c77c5c1a31c95bdf1cf9301e6d9ef4/defusedxml-0.7.1-py2.py3-none-any.whl", hash = "sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61", size = 25604, upload-time = "2021-03-08T10:59:24.45Z" },
 ]
 
 [[package]]
@@ -669,6 +693,18 @@ wheels = [
 ]
 
 [[package]]
+name = "python-didl-lite"
+version = "1.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "defusedxml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/be/95/34675b3a6be5de413921f288b823e64ca9528ac702c0c37ae5ed7e269343/python_didl_lite-1.5.0.tar.gz", hash = "sha256:6ed1c8db01426a4c282b1b810bb7d9ebb3abec7ea832e48e89972544568caec1", size = 17503, upload-time = "2026-01-03T10:32:40.656Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/13/24/a5f4a5e69cac8eb3be721a2b3271042fc8b785eb696f1c58ef79c5b003f9/python_didl_lite-1.5.0-py3-none-any.whl", hash = "sha256:88023b04458019e88cc3c64445a1da4d11bae0fbe1cd96f49888e53862610a97", size = 13686, upload-time = "2026-01-03T10:32:39.4Z" },
+]
+
+[[package]]
 name = "requests"
 version = "2.34.2"
 source = { registry = "https://pypi.org/simple" }
@@ -864,10 +900,12 @@ dependencies = [
     { name = "aiohttp" },
     { name = "aiowebostv" },
     { name = "androidtvremote2" },
+    { name = "async-upnp-client" },
     { name = "pyatv" },
     { name = "rokuecp" },
     { name = "samsungtvws", extra = ["async"] },
     { name = "textual" },
+    { name = "zeroconf" },
 ]
 
 [package.dev-dependencies]
@@ -883,10 +921,12 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.9" },
     { name = "aiowebostv", specifier = ">=0.7" },
     { name = "androidtvremote2", specifier = ">=0.3.1" },
+    { name = "async-upnp-client", specifier = ">=0.40" },
     { name = "pyatv", specifier = ">=0.18.0" },
     { name = "rokuecp", specifier = ">=0.19" },
     { name = "samsungtvws", extras = ["async"] },
     { name = "textual", specifier = ">=0.80" },
+    { name = "zeroconf", specifier = ">=0.130" },
 ]
 
 [package.metadata.requires-dev]
@@ -903,6 +943,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/53/0c/06f8b233b8fd13b9e5ee11424ef85419ba0d8ba0b3138bf360be2ff56953/urllib3-2.7.0.tar.gz", hash = "sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c", size = 433602, upload-time = "2026-05-07T16:13:18.596Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl", hash = "sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897", size = 131087, upload-time = "2026-05-07T16:13:17.151Z" },
+]
+
+[[package]]
+name = "voluptuous"
+version = "0.16.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/92/f4/0738e6849858deae22218be3bbb8207ba83a96e9d0ec7e8e8cd67b30e5ca/voluptuous-0.16.0.tar.gz", hash = "sha256:006535e22fed944aec17bef6e8725472476194743c87bd233e912eb463f8ff05", size = 54238, upload-time = "2025-12-18T23:18:46.08Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d1/00/0e0da784245c93cf346150ab67634177bf277f93b7a162bb56c928c39c04/voluptuous-0.16.0-py3-none-any.whl", hash = "sha256:ee342095263e1b5afbd4d418cb5adc92810eebfd07696bb033a261210df33db4", size = 31931, upload-time = "2025-12-18T23:18:44.694Z" },
 ]
 
 [[package]]

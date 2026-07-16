@@ -93,7 +93,11 @@ class DeviceListScreen(Screen[None]):
             self.app.push_screen(AddDeviceScreen(existing=device))
 
     def action_add(self) -> None:
-        self.app.push_screen(AddDeviceScreen())
+        # The add entry opens discovery first; manual entry is its last row. Imported
+        # lazily because discover_screen imports AddDeviceScreen from this module.
+        from .discover_screen import DiscoverScreen
+
+        self.app.push_screen(DiscoverScreen())
 
     def action_edit(self) -> None:
         device = self._selected()

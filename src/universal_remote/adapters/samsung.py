@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Awaitable, Callable
 
 from samsungtvws.async_remote import SamsungTVWSAsyncRemote
 from samsungtvws.remote import SendInputString, SendRemoteKey
 
 from ..capabilities import Capabilities
+from ..discovery import DiscoveredDevice, SsdpHit, resolve_upnp_name, search_ssdp
 from ..errors import ConnectionFailedError, TextUnsupportedError
 from ..keys import Key
 from ..session import BaseSession
@@ -18,6 +19,8 @@ if TYPE_CHECKING:
 
 PLATFORM = "samsung-tizen"
 APP_NAME = "UniversalRemote"
+# The Samsung SSDP search target; the friendly name comes from the UPnP device XML.
+DISCOVERY_TARGET = "urn:samsung.com:device:RemoteControlReceiver:1"
 CONTROL_PORT = 8002  # wss control channel; 8001 would be plain ws
 _PAIR_TIMEOUT = 30  # seconds to allow for tapping "Allow" on the TV
 _CONNECT_TIMEOUT = 10  # seconds to reach the TV before treating it as unreachable
@@ -55,6 +58,10 @@ _CAPABILITIES = Capabilities(keys=frozenset(SAMSUNG_KEYS), text=True)
 # Factory so tests can inject a fake transport in place of the real remote.
 RemoteFactory = Callable[..., SamsungTVWSAsyncRemote]
 
+# Discovery seams, injected so discovery is testable without a live network.
+SsdpSearcher = Callable[[str, float], Awaitable[list[SsdpHit]]]
+NameResolver = Callable[[str], Awaitable[str | None]]
+
 
 class SamsungSession(BaseSession):
     """A live connection to a Samsung TV; maps generic keys to Samsung codes."""
@@ -91,12 +98,31 @@ class SamsungTizenAdapter:
         self,
         remote_factory: RemoteFactory = SamsungTVWSAsyncRemote,
         connect_timeout: float = _CONNECT_TIMEOUT,
+        search: SsdpSearcher = search_ssdp,
+        resolve_name: NameResolver = resolve_upnp_name,
     ) -> None:
         self._remote_factory = remote_factory
         self._connect_timeout = connect_timeout
+        self._search = search
+        self._resolve_name = resolve_name
 
     def capabilities(self) -> Capabilities:
         return _CAPABILITIES
+
+    async def discover(self, timeout: float) -> list[DiscoveredDevice]:
+        # SSDP finds Samsung IPs; the friendly name is a separate best-effort UPnP
+        # read, so a failed name resolution still yields the device (named by IP).
+        hits = await self._search(DISCOVERY_TARGET, timeout)
+        devices = []
+        for hit in hits:
+            try:
+                name = await self._resolve_name(hit.location)
+            except Exception:
+                name = None
+            devices.append(
+                DiscoveredDevice(name=name or "", platform=PLATFORM, ip=hit.ip)
+            )
+        return devices
 
     async def pair(self, device: "Device", *, prompt=None) -> str:
         remote = self._remote_factory(

@@ -14,6 +14,7 @@ from universal_remote.tui.devices_screen import (
     ConfirmDeleteScreen,
     DeviceListScreen,
 )
+from universal_remote.tui.discover_screen import DiscoverScreen
 
 
 def _registry(*platforms: str):
@@ -32,6 +33,18 @@ def _index_of(option_list: OptionList, option_id: str) -> int:
         if option_list.get_option_at_index(index).id == option_id:
             return index
     raise AssertionError(f"option {option_id!r} not found")
+
+
+async def _open_manual_add(pilot) -> None:
+    """Open the manual add form via the discovery screen's "+ Add manually" row.
+
+    The add entry now opens discovery first; with the test registry's adapters
+    declaring no discovery, the manual row is the sole (highlighted) row.
+    """
+    await pilot.press("a")
+    await pilot.pause()
+    await pilot.press("enter")
+    await pilot.pause()
 
 
 class TestDeviceList:
@@ -116,7 +129,7 @@ class TestDeviceList:
 
 
 class TestSelection:
-    def test_given_the_add_row_when_selected_by_enter_then_the_add_flow_opens(
+    def test_given_the_add_row_when_selected_by_enter_then_discovery_opens(
         self, tmp_path
     ):
         store = DeviceStore(path=tmp_path / "d.json")
@@ -128,12 +141,11 @@ class TestSelection:
                 await pilot.pause()
                 await pilot.press("enter")
                 await pilot.pause()
-                assert isinstance(app.screen, AddDeviceScreen)
-                assert app.screen._existing is None
+                assert isinstance(app.screen, DiscoverScreen)
 
         asyncio.run(scenario())
 
-    def test_given_the_add_row_when_clicked_then_the_add_flow_opens(self, tmp_path):
+    def test_given_the_add_row_when_clicked_then_discovery_opens(self, tmp_path):
         store = DeviceStore(path=tmp_path / "d.json")
 
         async def scenario():
@@ -144,8 +156,7 @@ class TestSelection:
                 # the first list row renders at relative y=1 in the OptionList
                 await pilot.click("#device-list", offset=(2, 1))
                 await pilot.pause()
-                assert isinstance(app.screen, AddDeviceScreen)
-                assert app.screen._existing is None
+                assert isinstance(app.screen, DiscoverScreen)
 
         asyncio.run(scenario())
 
@@ -259,8 +270,7 @@ class TestAddDevice:
             async with app.run_test() as pilot:
                 await pilot.press("d")
                 await pilot.pause()
-                await pilot.press("a")
-                await pilot.pause()
+                await _open_manual_add(pilot)
                 assert isinstance(app.screen, AddDeviceScreen)
                 app.screen.query_one("#ip", Input).value = "10.0.0.9"
                 app.screen.query_one("#name", Input).value = "Bedroom TV"
@@ -284,8 +294,7 @@ class TestAddDevice:
             async with app.run_test() as pilot:
                 await pilot.press("d")
                 await pilot.pause()
-                await pilot.press("a")
-                await pilot.pause()
+                await _open_manual_add(pilot)
                 children = app.screen.query_one("#add-device").children
                 assert [w.id for w in children] == [
                     "add-title",
@@ -313,8 +322,7 @@ class TestAddDevice:
             async with app.run_test() as pilot:
                 await pilot.press("d")
                 await pilot.pause()
-                await pilot.press("a")
-                await pilot.pause()
+                await _open_manual_add(pilot)
                 selector = app.screen.query_one("#platform", Select)
                 labels = [(str(prompt), value) for prompt, value in selector._options]
                 assert labels == [
@@ -335,8 +343,7 @@ class TestAddDevice:
             async with app.run_test() as pilot:
                 await pilot.press("d")
                 await pilot.pause()
-                await pilot.press("a")
-                await pilot.pause()
+                await _open_manual_add(pilot)
                 banner = app.screen.query_one("#add-title", Static)
                 assert str(banner.render()) == ADD_TITLE_ART
 
@@ -371,8 +378,7 @@ class TestAddDevice:
             async with app.run_test() as pilot:
                 await pilot.press("d")
                 await pilot.pause()
-                await pilot.press("a")
-                await pilot.pause()
+                await _open_manual_add(pilot)
                 selector = app.screen.query_one("#platform", Select)
                 assert selector.value == "samsung-tizen"
                 selector.value = "lg-webos"
@@ -394,8 +400,7 @@ class TestDuplicateRejection:
             async with app.run_test() as pilot:
                 await pilot.press("d")
                 await pilot.pause()
-                await pilot.press("a")
-                await pilot.pause()
+                await _open_manual_add(pilot)
                 assert app.screen.query_one("#error", Label).display is False
 
         asyncio.run(scenario())
@@ -411,8 +416,7 @@ class TestDuplicateRejection:
             async with app.run_test() as pilot:
                 await pilot.press("d")
                 await pilot.pause()
-                await pilot.press("a")
-                await pilot.pause()
+                await _open_manual_add(pilot)
                 app.screen.query_one("#name", Input).value = "Living Room"
                 await pilot.click("#save")
                 await pilot.pause()
@@ -431,8 +435,7 @@ class TestDuplicateRejection:
             async with app.run_test() as pilot:
                 await pilot.press("d")
                 await pilot.pause()
-                await pilot.press("a")
-                await pilot.pause()
+                await _open_manual_add(pilot)
                 app.screen.query_one("#name", Input).value = "living room"
                 app.screen.query_one("#ip", Input).value = "10.0.0.9"
                 await pilot.click("#save")
@@ -456,8 +459,7 @@ class TestDuplicateRejection:
             async with app.run_test() as pilot:
                 await pilot.press("d")
                 await pilot.pause()
-                await pilot.press("a")
-                await pilot.pause()
+                await _open_manual_add(pilot)
                 app.screen.query_one("#name", Input).value = "Bedroom"
                 app.screen.query_one("#ip", Input).value = "10.0.0.5"
                 await pilot.click("#save")
@@ -481,13 +483,14 @@ class TestDuplicateRejection:
             async with app.run_test() as pilot:
                 await pilot.press("d")
                 await pilot.pause()
-                await pilot.press("a")
-                await pilot.pause()
+                await _open_manual_add(pilot)
                 app.screen.query_one("#name", Input).value = "Bedroom"
                 app.screen.query_one("#ip", Input).value = "10.0.0.9"
                 await pilot.click("#save")
                 await pilot.pause()
-                assert isinstance(app.screen, DeviceListScreen)
+                # A successful save closes the manual form back to the discovery
+                # screen (which sits between the device list and the add form).
+                assert isinstance(app.screen, DiscoverScreen)
 
         asyncio.run(scenario())
 
@@ -739,8 +742,7 @@ class TestVimNavigation:
             async with app.run_test() as pilot:
                 await pilot.press("d")
                 await pilot.pause()
-                await pilot.press("a")
-                await pilot.pause()
+                await _open_manual_add(pilot)
                 name = app.screen.query_one("#name", Input)
                 name.focus()
                 await pilot.pause()
@@ -791,8 +793,7 @@ class TestFormNavigation:
             async with app.run_test() as pilot:
                 await pilot.press("d")
                 await pilot.pause()
-                await pilot.press("a")
-                await pilot.pause()
+                await _open_manual_add(pilot)
                 app.screen.query_one("#platform", Select).focus()
                 await pilot.pause()
                 assert app.focused.id == "platform"
@@ -816,8 +817,7 @@ class TestFormNavigation:
             async with app.run_test() as pilot:
                 await pilot.press("d")
                 await pilot.pause()
-                await pilot.press("a")
-                await pilot.pause()
+                await _open_manual_add(pilot)
                 selector = app.screen.query_one("#platform", Select)
                 selector.focus()
                 await pilot.pause()

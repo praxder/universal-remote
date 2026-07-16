@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Awaitable, Callable
 
 from adb_shell.adb_device_async import AdbDeviceTcpAsync
 from adb_shell.auth.keygen import keygen as adb_keygen
 from adb_shell.auth.sign_pythonrsa import PythonRSASigner
 
 from ..capabilities import Capabilities
+from ..discovery import DiscoveredDevice, MdnsHit, browse_mdns
 from ..errors import ConnectionFailedError, TextUnsupportedError
 from ..keys import Key
 from ..session import BaseSession
@@ -27,6 +28,10 @@ if TYPE_CHECKING:
 
 PLATFORM = "firetv"
 ADB_PORT = 5555
+# The Amazon mDNS service; the friendly name is in the TXT "n" key, since the
+# instance name is a device code (e.g. "AFTMM").
+DISCOVERY_SERVICE = "_amzn-wplay._tcp.local."
+_NAME_TXT_KEY = "n"
 _PAIR_TIMEOUT = 30  # seconds to allow for accepting the authorization popup
 _CONNECT_TIMEOUT = 10  # seconds to reach the device before treating it unreachable
 
@@ -115,6 +120,9 @@ DeviceFactory = Callable[..., AdbDeviceTcpAsync]
 Keygen = Callable[[], tuple[str, str]]  # returns (public, private) key contents
 SignerFactory = Callable[..., PythonRSASigner]
 
+# The mDNS browse seam, injected so discovery is testable without a live network.
+MdnsBrowser = Callable[[str, float], Awaitable[list[MdnsHit]]]
+
 
 def _keygen() -> tuple[str, str]:
     """Generate a fresh ADB keypair in a temp dir, returning (public, private).
@@ -182,14 +190,28 @@ class FireTvAdapter:
         keygen: Keygen = _keygen,
         signer_factory: SignerFactory = PythonRSASigner,
         connect_timeout: float = _CONNECT_TIMEOUT,
+        browse: MdnsBrowser = browse_mdns,
     ) -> None:
         self._device_factory = device_factory
         self._keygen = keygen
         self._signer_factory = signer_factory
         self._connect_timeout = connect_timeout
+        self._browse = browse
 
     def capabilities(self) -> Capabilities:
         return _CAPABILITIES
+
+    async def discover(self, timeout: float) -> list[DiscoveredDevice]:
+        # The friendly name is in the TXT "n" key; a blank one falls back to the IP.
+        hits = await self._browse(DISCOVERY_SERVICE, timeout)
+        return [
+            DiscoveredDevice(
+                name=hit.properties.get(_NAME_TXT_KEY, ""),
+                platform=PLATFORM,
+                ip=hit.ip,
+            )
+            for hit in hits
+        ]
 
     async def pair(self, device: "Device", *, prompt=None) -> str:
         # Popup pairing (like Samsung/LG): generate a keypair, connect to trigger

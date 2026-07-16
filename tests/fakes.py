@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from ipaddress import ip_address
 
 from universal_remote.capabilities import Capabilities
 from universal_remote.errors import PairingCancelledError
@@ -280,10 +281,21 @@ class FakeAppleTv:
 
 
 class FakeAppleTvConfig:
-    """Stands in for a scanned `BaseConfig`: carries an identity and takes credentials."""
+    """Stands in for a scanned `BaseConfig`: identity, address, and taken credentials.
 
-    def __init__(self, identifier: str = "atv-id-123") -> None:
+    `address` is a real `IPv4Address` like pyatv's, so an adapter that forgets to
+    `str()` it is caught rather than silently passing.
+    """
+
+    def __init__(
+        self,
+        identifier: str = "atv-id-123",
+        name: str = "Apple TV",
+        address: str = "10.0.0.5",
+    ) -> None:
         self.identifier = identifier
+        self.name = name
+        self.address = ip_address(address)
         self.applied_credentials: dict[object, str] = {}
 
     def set_credentials(self, protocol: object, credentials: str) -> bool:
@@ -522,3 +534,29 @@ class FakeAdapter:
         session = FakeSession(self._capabilities)
         self.sessions.append(session)
         return session
+
+
+class FakeDiscoverAdapter:
+    """An adapter double that discovers canned devices, optionally gated mid-scan.
+
+    Only the surface the discovery screen touches — `platform`, `display_name`, and
+    `discover` — is provided. Pass a held `asyncio.Event` as `gate` to keep the scan
+    in flight so a test can assert streaming/manual-row behaviour before it finishes.
+    """
+
+    def __init__(
+        self,
+        platform: str = "fake-tv",
+        display_name: str | None = None,
+        devices: list | None = None,
+        gate: asyncio.Event | None = None,
+    ) -> None:
+        self.platform = platform
+        self.display_name = display_name or platform
+        self._devices = devices or []
+        self.gate = gate
+
+    async def discover(self, timeout: float) -> list:
+        if self.gate is not None:
+            await self.gate.wait()
+        return list(self._devices)

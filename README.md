@@ -25,16 +25,21 @@ menus and lists alongside the arrow keys.
 ## Add a TV
 
 1. From the menu choose **Manage Devices** (`d`), then **Add** (`a`).
-2. When more than one platform is available, pick the TV's **platform**
-   (Samsung Tizen, LG WebOS, Apple TV, Roku, Fire TV, or Android TV) from the
-   selector. With a single adapter installed the selector is hidden and that
-   platform is used automatically.
-3. Enter the TV's IP address and press **Probe** — the app queries the TV's info
-   endpoint (`http://<ip>:8001/api/v2/`) and pre-fills name, model, and MAC.
-   If the probe fails, fill the fields in manually; adding is never blocked.
-   Probe targets the Samsung info endpoint, so **LG, Apple TV, Roku, Fire TV, and
-   Android TV use manual entry**.
-4. **Save**.
+2. The app scans your local network and lists the TVs it finds — each row shows the
+   device's **name**, its **platform**, and its **IP address**. Rows stream in as
+   each platform answers, so you don't have to wait for the whole scan to finish.
+3. **Select a discovered TV** to add it — no platform or IP typing, and no pairing
+   yet (that happens the first time you use the remote). TVs you have already saved
+   are left out of the list.
+4. If your TV isn't listed, choose **+ Add manually** (always the last row) to open
+   the manual form: pick the **platform** (Samsung Tizen, LG WebOS, Apple TV, Roku,
+   Fire TV, or Android TV — the selector is hidden when only one adapter is
+   installed), enter a **name** and the TV's **IP address**, and **Save**.
+
+Discovery is best-effort: a TV that is off, on another subnet, or not yet set up
+(for example, a Fire TV with ADB debugging still disabled) simply won't appear, so
+manual entry is always available. You can leave the discovery screen (`Esc`) at any
+time, even while it is still scanning.
 
 ## Pair and control
 

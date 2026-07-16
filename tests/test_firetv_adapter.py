@@ -6,6 +6,7 @@ from adb_shell.exceptions import TcpTimeoutException
 from tests.fakes import FAKE_GETEVENT_LP, FakeAdbDevice, FakeAdbSigner, fake_keygen
 from universal_remote.adapters.firetv import (
     ADB_PORT,
+    DISCOVERY_SERVICE,
     EVDEV_KEYS,
     FIRETV_KEYS,
     PLATFORM,
@@ -16,6 +17,7 @@ from universal_remote.adapters.firetv import (
     register,
 )
 from universal_remote.devices.models import Device
+from universal_remote.discovery import DiscoveredDevice, MdnsHit
 from universal_remote.errors import (
     ConnectionFailedError,
     TextUnsupportedError,
@@ -400,3 +402,43 @@ class TestFireTvText:
                 await session.send_text("hi")
 
         run(scenario())
+
+
+class TestFireTvDiscovery:
+    def test_given_mdns_hits_when_discovering_then_the_txt_name_is_used(self):
+        # The Amazon service's instance name is a device code; the friendly name
+        # lives in the TXT "n" key, so discovery must read it from there.
+        seen: list[str] = []
+
+        async def fake_browse(service_type, timeout):
+            seen.append(service_type)
+            return [
+                MdnsHit(
+                    name="AFTMM",
+                    ip="10.0.0.5",
+                    properties={"n": "Living Room Fire TV"},
+                )
+            ]
+
+        adapter = FireTvAdapter(browse=fake_browse)
+
+        found = run(adapter.discover(timeout=3))
+
+        assert found == [
+            DiscoveredDevice(
+                name="Living Room Fire TV", platform=PLATFORM, ip="10.0.0.5"
+            )
+        ]
+        assert seen == [DISCOVERY_SERVICE]
+
+    def test_given_no_txt_name_when_discovering_then_the_name_falls_back_to_the_ip(
+        self,
+    ):
+        async def fake_browse(service_type, timeout):
+            return [MdnsHit(name="AFTMM", ip="10.0.0.5", properties={})]
+
+        adapter = FireTvAdapter(browse=fake_browse)
+
+        found = run(adapter.discover(timeout=3))
+
+        assert found[0].name == "10.0.0.5"

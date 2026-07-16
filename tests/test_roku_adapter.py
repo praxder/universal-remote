@@ -6,6 +6,7 @@ from rokuecp.const import VALID_REMOTE_KEYS
 
 from tests.fakes import FakeClientSession, FakeRoku
 from universal_remote.adapters.roku import (
+    DISCOVERY_TARGET,
     PLATFORM,
     ROKU_KEYS,
     RokuAdapter,
@@ -13,6 +14,7 @@ from universal_remote.adapters.roku import (
     register,
 )
 from universal_remote.devices.models import Device
+from universal_remote.discovery import DiscoveredDevice, SsdpHit
 from universal_remote.errors import (
     ConnectionFailedError,
     PairingCancelledError,
@@ -292,3 +294,40 @@ class TestRokuText:
                 await session.send_text("hi")
 
         run(scenario())
+
+
+class TestRokuDiscovery:
+    def test_given_ssdp_responders_when_discovering_then_the_ecp_name_is_resolved(self):
+        seen_targets: list[str] = []
+        seen_ips: list[str] = []
+
+        async def fake_search(target, timeout):
+            seen_targets.append(target)
+            return [SsdpHit(ip="10.0.0.5", location="http://10.0.0.5:8060/")]
+
+        async def fake_resolve_name(ip):
+            seen_ips.append(ip)
+            return "Living Room Roku"
+
+        adapter = RokuAdapter(search=fake_search, resolve_name=fake_resolve_name)
+
+        found = run(adapter.discover(timeout=3))
+
+        assert found == [
+            DiscoveredDevice(name="Living Room Roku", platform=PLATFORM, ip="10.0.0.5")
+        ]
+        assert seen_targets == [DISCOVERY_TARGET]
+        assert seen_ips == ["10.0.0.5"]
+
+    def test_given_name_resolution_fails_when_discovering_then_the_name_is_the_ip(self):
+        async def fake_search(target, timeout):
+            return [SsdpHit(ip="10.0.0.5", location="http://10.0.0.5:8060/")]
+
+        async def failing_resolve_name(ip):
+            raise OSError("device-info unreachable")
+
+        adapter = RokuAdapter(search=fake_search, resolve_name=failing_resolve_name)
+
+        found = run(adapter.discover(timeout=3))
+
+        assert found[0].name == "10.0.0.5"

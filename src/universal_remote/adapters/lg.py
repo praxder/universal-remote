@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Awaitable, Callable
 
 from aiowebostv import WebOsClient, endpoints
 
 from ..capabilities import Capabilities
+from ..discovery import DiscoveredDevice, SsdpHit, resolve_upnp_name, search_ssdp
 from ..errors import ConnectionFailedError, TextUnsupportedError
 from ..keys import Key
 from ..session import BaseSession
@@ -18,6 +19,8 @@ if TYPE_CHECKING:
 
 PLATFORM = "lg-webos"
 _CONNECT_TIMEOUT = 10  # seconds to reach the TV before treating it as unreachable
+# The LG SSDP search target; the friendly name comes from the UPnP device XML.
+DISCOVERY_TARGET = "urn:lge-com:service:webos-second-screen:1"
 
 # Generic key -> LG input-channel button name.
 LG_BUTTONS: dict[Key, str] = {
@@ -48,6 +51,10 @@ _CAPABILITIES = Capabilities(keys=frozenset(LG_BUTTONS), text=True)
 
 # Factory so tests can inject a fake client in place of the real WebOS client.
 ClientFactory = Callable[..., WebOsClient]
+
+# Discovery seams, injected so discovery is testable without a live network.
+SsdpSearcher = Callable[[str, float], Awaitable[list[SsdpHit]]]
+NameResolver = Callable[[str], Awaitable[str | None]]
 
 
 class LgWebOsSession(BaseSession):
@@ -85,12 +92,31 @@ class LgWebOsAdapter:
         self,
         client_factory: ClientFactory = WebOsClient,
         connect_timeout: float = _CONNECT_TIMEOUT,
+        search: SsdpSearcher = search_ssdp,
+        resolve_name: NameResolver = resolve_upnp_name,
     ) -> None:
         self._client_factory = client_factory
         self._connect_timeout = connect_timeout
+        self._search = search
+        self._resolve_name = resolve_name
 
     def capabilities(self) -> Capabilities:
         return _CAPABILITIES
+
+    async def discover(self, timeout: float) -> list[DiscoveredDevice]:
+        # SSDP finds LG IPs; the friendly name is a separate best-effort UPnP read,
+        # so a failed name resolution still yields the device (named by IP).
+        hits = await self._search(DISCOVERY_TARGET, timeout)
+        devices = []
+        for hit in hits:
+            try:
+                name = await self._resolve_name(hit.location)
+            except Exception:
+                name = None
+            devices.append(
+                DiscoveredDevice(name=name or "", platform=PLATFORM, ip=hit.ip)
+            )
+        return devices
 
     async def pair(self, device: "Device", *, prompt=None) -> str:
         client = self._client_factory(host=device.ip, client_key=None)

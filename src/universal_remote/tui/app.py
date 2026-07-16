@@ -30,6 +30,10 @@ class UniversalRemoteApp(App[None]):
     #add-title { width: 52; text-align: left; margin: 1 0 2 0; }
     /* wide enough for the "Select Device" banner; padded above and below */
     #use-remote-title { width: 58; text-align: left; margin: 1 0 1 0; }
+    /* wide enough for the "Discover" banner; padded like the Devices banner */
+    #discover-title { width: 40; text-align: left; margin: 1 0 1 0; }
+    /* the "searching" indicator, dimmed and hidden once every scan is done */
+    #discover-status { margin-top: 1; color: $text-muted; }
     /* slight left indent on Save to offset it from the fields above */
     #add-device #save { margin: 1 0 0 1; }
     /* duplicate-save error: hidden until there is a message, then shown in red */

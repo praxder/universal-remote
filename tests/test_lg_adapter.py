@@ -4,12 +4,14 @@ import pytest
 
 from tests.fakes import FakeWebOsClient
 from universal_remote.adapters.lg import (
+    DISCOVERY_TARGET,
     LG_BUTTONS,
     PLATFORM,
     LgWebOsAdapter,
     register,
 )
 from universal_remote.devices.models import Device
+from universal_remote.discovery import DiscoveredDevice, SsdpHit
 from universal_remote.errors import ConnectionFailedError, TextUnsupportedError
 from universal_remote.keys import Key
 from universal_remote.registry import AdapterRegistry
@@ -200,3 +202,44 @@ class TestLgText:
                 await session.send_text("hello")
 
         run(scenario())
+
+
+class TestLgDiscovery:
+    def test_given_ssdp_responders_when_discovering_then_the_upnp_name_is_resolved(
+        self,
+    ):
+        seen_targets: list[str] = []
+        seen_locations: list[str] = []
+
+        async def fake_search(target, timeout):
+            seen_targets.append(target)
+            return [SsdpHit(ip="10.0.0.5", location="http://10.0.0.5:1741/desc.xml")]
+
+        async def fake_resolve_name(location):
+            seen_locations.append(location)
+            return "Kitchen LG"
+
+        adapter = LgWebOsAdapter(search=fake_search, resolve_name=fake_resolve_name)
+
+        found = run(adapter.discover(timeout=3))
+
+        assert found == [
+            DiscoveredDevice(name="Kitchen LG", platform=PLATFORM, ip="10.0.0.5")
+        ]
+        assert seen_targets == [DISCOVERY_TARGET]
+        assert seen_locations == ["http://10.0.0.5:1741/desc.xml"]
+
+    def test_given_the_platform_when_discovering_then_it_is_the_registered_identifier(
+        self,
+    ):
+        async def fake_search(target, timeout):
+            return [SsdpHit(ip="10.0.0.5", location="http://10.0.0.5/d")]
+
+        async def fake_resolve_name(location):
+            return "Kitchen"
+
+        adapter = LgWebOsAdapter(search=fake_search, resolve_name=fake_resolve_name)
+
+        found = run(adapter.discover(timeout=3))
+
+        assert found[0].platform == "lg-webos"

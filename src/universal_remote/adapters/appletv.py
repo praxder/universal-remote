@@ -9,6 +9,7 @@ import pyatv
 from pyatv.const import Protocol
 
 from ..capabilities import Capabilities
+from ..discovery import DiscoveredDevice
 from ..errors import (
     ConnectionFailedError,
     PairingCancelledError,
@@ -91,6 +92,21 @@ class AppleTvAdapter:
 
     def capabilities(self) -> Capabilities:
         return _CAPABILITIES
+
+    async def discover(self, timeout: float) -> list[DiscoveredDevice]:
+        # A network-wide scan (no `hosts`) so pyatv finds every Apple TV; each
+        # config already carries the name, address, and identifier we persist.
+        loop = asyncio.get_running_loop()
+        configs = await self._pyatv.scan(loop, timeout=int(timeout))
+        return [
+            DiscoveredDevice(
+                name=config.name,
+                platform=PLATFORM,
+                ip=str(config.address),
+                identifier=config.identifier,
+            )
+            for config in configs
+        ]
 
     async def pair(self, device: "Device", *, prompt=None) -> str:
         # A PIN adapter cannot pair without a way to ask for the PIN.

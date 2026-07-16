@@ -12,6 +12,7 @@ from universal_remote.adapters.appletv import (
     register,
 )
 from universal_remote.devices.models import Device
+from universal_remote.discovery import DiscoveredDevice
 from universal_remote.errors import (
     ConnectionFailedError,
     PairingCancelledError,
@@ -196,6 +197,35 @@ class TestAppleTvConnect:
         run(adapter.connect(_device(identifier="atv-1", credential="cred")))
 
         assert fake.config.applied_credentials[Protocol.Companion] == "cred"
+
+
+class TestAppleTvDiscovery:
+    def test_given_a_scan_when_discovering_then_configs_map_to_discovered_devices(self):
+        fake = FakePyatv(
+            config=FakeAppleTvConfig(
+                identifier="atv-9", name="Bedroom", address="10.0.0.42"
+            )
+        )
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        found = run(adapter.discover(timeout=3))
+
+        assert found == [
+            DiscoveredDevice(
+                name="Bedroom",
+                platform=PLATFORM,
+                ip="10.0.0.42",
+                identifier="atv-9",
+            )
+        ]
+
+    def test_given_discovery_when_scanning_then_it_is_network_wide_with_no_hosts(self):
+        fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-1"))
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        run(adapter.discover(timeout=3))
+
+        assert fake.scanned_hosts == [None]
 
 
 class TestAppleTvKeyMapping:
