@@ -59,9 +59,11 @@ _CAPABILITIES = Capabilities(keys=frozenset(FIRETV_KEYS), text=True)
 
 # Generic key -> Linux evdev scancode for the on-device remote input node (mapped
 # by Fire OS's Generic.kl). Sent via `sendevent`, these reach the focused window
-# like the physical remote at ~290ms, vs the `input` binary's ~1.2s ART cold-start
-# (see FIRETV_KEYS). Keys absent here — home, menu, media transport — have no evdev
-# entry on that node, so they fall back to `input keyevent`.
+# like the physical remote at ~300ms, vs the `input` binary's ~1.1s ART cold-start
+# (see FIRETV_KEYS). This covers every declared key, so `input keyevent` is used
+# only when no input node is discovered (see FireTvSession). Home, menu, and the
+# media-transport codes were read from the device's Generic.kl and verified on
+# hardware; `cmd media_session dispatch` was tried for media and found unimplemented.
 EVDEV_KEYS: dict[Key, int] = {
     Key.UP: 103,
     Key.DOWN: 108,
@@ -69,9 +71,17 @@ EVDEV_KEYS: dict[Key, int] = {
     Key.RIGHT: 106,
     Key.OK: 353,  # DPAD_CENTER via KEY_SELECT
     Key.BACK: 158,
+    Key.HOME: 172,  # KEY_HOMEPAGE
+    Key.MENU: 139,  # KEY_MENU
     Key.VOL_UP: 115,
     Key.VOL_DOWN: 114,
     Key.MUTE: 113,
+    Key.PLAY: 207,  # KEY_PLAY
+    Key.PAUSE: 201,  # KEY_PAUSECD
+    Key.PLAY_PAUSE: 164,  # KEY_PLAYPAUSE
+    Key.STOP: 128,  # KEY_STOP
+    Key.REWIND: 168,  # KEY_REWIND
+    Key.FAST_FORWARD: 208,  # KEY_FASTFORWARD
     Key.NUM_0: 11,  # KEY_0
     **{Key[f"NUM_{digit}"]: digit + 1 for digit in range(1, 10)},  # KEY_1..KEY_9
 }
@@ -125,9 +135,9 @@ def _keygen() -> tuple[str, str]:
 class FireTvSession(BaseSession):
     """A live ADB connection to a Fire TV.
 
-    Fast keys (`EVDEV_KEYS`) dispatch via `sendevent` to the discovered remote
-    input node; keys without an evdev mapping — or any key when no node was found
-    — fall back to `input keyevent`.
+    Keys dispatch via `sendevent` to the discovered remote input node (`EVDEV_KEYS`
+    covers every declared key). When no node was found the whole session falls back
+    to `input keyevent`.
     """
 
     def __init__(

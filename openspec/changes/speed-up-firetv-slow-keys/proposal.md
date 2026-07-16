@@ -1,12 +1,14 @@
 ## Why
 
-Fire TV key dispatch is uneven: the d-pad, OK, back, volume, mute, and number keys reach the device fast (~290ms via `sendevent`), but HOME, MENU, and every media-transport key still fall back to `input keyevent`, which cold-starts an ART VM on each press (~1.2s). Those keys feel visibly laggy next to the rest — and next to Amazon's own remote app, which is uniformly instant. The slow keys are exactly the ones with no `sendevent` mapping today; giving them a fast device path closes the gap without changing what any key does.
+Fire TV key dispatch is uneven: the d-pad, OK, back, volume, mute, and number keys reach the device fast (~300ms via `sendevent`), but HOME, MENU, and every media-transport key still fall back to `input keyevent`, which cold-starts an ART VM on each press (~1.1s). Those keys feel visibly laggy next to the rest. The slow keys are exactly the ones with no `sendevent` mapping today; giving them one closes the gap.
 
 ## What Changes
 
-- Dispatch the media-transport keys — PLAY, PAUSE, PLAY_PAUSE, STOP, REWIND, FAST_FORWARD — via `cmd media_session dispatch <verb>` (a native binder call into MediaSessionManager, no ART VM) instead of `input keyevent`. This is a different service path from the previously rejected `cmd input keyevent` (which silently no-ops); it targets the active media session, matching the existing constraint that `input keyevent` media keys also only act on a live session.
-- Add HOME and MENU to the `sendevent` fast path, using evdev scancodes **captured live from the physical remote via `getevent`** — not guessed. Prior work concluded home was unreachable via `sendevent`; that likely tested `KEY_HOME` (102 → `MOVE_HOME`, a cursor move) rather than the home button's `KEY_HOMEPAGE` (172 → `KEYCODE_HOME`). The capture resolves this empirically.
-- Preserve the existing `input keyevent` fallback for any key whose fast path is unavailable or whose code the capture does not confirm, so a device that does not fit degrades to today's working behaviour.
+- Add HOME, MENU, and the six media-transport keys (PLAY, PAUSE, PLAY_PAUSE, STOP, REWIND, FAST_FORWARD) to the existing `sendevent` fast path by extending `EVDEV_KEYS` with their evdev scancodes. All eight then dispatch at ~300ms instead of ~1.1s, a 3–4× improvement, and nothing is left on the slow path except when no input node is found.
+- The scancodes are read from the device's own `Generic.kl` keylayout and verified on hardware — not guessed. HOME (`172`→HOME) and the media keys (`164`→MEDIA_PLAY_PAUSE, `207`→MEDIA_PLAY, `201`→MEDIA_PAUSE, `168`→MEDIA_REWIND, `208`→MEDIA_FAST_FORWARD, `128`→MEDIA_STOP) were confirmed injecting; MENU (`139`→MENU) delivers the same keycode `input keyevent` already sent, so it is a pure latency swap.
+- The `input keyevent` fallback stays intact for the whole session when no input node is discovered, so a device that does not fit degrades to today's working behaviour. No key changes which action it sends.
+
+**Superseded during implementation:** the original proposal routed media keys through `cmd media_session dispatch`. Hardware testing showed that verb is **not implemented** on this Fire OS build (`cmd media_session dispatch` returns "No shell command implementation" — a fast no-op, the same trap as the previously-rejected `cmd input keyevent`). The single `sendevent` path handles every key and is the only working fast route, so the two-path design collapsed to one.
 
 ## Capabilities
 
@@ -14,11 +16,11 @@ Fire TV key dispatch is uneven: the d-pad, OK, back, volume, mute, and number ke
 <!-- none -->
 
 ### Modified Capabilities
-- `firetv-adapter`: The "Low-latency key dispatch with fallback" requirement is broadened to cover two fast device paths (an evdev `sendevent` path and a media-session dispatch path for transport keys) rather than a single one, so home, menu, and the media-transport keys are no longer confined to the slow key-event fallback. The action each key sends is unchanged.
+- `firetv-adapter`: The "Low-latency key dispatch with fallback" requirement is clarified so its single faster path covers home, menu, and the media-transport keys — previously confined to the slow key-event fallback. The action each key sends is unchanged.
 
 ## Impact
 
-- **Code**: `src/universal_remote/adapters/firetv.py` — extend `EVDEV_KEYS` with captured HOME/MENU scancodes; add a media-session dispatch table and route those keys through it in `FireTvSession._dispatch_key`; the `input keyevent` fallback stays as the final tier.
-- **Tests**: `tests/test_firetv_adapter.py` — assert media keys emit the `cmd media_session dispatch` command and that HOME/MENU emit `sendevent` to the discovered node; fallback behaviour unchanged.
-- **Dependencies**: none (uses existing `adb-shell` `shell()` path).
-- **Hardware-verifiable only**: correct scancodes and that `cmd media_session dispatch` injects are confirmable only on a real Fire TV, matching the adapter's existing best-effort register.
+- **Code**: `src/universal_remote/adapters/firetv.py` — add eight entries to `EVDEV_KEYS`; correct the comment/docstring that claimed home/menu/media have no evdev entry. `_dispatch_key` is unchanged: its existing "node + code → `sendevent`, else `input keyevent`" logic routes the new keys automatically.
+- **Tests**: `tests/test_firetv_adapter.py` — assert HOME, MENU, and the media keys emit `sendevent` to the discovered node, and still fall back to `input keyevent` when no node is found.
+- **Dependencies**: none.
+- **Hardware-verifiable only**: correct scancodes and injection are confirmable only on a real Fire TV; HOME and the play/pause/play-pause keys were verified against a live YouTube session, the rest ride the identical confirmed mechanism (best-effort, matching the adapter's existing register).

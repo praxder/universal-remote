@@ -117,12 +117,11 @@ menus and lists alongside the arrow keys.
   reappears each connect.
 - **No channel keys.** A Fire TV streamer has no tuner, so **channel up/down are
   unavailable** — those on-screen buttons are shown disabled for Fire TV.
-- **Key latency varies by key.** The d-pad, OK, back, volume, mute, and number
-  pad use a fast native input path (~kernel `sendevent`) and respond promptly.
-  Home, menu, and the media-transport keys have no native mapping on the remote
-  input device, so they use `adb shell input keyevent`, which cold-starts a
-  runtime on Fire OS and lags ~1s — an inherent limit of that path. On a device
-  where the fast path is unavailable, all keys use the slower path.
+- **Keys use a fast native input path.** Every key — d-pad, OK, back, home, menu,
+  volume, mute, the media-transport keys, and the number pad — dispatches over a
+  fast native path (kernel `sendevent`) and responds promptly. If the remote input
+  device can't be found, all keys fall back to `adb shell input keyevent`, which
+  cold-starts a runtime on Fire OS and lags ~1s.
 - **Text and key codes are best-effort**, as with the other platforms: key
   events and `input text` are sent over ADB, and a failed text send reports
   "not supported" rather than silently dropping input.

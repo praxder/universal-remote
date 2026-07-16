@@ -301,18 +301,35 @@ class TestFireTvKeyDispatch:
 
         assert devices[0].commands == [evdev_press(_NODE, EVDEV_KEYS[Key.OK])]
 
-    def test_given_a_fallback_key_when_sent_then_input_keyevent_is_dispatched(self):
-        # HOME has no evdev entry on the remote node, so it uses the ART path.
+    @pytest.mark.parametrize(
+        ("key", "code"),
+        [
+            (Key.HOME, 172),
+            (Key.MENU, 139),
+            (Key.PLAY, 207),
+            (Key.PAUSE, 201),
+            (Key.PLAY_PAUSE, 164),
+            (Key.STOP, 128),
+            (Key.REWIND, 168),
+            (Key.FAST_FORWARD, 208),
+        ],
+    )
+    def test_given_home_menu_or_media_key_when_sent_then_a_sendevent_press_is_dispatched(
+        self, key, code
+    ):
+        # These once fell back to `input keyevent` (~1.1s); they now ride the sendevent
+        # fast path via scancodes confirmed against the device's Generic.kl.
         devices: list[FakeAdbDevice] = []
         adapter = _capturing_adapter(devices)
 
         async def scenario():
             session = await adapter.connect(_device())
-            await session.send_key(Key.HOME)
+            await session.send_key(key)
 
         run(scenario())
 
-        assert devices[0].commands == [f"input keyevent {FIRETV_KEYS[Key.HOME]}"]
+        assert EVDEV_KEYS[key] == code
+        assert devices[0].commands == [evdev_press(_NODE, code)]
 
     def test_given_every_supported_key_when_sent_then_each_uses_its_expected_path(self):
         devices: list[FakeAdbDevice] = []
