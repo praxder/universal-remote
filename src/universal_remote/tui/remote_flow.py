@@ -157,6 +157,17 @@ class UseRemoteScreen(Screen[None]):
         if self._timer is not None:
             self._timer.stop()
 
+    def on_screen_suspend(self) -> None:
+        # Another screen is on top: probe only while the picker is visible.
+        if self._timer is not None:
+            self._timer.pause()
+
+    def on_screen_resume(self) -> None:
+        # Back on top: refresh once immediately, then resume interval probing.
+        if self._timer is not None:
+            self._probe_cycle()
+            self._timer.resume()
+
     def _row_prompt(self, status: Reachability, index: int, name: str) -> str:
         color = _BUBBLE_COLORS[status]
         return f"[{color}]●[/] {index + 1}. {name}"

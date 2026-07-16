@@ -639,3 +639,58 @@ class TestUseRemoteReachability:
                 assert len(probe.calls) == count_after_leaving  # no further probes
 
         asyncio.run(scenario())
+
+    def test_given_a_screen_is_pushed_on_top_when_time_passes_then_probing_pauses(
+        self, tmp_path, monkeypatch
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Living", ip="1.1.1.1", credential="tok"))
+        probe = _FakeProbe({"1.1.1.1": Reachability.REACHABLE})
+        monkeypatch.setattr(remote_flow, "probe", probe)
+        monkeypatch.setattr(UseRemoteScreen, "POLL_INTERVAL", 0.05)
+        adapter = FakeAdapter(platform="fake-tv", reachability_port=9999)
+
+        async def scenario():
+            adapter.connect_gate = asyncio.Event()  # keep ConnectingModal on top
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause(0.05)
+                await pilot.press("enter")  # select: pushes ConnectingModal on top
+                await _settle(pilot)
+                assert isinstance(app.screen, ConnectingModal)
+                paused_at = len(probe.calls)
+                for _ in range(6):
+                    await pilot.pause(0.05)
+                assert len(probe.calls) == paused_at  # covered picker does not probe
+
+        asyncio.run(scenario())
+
+    def test_given_the_top_screen_is_dismissed_when_time_passes_then_probing_resumes(
+        self, tmp_path, monkeypatch
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Living", ip="1.1.1.1", credential="tok"))
+        probe = _FakeProbe({"1.1.1.1": Reachability.REACHABLE})
+        monkeypatch.setattr(remote_flow, "probe", probe)
+        monkeypatch.setattr(UseRemoteScreen, "POLL_INTERVAL", 0.05)
+        adapter = FakeAdapter(platform="fake-tv", reachability_port=9999)
+
+        async def scenario():
+            adapter.connect_gate = asyncio.Event()  # hold connect so the modal stays up
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause(0.05)
+                await pilot.press("enter")  # push ConnectingModal on top
+                await _settle(pilot)
+                assert isinstance(app.screen, ConnectingModal)
+                await pilot.press("escape")  # dismiss: picker is visible again
+                await _settle(pilot)
+                assert isinstance(app.screen, UseRemoteScreen)
+                resumed_at = len(probe.calls)
+                for _ in range(6):
+                    await pilot.pause(0.05)
+                assert len(probe.calls) > resumed_at  # probing resumed on return
+
+        asyncio.run(scenario())

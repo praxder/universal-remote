@@ -21,6 +21,7 @@
 - [x] 3.6 Implement bubble rendering in `UseRemoteScreen.on_mount` (`remote_flow.py`): render each row with a yellow Rich-markup `●` before the number; map REACHABLE/UNREACHABLE/UNKNOWN → green/red/yellow markup
 - [x] 3.7 Implement the probe cycle: resolve each device's adapter port, probe devices with a port concurrently (timeout 2.0s), leave portless devices yellow, and update each row in place via `replace_option_prompt_at_index` as results resolve
 - [x] 3.8 Implement interval polling: run one cycle immediately, then `set_interval(5.0, ...)`; add a per-device in-flight guard so a slow probe does not stack; stop the interval and cancel in-flight work on unmount / leaving the screen
+- [x] 3.9 Gate probing on picker visibility: pause the interval on `ScreenSuspend` (a screen pushed on top) and resume it with an immediate refresh on `ScreenResume`, so no probes run while the picker is covered
 
 ## 4. Docs, preflight, and verification
 

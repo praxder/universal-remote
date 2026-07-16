@@ -49,7 +49,7 @@ A `Reachability` (or `Status`) enum with `REACHABLE`, `UNREACHABLE`, `UNKNOWN`, 
 - Each cycle resolves the adapter per device; a device whose adapter has no port stays yellow. Devices with a port are probed **concurrently** (timeout `2.0s`, strictly below the interval so cycles cannot stack).
 - As each probe resolves, the corresponding row's prompt is replaced **in place** (`replace_option_prompt_at_index`) so the highlight/cursor position is preserved and there is no full-list rebuild.
 - A per-device in-flight guard skips a device whose previous probe has not yet resolved.
-- On unmount / leaving the screen, the interval is stopped and in-flight work is cancelled.
+- Probing follows picker visibility: the interval is **paused on `ScreenSuspend`** (a modal or the remote is pushed on top) and **resumed on `ScreenResume`**, which also runs one immediate refresh so bubbles are current on return. On unmount / leaving the screen entirely, the interval is stopped and in-flight work is cancelled.
 
 The bubble is a Rich-markup colored `●` prepended to the existing `"{n}. {name}"` prompt.
 
