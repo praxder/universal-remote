@@ -63,6 +63,11 @@ class TestSamsungRegistration:
         assert adapter.display_name == "Samsung Tizen"
         assert adapter.platform == PLATFORM
 
+    def test_given_the_adapter_when_reachability_port_read_then_it_is_the_control_port(
+        self,
+    ):
+        assert SamsungTizenAdapter().reachability_port == 8002
+
 
 class TestSamsungCapabilities:
     def test_given_the_adapter_when_capabilities_read_then_the_core_button_set_is_declared(

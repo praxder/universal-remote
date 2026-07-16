@@ -38,7 +38,11 @@ menus and lists alongside the arrow keys.
 
 ## Pair and control
 
-1. From the menu choose **Use Remote** (`r`) and pick your TV.
+1. From the menu choose **Use Remote** (`r`) and pick your TV. Each device shows a
+   **reachability bubble** before its number — 🟢 green (on the network), 🔴 red
+   (unreachable), 🟡 yellow (still checking, or unknown for a platform with no
+   probe port). It refreshes every few seconds and is advisory only: you can still
+   select a red device to connect.
 2. First time only: Samsung, LG, and Fire TV show an **authorization popup** —
    accept it. **Apple TV** instead displays a **PIN** on the TV screen, and
    **Android TV / Google TV** a pairing **code**; type it into the app when

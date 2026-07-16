@@ -129,6 +129,7 @@ class AndroidTvAdapter:
 
     platform = PLATFORM
     display_name = "Android TV"
+    reachability_port = 6466  # Remote v2 api/command port
 
     def __init__(self, remote_factory: RemoteFactory = AndroidTVRemote) -> None:
         self._remote_factory = remote_factory

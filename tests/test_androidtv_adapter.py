@@ -89,6 +89,11 @@ class TestAndroidTvRegistration:
         assert adapter.display_name == "Android TV"
         assert adapter.platform == "androidtv"
 
+    def test_given_the_adapter_when_reachability_port_read_then_it_is_the_remote_port(
+        self,
+    ):
+        assert AndroidTvAdapter().reachability_port == 6466
+
 
 class TestAndroidTvCapabilities:
     def test_given_the_adapter_when_capabilities_read_then_the_button_set_is_declared(

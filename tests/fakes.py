@@ -475,10 +475,13 @@ class FakeAdapter:
         prompt_message: str | None = None,
         pair_identifier: str | None = None,
         requires_pairing: bool = True,
+        reachability_port: int | None = None,
     ) -> None:
         self.platform = platform
         self.display_name = display_name or platform
         self.requires_pairing = requires_pairing
+        # None mirrors an adapter that declares no port (device stays unknown).
+        self.reachability_port = reachability_port
         self._capabilities = capabilities or Capabilities(
             keys=frozenset(Key), text=True
         )

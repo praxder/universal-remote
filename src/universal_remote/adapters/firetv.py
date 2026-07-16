@@ -174,6 +174,7 @@ class FireTvAdapter:
 
     platform = PLATFORM
     display_name = "Fire TV"
+    reachability_port = ADB_PORT
 
     def __init__(
         self,

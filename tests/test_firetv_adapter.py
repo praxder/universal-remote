@@ -101,6 +101,11 @@ class TestFireTvRegistration:
         assert adapter.display_name == "Fire TV"
         assert adapter.platform == "firetv"
 
+    def test_given_the_adapter_when_reachability_port_read_then_it_is_the_adb_port(
+        self,
+    ):
+        assert FireTvAdapter().reachability_port == 5555
+
 
 class TestFireTvPairingRequirement:
     def test_given_the_adapter_when_asked_then_it_requires_pairing(self):

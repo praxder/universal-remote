@@ -83,6 +83,8 @@ class AppleTvAdapter:
 
     platform = PLATFORM
     display_name = "Apple TV"
+    # AirPlay port — a proxy for "awake"; Companion control is mDNS-dynamic.
+    reachability_port = 7000
 
     def __init__(self, pyatv_api=pyatv) -> None:
         self._pyatv = pyatv_api

@@ -7,7 +7,9 @@ from universal_remote.capabilities import Capabilities
 from universal_remote.devices.models import Device
 from universal_remote.devices.store import DeviceStore
 from universal_remote.keys import Key
+from universal_remote.reachability import Reachability
 from universal_remote.registry import AdapterRegistry
+from universal_remote.tui import remote_flow
 from universal_remote.tui.app import UniversalRemoteApp
 from universal_remote.tui.menu import MenuScreen
 from universal_remote.tui.remote_flow import (
@@ -80,7 +82,7 @@ class TestUseRemoteSelection:
                     picker.get_option_at_index(i).prompt
                     for i in range(picker.option_count)
                 }
-                assert names == {"1. Living", "2. Bedroom"}
+                assert names == {"[yellow]●[/] 1. Living", "[yellow]●[/] 2. Bedroom"}
 
         asyncio.run(scenario())
 
@@ -101,7 +103,7 @@ class TestUseRemoteSelection:
                     picker.get_option_at_index(i).prompt
                     for i in range(picker.option_count)
                 ]
-                assert prompts == ["1. Living", "2. Bedroom"]
+                assert prompts == ["[yellow]●[/] 1. Living", "[yellow]●[/] 2. Bedroom"]
 
         asyncio.run(scenario())
 
@@ -460,5 +462,180 @@ class TestUseRemoteExit:
                 await pilot.press("escape")
                 await pilot.pause()
                 assert isinstance(app.screen, MenuScreen)
+
+        asyncio.run(scenario())
+
+
+class _FakeProbe:
+    """A stand-in for `reachability.probe`: canned per-ip results, optional gate.
+
+    Records each (ip, port) call so a test can count re-probes; the gate parks
+    the probe so a test can assert the pre-resolution yellow state.
+    """
+
+    def __init__(
+        self,
+        results: dict[str, Reachability],
+        gate: asyncio.Event | None = None,
+    ) -> None:
+        self._results = results
+        self._gate = gate
+        self.calls: list[tuple[str, int]] = []
+
+    async def __call__(self, ip: str, port: int, timeout: float) -> Reachability:
+        self.calls.append((ip, port))
+        if self._gate is not None:
+            await self._gate.wait()
+        return self._results.get(ip, Reachability.UNREACHABLE)
+
+
+class TestUseRemoteReachability:
+    def test_given_probes_pending_when_opening_then_every_row_starts_yellow(
+        self, tmp_path, monkeypatch
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Living", ip="1.1.1.1"))
+        store.add(_dev(name="Bedroom", ip="2.2.2.2"))
+        gate = asyncio.Event()  # keeps probes in flight so nothing resolves yet
+        probe = _FakeProbe({}, gate=gate)
+        monkeypatch.setattr(remote_flow, "probe", probe)
+        adapter = FakeAdapter(platform="fake-tv", reachability_port=9999)
+
+        async def scenario():
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                picker = app.screen.query_one("#device-picker", OptionList)
+                prompts = [
+                    picker.get_option_at_index(i).prompt
+                    for i in range(picker.option_count)
+                ]
+                assert prompts == [
+                    "[yellow]●[/] 1. Living",
+                    "[yellow]●[/] 2. Bedroom",
+                ]
+                assert len(probe.calls) == 2  # probes started but parked on the gate
+                gate.set()  # release so teardown is clean
+
+        asyncio.run(scenario())
+
+    def test_given_probes_resolve_when_open_then_bubbles_turn_green_and_red(
+        self, tmp_path, monkeypatch
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Living", ip="1.1.1.1"))
+        store.add(_dev(name="Bedroom", ip="2.2.2.2"))
+        gate = asyncio.Event()  # hold probes so the cursor can be moved first
+        probe = _FakeProbe(
+            {"1.1.1.1": Reachability.REACHABLE, "2.2.2.2": Reachability.UNREACHABLE},
+            gate=gate,
+        )
+        monkeypatch.setattr(remote_flow, "probe", probe)
+        adapter = FakeAdapter(platform="fake-tv", reachability_port=9999)
+
+        async def scenario():
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                picker = app.screen.query_one("#device-picker", OptionList)
+                picker.highlighted = 1  # move the cursor off row 0 before resolving
+                gate.set()  # now let the probes resolve and update rows in place
+                await _settle(pilot)
+                prompts = [
+                    picker.get_option_at_index(i).prompt
+                    for i in range(picker.option_count)
+                ]
+                assert prompts == ["[green]●[/] 1. Living", "[red]●[/] 2. Bedroom"]
+                assert picker.highlighted == 1  # in-place update preserved the cursor
+
+        asyncio.run(scenario())
+
+    def test_given_a_portless_adapter_when_open_then_the_row_stays_yellow(
+        self, tmp_path, monkeypatch
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Living", ip="1.1.1.1"))
+        probe = _FakeProbe({"1.1.1.1": Reachability.REACHABLE})
+        monkeypatch.setattr(remote_flow, "probe", probe)
+        adapter = FakeAdapter(platform="fake-tv")  # declares no reachability_port
+
+        async def scenario():
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await _settle(pilot)
+                picker = app.screen.query_one("#device-picker", OptionList)
+                assert picker.get_option_at_index(0).prompt == "[yellow]●[/] 1. Living"
+                assert probe.calls == []  # portless: never probed
+
+        asyncio.run(scenario())
+
+    def test_given_a_red_device_when_selected_then_the_connect_flow_still_begins(
+        self, tmp_path, monkeypatch
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Living", ip="1.1.1.1", credential="tok"))
+        probe = _FakeProbe({"1.1.1.1": Reachability.UNREACHABLE})
+        monkeypatch.setattr(remote_flow, "probe", probe)
+        adapter = FakeAdapter(platform="fake-tv", reachability_port=9999)
+
+        async def scenario():
+            adapter.connect_gate = asyncio.Event()  # hold connect so the modal stays up
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await _settle(pilot)
+                picker = app.screen.query_one("#device-picker", OptionList)
+                assert picker.get_option_at_index(0).prompt == "[red]●[/] 1. Living"
+                await pilot.press("enter")
+                await _settle(pilot)
+                assert isinstance(app.screen, ConnectingModal)
+
+        asyncio.run(scenario())
+
+    def test_given_the_screen_stays_open_when_the_interval_fires_then_it_reprobes(
+        self, tmp_path, monkeypatch
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Living", ip="1.1.1.1"))
+        probe = _FakeProbe({"1.1.1.1": Reachability.REACHABLE})
+        monkeypatch.setattr(remote_flow, "probe", probe)
+        monkeypatch.setattr(UseRemoteScreen, "POLL_INTERVAL", 0.05)
+        adapter = FakeAdapter(platform="fake-tv", reachability_port=9999)
+
+        async def scenario():
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                for _ in range(6):
+                    await pilot.pause(0.05)
+                assert len(probe.calls) >= 2  # initial cycle plus at least one re-probe
+
+        asyncio.run(scenario())
+
+    def test_given_the_screen_is_left_when_time_passes_then_no_more_probes(
+        self, tmp_path, monkeypatch
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Living", ip="1.1.1.1"))
+        probe = _FakeProbe({"1.1.1.1": Reachability.REACHABLE})
+        monkeypatch.setattr(remote_flow, "probe", probe)
+        monkeypatch.setattr(UseRemoteScreen, "POLL_INTERVAL", 0.05)
+        adapter = FakeAdapter(platform="fake-tv", reachability_port=9999)
+
+        async def scenario():
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause(0.05)
+                await pilot.press("escape")  # leave the Use Remote picker
+                await pilot.pause()
+                assert isinstance(app.screen, MenuScreen)
+                count_after_leaving = len(probe.calls)
+                for _ in range(6):
+                    await pilot.pause(0.05)
+                assert len(probe.calls) == count_after_leaving  # no further probes
 
         asyncio.run(scenario())

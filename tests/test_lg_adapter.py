@@ -61,6 +61,11 @@ class TestLgRegistration:
         assert adapter.display_name == "LG WebOS"
         assert adapter.platform == PLATFORM
 
+    def test_given_the_adapter_when_reachability_port_read_then_it_is_the_webos_port(
+        self,
+    ):
+        assert LgWebOsAdapter().reachability_port == 3000
+
 
 class TestLgCapabilities:
     def test_given_the_adapter_when_capabilities_read_then_the_core_button_set_is_declared(

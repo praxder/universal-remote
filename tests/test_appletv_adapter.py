@@ -71,6 +71,12 @@ class TestAppleTvRegistration:
         assert adapter.display_name == "Apple TV"
         assert adapter.platform == "apple-tv"
 
+    def test_given_the_adapter_when_reachability_port_read_then_it_is_the_airplay_port(
+        self,
+    ):
+        # AirPlay 7000 is a proxy for "awake"; Companion control is mDNS-dynamic.
+        assert AppleTvAdapter().reachability_port == 7000
+
 
 class TestAppleTvCapabilities:
     def test_given_the_adapter_when_capabilities_read_then_the_core_button_set_is_declared(

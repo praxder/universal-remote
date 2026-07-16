@@ -91,6 +91,11 @@ class TestRokuRegistration:
         assert adapter.display_name == "Roku"
         assert adapter.platform == "roku"
 
+    def test_given_the_adapter_when_reachability_port_read_then_it_is_the_ecp_port(
+        self,
+    ):
+        assert RokuAdapter().reachability_port == 8060
+
 
 class TestRokuNoPairing:
     def test_given_the_adapter_when_asked_then_it_declares_no_pairing(self):

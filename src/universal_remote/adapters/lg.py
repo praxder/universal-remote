@@ -79,6 +79,7 @@ class LgWebOsAdapter:
 
     platform = PLATFORM
     display_name = "LG WebOS"
+    reachability_port = 3000  # aiowebostv tries ws://:3000 first
 
     def __init__(
         self,

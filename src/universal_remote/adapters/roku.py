@@ -85,6 +85,7 @@ class RokuAdapter:
     platform = PLATFORM
     display_name = "Roku"
     requires_pairing = False
+    reachability_port = 8060  # ECP HTTP port
 
     def __init__(
         self,

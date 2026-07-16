@@ -85,6 +85,7 @@ class SamsungTizenAdapter:
 
     platform = PLATFORM
     display_name = "Samsung Tizen"
+    reachability_port = CONTROL_PORT  # wss control channel
 
     def __init__(
         self,
