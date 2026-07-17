@@ -7,7 +7,11 @@ from universal_remote.devices.store import DeviceStore
 from universal_remote.discovery import DiscoveredDevice
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
-from universal_remote.tui.devices_screen import AddDeviceScreen, DeviceListScreen
+from universal_remote.tui.devices_screen import (
+    AdbTextHintScreen,
+    AddDeviceScreen,
+    DeviceListScreen,
+)
 from universal_remote.tui.discover_screen import ADD_MANUAL_ID, DiscoverScreen
 
 
@@ -166,6 +170,76 @@ class TestSelectDiscovered:
         assert [(d.name, d.platform, d.ip, d.identifier) for d in saved] == [
             ("Bedroom", "apple-tv", "10.0.0.42", "atv-9")
         ]
+
+    def test_given_a_discovered_android_tv_when_added_then_the_adb_text_hint_shows(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        registry = _registry(
+            FakeDiscoverAdapter(
+                platform="androidtv",
+                display_name="Android TV",
+                supports_adb_text=True,
+                devices=[
+                    DiscoveredDevice(
+                        name="Living Room", platform="androidtv", ip="10.0.0.5"
+                    )
+                ],
+            )
+        )
+
+        async def scenario():
+            app = UniversalRemoteApp(store=store, registry=registry)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                app.push_screen(DiscoverScreen())
+                await pilot.pause()
+                await pilot.pause()
+                picker = app.screen.query_one("#discover-list", OptionList)
+                picker.highlighted = 0
+                await pilot.pause()
+                await pilot.press("enter")
+                await pilot.pause()
+                assert isinstance(app.screen, AdbTextHintScreen)
+                await pilot.press("escape")
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+
+        asyncio.run(scenario())
+
+        assert [d.name for d in store.list()] == ["Living Room"]
+
+    def test_given_a_discovered_non_android_device_when_added_then_no_hint_shows(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        registry = _registry(
+            FakeDiscoverAdapter(
+                platform="roku",
+                display_name="Roku",
+                devices=[DiscoveredDevice(name="Den", platform="roku", ip="10.0.0.7")],
+            )
+        )
+
+        async def scenario():
+            app = UniversalRemoteApp(store=store, registry=registry)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                app.push_screen(DiscoverScreen())
+                await pilot.pause()
+                await pilot.pause()
+                picker = app.screen.query_one("#discover-list", OptionList)
+                picker.highlighted = 0
+                await pilot.pause()
+                await pilot.press("enter")
+                await pilot.pause()
+                assert not isinstance(app.screen, AdbTextHintScreen)
+                messages = [n.message for n in app._notifications]
+                assert 'Added "Den".' in messages
+
+        asyncio.run(scenario())
 
     def test_given_a_discovered_row_when_saved_then_a_success_toast_is_shown(
         self, tmp_path

@@ -17,7 +17,7 @@ from textual.widgets.option_list import Option
 from ..devices.models import Device
 from ..discovery import DiscoveredDevice, discover_one, exclude_saved, merge
 from .device_option_list import DeviceOptionList
-from .devices_screen import AddDeviceScreen
+from .devices_screen import AdbTextHintScreen, AddDeviceScreen
 
 ADD_MANUAL_ID = "__add_manual__"
 
@@ -120,7 +120,13 @@ class DiscoverScreen(Screen[None]):
             )
         )
         self.app.pop_screen()
-        self.app.notify(f'Added "{device.name}".')
+        # Android TV text can be swallowed by the IME overlay; hint at the ADB remedy
+        # (a dismissible modal) instead of the plain toast for those devices.
+        adapter = self.app.registry.resolve(device.platform)
+        if getattr(adapter, "supports_adb_text", False):
+            self.app.push_screen(AdbTextHintScreen(device.name))
+        else:
+            self.app.notify(f'Added "{device.name}".')
 
     def action_back(self) -> None:
         self.app.pop_screen()

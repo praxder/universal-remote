@@ -613,11 +613,14 @@ class FakeDiscoverAdapter:
         display_name: str | None = None,
         devices: list | None = None,
         gate: asyncio.Event | None = None,
+        supports_adb_text: bool = False,
     ) -> None:
         self.platform = platform
         self.display_name = display_name or platform
         self._devices = devices or []
         self.gate = gate
+        # Whether adding this type offers the ADB text path (gates the post-add hint).
+        self.supports_adb_text = supports_adb_text
 
     async def discover(self, timeout: float) -> list:
         if self.gate is not None:

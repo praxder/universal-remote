@@ -221,6 +221,40 @@ class AdbTextSetupScreen(ModalScreen[bool]):
         self.query_one("#adb-setup-status", Label).update(message)
 
 
+class AdbTextHintScreen(ModalScreen[None]):
+    """One-time hint after adding an Android TV device: text can be routed over ADB.
+
+    Confirms the add and points the user to the Edit screen's text-input toggle, so a
+    device whose text gets swallowed by the IME overlay has a discoverable remedy.
+    """
+
+    BINDINGS = [("escape,enter", "ok", "OK")]
+
+    _BODY = (
+        "If text input has trouble typing in some apps, edit this device in "
+        "Manage Devices and switch text input to ADB."
+    )
+
+    def __init__(self, device_name: str) -> None:
+        super().__init__()
+        self._device_name = device_name
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="adb-hint"):
+            yield Label(f'Added "{self._device_name}"', id="adb-hint-title")
+            yield Label(self._BODY, id="adb-hint-body")
+            yield Button("OK", id="adb-hint-ok")
+
+    def on_mount(self) -> None:
+        self.query_one("#adb-hint-ok", Button).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.action_ok()
+
+    def action_ok(self) -> None:
+        self.dismiss(None)
+
+
 class DeviceTypeSelect(Select):
     """A Select that moves field focus on Up/Down and opens on Enter/Space.
 

@@ -30,6 +30,7 @@
 - [x] 5.1 Add an Android-TV-only text-input-mode toggle to the Add/Edit screen (gated on an adapter `supports_adb_text` flag): switching to ADB launches the pairing modal (address + code); success holds the opt-in as form intent, cancel/failure reverts the toggle; the opt-in is written to `text_via_adb` on Save. Remove the device-list "Set up text input (ADB)" action.
 - [x] 5.2 Surface the ADB-text-unavailable signal as a one-line status on the Use Remote surface when a send falls back.
 - [x] 5.3 Add tests: toggle visible only for Android TV; switching to ADB launches pairing and opts in on Save; cancel/failure reverts the toggle and leaves the device unchanged; editing flips an existing device's mode; and the fallback status line.
+- [x] 5.4 Show a one-time ADB-text hint after adding an Android TV device from the discovery screen (a dismissible modal), gated on `supports_adb_text`; no hint for other device types. Add tests for both.
 
 ## 6. Documentation and preflight
 

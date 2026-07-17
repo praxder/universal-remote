@@ -101,6 +101,15 @@ class UniversalRemoteApp(App[None]):
     #adb-setup Input { width: 100%; margin-bottom: 1; }
     #adb-setup-status { width: 100%; color: $warning; }
     #adb-setup #adb-setup-submit, #adb-setup #cancel { width: 100%; margin-top: 1; }
+    /* post-add ADB text hint: a centered dialog over the device list */
+    AdbTextHintScreen { align: center middle; background: $background 60%; }
+    #adb-hint {
+        width: 54; height: auto; padding: 1 2;
+        border: thick $primary; background: $surface;
+    }
+    #adb-hint-title { width: 100%; text-align: center; text-style: bold; }
+    #adb-hint-body { width: 100%; margin: 1 0; }
+    #adb-hint #adb-hint-ok { width: 100%; }
     """
 
     def __init__(
