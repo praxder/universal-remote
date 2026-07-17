@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from textual.app import App, SystemCommand
 from textual.screen import Screen
+from textual.worker import WorkerFailed
 
 from typing import Callable, Iterable
 
 from ..devices.store import DeviceStore
+from ..error_log import log_exception
+from ..errors import UniversalRemoteError
 from ..registry import AdapterRegistry
 from ..registry import registry as default_registry
 from .menu import MenuScreen
@@ -132,3 +135,39 @@ class UniversalRemoteApp(App[None]):
 
     def on_mount(self) -> None:
         self.push_screen(MenuScreen())
+
+    def _handle_exception(self, error: Exception) -> None:
+        """App-wide safety net: an unexpected error toasts and stays, not crashes.
+
+        Until the app has finished its initial mount, a compose/mount failure leaves
+        a half-built widget tree with no surface to toast on, so those errors fall
+        through to Textual's default teardown (`_is_mounted` is only set once the
+        app's Compose and Mount have succeeded). Once mounted, a worker or handler
+        error is logged, surfaced as an error toast, and swallowed so the session
+        survives. The `_exception` bookkeeping is preserved so `run_test()` still
+        re-raises and tests keep surfacing bugs; `run()` never re-raises it, so a
+        real session stays open.
+        """
+        if not self._is_mounted:
+            super()._handle_exception(error)
+            return
+        original = error.error if isinstance(error, WorkerFailed) else error
+        try:
+            # The net must never crash on its own reporting — an unwritable log dir
+            # or a failed toast cannot be allowed to become the fatal error.
+            log_exception(original)
+            self.notify(self._error_message(original), title="Error", severity="error")
+        except Exception:
+            pass
+        # Preserve Textual's bookkeeping so `run_test()` re-raises and tests keep
+        # surfacing bugs; `run()` never re-raises it, so a real session stays open.
+        if self._exception is None:
+            self._exception = error
+            self._exception_event.set()
+
+    @staticmethod
+    def _error_message(error: BaseException) -> str:
+        """A domain error's message is user-safe; anything else stays generic."""
+        if isinstance(error, UniversalRemoteError):
+            return str(error)
+        return f"Something went wrong — {type(error).__name__}. The error was logged."

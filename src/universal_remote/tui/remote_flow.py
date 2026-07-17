@@ -186,6 +186,11 @@ class UseRemoteScreen(Screen[None]):
     async def _probe_device(self, index: int, device: Device, port: int) -> None:
         try:
             status = await probe(device.ip, port, self.PROBE_TIMEOUT)
+        except Exception:
+            # Reachability is advisory and re-runs every few seconds. An unexpected
+            # failure must stay best-effort — never reaching the global error net,
+            # which would toast on every cycle. Treat it as unknown and move on.
+            status = Reachability.UNKNOWN
         finally:
             self._inflight.discard(device.id)
         picker = self.query_one("#device-picker", DeviceOptionList)

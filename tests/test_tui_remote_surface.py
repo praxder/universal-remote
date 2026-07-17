@@ -1,6 +1,6 @@
 import asyncio
 
-from textual.widgets import Button, Label
+from textual.widgets import Button, Input, Label
 
 from tests.fakes import FakeAdapter
 from universal_remote.capabilities import Capabilities
@@ -419,3 +419,38 @@ class TestRemoteSurface:
                 assert "UP" in str(status.content)
 
         asyncio.run(scenario())
+
+    def test_given_a_text_send_fails_when_submitted_then_the_remote_survives(
+        self, tmp_path
+    ):
+        # Arrange: a live remote whose device will fail the next text send.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        captured: dict = {}
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                adapter.sessions[0].text_dispatch_error = RuntimeError("device dropped")
+
+                # Act: enter text mode, type, and submit — the send raises.
+                await pilot.press("t")
+                await pilot.pause()
+                app.screen.query_one("#text", Input).value = "hello"
+                await pilot.press("enter")
+                await pilot.pause()
+
+                captured["screen"] = type(app.screen).__name__
+                captured["status"] = str(
+                    app.screen.query_one("#text-status", Label).content
+                )
+                captured["severities"] = [n.severity for n in app._notifications]
+
+        asyncio.run(scenario())
+
+        # The seam handled it locally: remote still up, a status shown, and the
+        # global error net was never engaged (no error toast).
+        assert captured["screen"] == "RemoteScreen"
+        assert captured["status"].strip() != ""
+        assert "error" not in captured["severities"]

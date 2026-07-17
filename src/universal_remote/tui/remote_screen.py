@@ -218,6 +218,10 @@ class RemoteScreen(Screen[None]):
                 await self._session.send_text(text)
             except TextUnsupportedError:
                 self._status("Text entry is not supported on this device")
+            except Exception:
+                # A failed text send (device timeout, dropped connection) must not
+                # take down the remote — report it and stay, like the key-send path.
+                self._status("Text entry failed — the device may be unreachable")
             else:
                 # An opted-in ADB send that fell back to Remote v2 flags itself; say
                 # so rather than leaving the user wondering why setup made no change.

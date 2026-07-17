@@ -9,14 +9,18 @@ When an unexpected exception reaches the application's exception handler while t
 - **THEN** the app stays open on its current screen
 - **AND** an error-severity toast is shown describing that something went wrong
 
-#### Scenario: A message handler raises an unexpected exception
-- **WHEN** an event or message handler raises an exception that is not handled locally while the app is running
+#### Scenario: A screen message handler raises an unexpected exception
+- **WHEN** a screen's event or message handler raises an exception that is not handled locally while the app is running
 - **THEN** the app stays open
 - **AND** an error-severity toast is shown
 
 #### Scenario: No terminal traceback on a caught error
 - **WHEN** the application catches an unexpected exception and stays open
 - **THEN** no Rich traceback is printed to the terminal for that error
+
+#### Scenario: The net never crashes on its own reporting
+- **WHEN** logging or toasting the caught error itself fails (for example an unwritable log directory)
+- **THEN** that secondary failure is suppressed and the app still stays open
 
 ### Requirement: Every caught error is logged to a file with its full traceback
 
@@ -55,11 +59,15 @@ High-frequency or routinely-flaky seams — the reachability probe (which fires 
 
 ### Requirement: App-closing errors still close the app
 
-An error that leaves the application in a structurally broken state — an exception during initial startup, compose, or mount, before the app is fully running — SHALL still close the app rather than leave a half-built, wedged interface. The catch-and-stay behavior applies only once the app is running.
+An error that leaves the application in a structurally broken state SHALL still close the app rather than leave a half-built, wedged interface. The catch-and-stay behavior applies only once the app has finished its initial mount. Two cases remain out of scope for staying open: an exception during initial startup, compose, or mount (there is no surface to toast on); and an exception on the application's own message pump — a global (app-level) binding action or app-level handler — which Textual tears down after the handler runs. Errors that run in a worker or in a screen's own handler are caught and stayed; these residual cases are not.
 
 #### Scenario: Startup/compose error still exits
-- **WHEN** an exception is raised during startup, compose, or mount before the app is running
+- **WHEN** an exception is raised during startup, compose, or mount before the app has finished mounting
 - **THEN** the app exits rather than staying open on a half-built screen
+
+#### Scenario: App-level handler error is not held open
+- **WHEN** an exception is raised on the application's own message pump (for example a global binding action)
+- **THEN** the error is logged, but the app is not guaranteed to stay open
 
 ### Requirement: Interrupt and cancellation signals are unaffected
 

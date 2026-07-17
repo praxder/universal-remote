@@ -34,8 +34,8 @@ Catch at the one funnel rather than wrapping every seam. Alternatives considered
 ### Decision: Expected vs. unexpected split on the `UniversalRemoteError` base
 In the override, an error whose (unwrapped) type is a `UniversalRemoteError` is "expected" and carries a user-safe message shown verbatim; anything else is "unexpected" and gets a generic "Something went wrong" toast plus the logged detail. Worker errors arrive wrapped as `WorkerFailed` — unwrap `error.__cause__`/the worker's original error before classifying. In practice most `UniversalRemoteError`s are already caught at their seam and never reach here; the base check is a safety valve for any that slip through.
 
-### Decision: Guard catch-and-stay on app running-state
-Only catch-and-stay once the app is running (`self._running` is True — set at app.py:3456/3475). Before that (startup/compose/mount), fall through to Textual's default `_fatal_error`/exit, matching the product decision that a compose/mount error may close the app rather than wedge a half-built tree. This is the simplest robust discriminator between "safe to continue" (runtime worker/handler error) and "structurally broken" (startup).
+### Decision: Guard catch-and-stay on mount completion (`_is_mounted`), not `_running`
+Only catch-and-stay once the app has finished its initial mount (`self._is_mounted`). `self._running` was the first candidate but is wrong: it flips True (app.py:3475) *before* the Compose event is dispatched, so a startup compose failure would slip past a `_running` guard and wedge a half-built tree. `_is_mounted` is False through Compose/Mount and only set True after they succeed (message_pump.py:612); the runtime dispatch path also forces it True before invoking the handler (message_pump.py:668). So it is True for every runtime worker/handler error and False for a startup compose/mount error — exactly the "safe to continue" vs. "structurally broken" split the product decision asks for (a compose/mount error may close the app).
 
 ### Decision: Keep test/pilot bug-surfacing intact
 When running under pilot/tests, preserve the `self._exception` bookkeeping (app.py:2217 re-raise) so tests that currently catch bugs via crash still fail. Only the normal-runtime shutdown (`_fatal_error`/`panic`) is skipped in favor of notify-and-stay. Detect the mode the same way Textual does internally (running under a pilot). This keeps the net from silently greening the suite.
@@ -49,11 +49,14 @@ Configure a module-level logger writing to a file in the app's state/config dire
 ## Risks / Trade-offs
 
 - **Private-API override** → Pin to the verified 8.2.8 behavior; add a focused test that drives an in-worker exception through the app and asserts it stays open, so a Textual upgrade that changes the funnel fails loudly.
-- **Compose error on a screen *push* while already running** (app running, but the pushed screen half-builds) → the running-state guard treats it as catch-and-stay, so the toast fires but the tree may be partially mounted. Mitigation: acceptable residual — the user stays on the prior screen and can retry or Ctrl-C; document as a known limitation rather than attempt fragile mid-compose detection.
+- **App-pump handler errors still tear down.** Discovered during implementation: after `_handle_exception`, Textual `break`s the message loop of the pump that raised (message_pump.py:670). Workers don't do this (worker.py:384 just marks the worker failed), and a *screen's* handler break only kills that screen's pump — the app survives and toasts (verified). But an error on the *app's own* pump (a global binding action) breaks the app loop and closes the app. Mitigation: keep app-level actions trivial; risky work belongs in workers or screen handlers. Documented as a residual, not fixed via the funnel.
+- **Inline handler I/O.** A screen handler doing device I/O directly (e.g. `RemoteScreen.on_input_submitted` → `send_text`) that raises an unexpected error would freeze that screen's pump even though the app survives. Mitigation (implemented): give such seams the same broad local `except` as `RemoteScreen._send`, so they report a status and stay fully alive — Tier 1, never reaching the net.
+- **Compose error on a screen *push* while already running** (app mounted, but the pushed screen half-builds) → the `_is_mounted` guard treats it as catch-and-stay, so the toast fires but the tree may be partially mounted. Mitigation: acceptable residual — the user stays on the prior screen and can retry or Ctrl-C.
 - **Swallowing a bug that recurs** → the app stays open but the same error may re-fire on the next interaction; the file log captures each occurrence for diagnosis, and the user can always quit.
 - **Toast on a truly-broken app** → mitigated by the running-state guard (startup errors still exit) and by keeping flaky seams off the net entirely.
 
-## Open Questions
+## Open Questions (resolved during implementation)
 
-- Exact log file location and rotation policy — reuse the device-store directory; decide whether to cap size. Resolve during implementation (TDD).
-- Whether to include a short "see log at <path>" pointer in the generic toast. Lean yes if the path is stable and short.
+- Log file location and rotation policy → `$XDG_CONFIG_HOME/universal-remote/error.log`, co-located with the device store; no size cap for now (append-only, low volume). Revisit only if it grows.
+- Whether to include a "see log at <path>" pointer in the generic toast → **no**. The toast stays short ("Something went wrong — <Type>. The error was logged.") and the README documents the fixed path; a full path in a transient toast adds noise without much value.
+- Net robustness → the log+notify body is wrapped so the net can never crash on its own reporting (e.g. an unwritable log dir); `_exception` is still recorded afterward so tests keep surfacing bugs. A caught, recovered error does not set a non-zero return code — a normal quit after recovery exits clean.

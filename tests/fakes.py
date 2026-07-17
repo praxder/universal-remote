@@ -60,6 +60,9 @@ class FakeSession(BaseSession):
         # When set, dispatching any key raises it — stands in for a device-side
         # failure (timeout, dropped connection) the on-screen remote must survive.
         self.dispatch_error: Exception | None = None
+        # The text-entry counterpart: when set, sending text raises it, standing in
+        # for an unexpected device-side text failure the remote must survive.
+        self.text_dispatch_error: Exception | None = None
         # Mirrors AndroidTvSession's fallback flag: a test sets it True to stand in
         # for a text send that fell back off the ADB path so the remote's status shows.
         self.adb_text_unavailable = False
@@ -70,6 +73,8 @@ class FakeSession(BaseSession):
         self.sent_keys.append(key)
 
     async def _dispatch_text(self, text: str) -> None:
+        if self.text_dispatch_error is not None:
+            raise self.text_dispatch_error
         self.sent_text.append(text)
 
     async def _release(self) -> None:

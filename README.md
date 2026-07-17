@@ -170,6 +170,18 @@ Devices and pairing credentials are stored in
 `~/.config/universal-remote/devices.json` (or `$XDG_CONFIG_HOME`), written with
 owner-only (`0600`) permissions since it holds secrets.
 
+## When something goes wrong
+
+The app is meant to stay up. An unexpected error while it is running — a device
+that drops mid-command, an adapter that misbehaves — is caught, shown as a brief
+error toast, and the app keeps running rather than crashing to the terminal. The
+full traceback is written to `~/.config/universal-remote/error.log` (or
+`$XDG_CONFIG_HOME`) so a real bug is still investigable. Expected, routine
+failures are handled where they happen (a failed key or text send reports a
+status; a failed reachability probe just leaves the bubble unresolved) and never
+raise a toast. A failure during startup still exits — there is no running screen
+to show a toast on yet.
+
 ## Development
 
 ```sh
