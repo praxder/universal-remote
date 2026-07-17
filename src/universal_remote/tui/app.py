@@ -24,15 +24,15 @@ class UniversalRemoteApp(App[None]):
     #menu { width: 100%; height: auto; }
     #menu Button { width: 28; margin: 1 0; }
     /* #title width matches the TITLE_ART banner so it never wraps */
-    #title { width: 42; text-align: center; margin-bottom: 1; }
+    #title { width: 42; text-align: center; margin-bottom: 1; color: $accent; }
     /* left-aligned so the multi-width banner lines keep their column alignment */
-    #devices-title { width: 36; text-align: left; margin: 1 0 1 0; }
+    #devices-title { width: 36; text-align: left; margin: 1 0 1 0; color: $accent; }
     /* wider than #devices-title so the "Add/Edit Device" banner never wraps */
-    #add-title { width: 52; text-align: left; margin: 1 0 2 0; }
+    #add-title { width: 52; text-align: left; margin: 1 0 2 0; color: $accent; }
     /* wide enough for the "Select Device" banner; padded above and below */
-    #use-remote-title { width: 58; text-align: left; margin: 1 0 1 0; }
+    #use-remote-title { width: 58; text-align: left; margin: 1 0 1 0; color: $accent; }
     /* wide enough for the "Discover" banner; padded like the Devices banner */
-    #discover-title { width: 40; text-align: left; margin: 1 0 1 0; }
+    #discover-title { width: 40; text-align: left; margin: 1 0 1 0; color: $accent; }
     /* the "searching" indicator: an animated spinner + bold text, hidden once done */
     #discover-status { height: 1; margin-top: 1; }
     #discover-status LoadingIndicator { width: 8; height: 1; color: $accent; }
