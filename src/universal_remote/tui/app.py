@@ -51,9 +51,17 @@ class UniversalRemoteApp(App[None]):
     }
     /* slight left indent on Save to offset it from the fields above */
     #add-device #save { margin: 1 0 0 1; }
-    /* text-input mode toggle: a labelled switch on one row, shown only for Android TV */
-    #text-adb-cell { height: auto; width: 100%; }
-    #text-adb-label { width: 1fr; content-align: left middle; height: auto; padding-left: 1; }
+    /* text-input mode toggle: a labelled switch on one row, shown only for Android TV.
+       Match the Inputs' filled box: $surface fill at height 3, and left/right `tall` borders
+       so the fill insets by 1 col on each side exactly like an Input. Only left/right (not
+       top/bottom): a full `tall` border would leave a 1-row content area and clip the
+       3-row-tall Switch, so the top/bottom stay open to fit it. */
+    #text-adb-cell {
+        height: 3; width: 100%; background: $surface;
+        border-left: tall $border-blurred; border-right: tall $border-blurred;
+    }
+    #text-adb-label { width: 1fr; content-align: left middle; height: 100%; padding-left: 2; }
+    #text-adb-switch { margin-right: 1; }
     /* duplicate-save error: hidden until there is a message, then shown in red */
     #add-device #error { display: none; color: $error; margin: 1 0 0 0; }
     #quote { width: 42; text-align: center; margin-top: 1; color: $text-muted; }
