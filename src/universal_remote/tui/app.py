@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from textual.app import App
+from textual.app import App, SystemCommand
+from textual.screen import Screen
 
-from typing import Callable
+from typing import Callable, Iterable
 
 from ..devices.store import DeviceStore
 from ..registry import AdapterRegistry
@@ -89,6 +90,13 @@ class UniversalRemoteApp(App[None]):
         self.store = store or DeviceStore()
         self.registry = registry or default_registry
         self.quote_provider = quote_provider or random_quote
+
+    def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
+        """Drop the Maximize and Screenshot commands from the command palette."""
+        for command in super().get_system_commands(screen):
+            if command.title in ("Maximize", "Screenshot"):
+                continue
+            yield command
 
     def on_mount(self) -> None:
         self.push_screen(MenuScreen())
