@@ -51,6 +51,9 @@ class UniversalRemoteApp(App[None]):
     }
     /* slight left indent on Save to offset it from the fields above */
     #add-device #save { margin: 1 0 0 1; }
+    /* text-input mode toggle: a labelled switch on one row, shown only for Android TV */
+    #text-adb-cell { height: auto; width: 100%; }
+    #text-adb-label { width: 1fr; content-align: left middle; height: auto; padding-left: 1; }
     /* duplicate-save error: hidden until there is a message, then shown in red */
     #add-device #error { display: none; color: $error; margin: 1 0 0 0; }
     #quote { width: 42; text-align: center; margin-top: 1; color: $text-muted; }
@@ -87,6 +90,17 @@ class UniversalRemoteApp(App[None]):
     #pin-entry { display: none; width: 100%; height: auto; }
     #pin-entry Input { width: 100%; margin-top: 1; }
     #pairing #submit, #pairing #cancel { width: 100%; margin-top: 1; }
+    /* ADB text setup: dim the device list behind a centered dialog box */
+    AdbTextSetupScreen { align: center middle; background: $background 60%; }
+    #adb-setup {
+        width: 62; height: auto; padding: 1 2;
+        border: thick $primary; background: $surface;
+    }
+    #adb-setup-title { width: 100%; text-align: center; text-style: bold; }
+    #adb-setup-guidance { width: 100%; margin: 1 0; }
+    #adb-setup Input { width: 100%; margin-bottom: 1; }
+    #adb-setup-status { width: 100%; color: $warning; }
+    #adb-setup #adb-setup-submit, #adb-setup #cancel { width: 100%; margin-top: 1; }
     """
 
     def __init__(

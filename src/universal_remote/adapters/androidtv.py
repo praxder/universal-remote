@@ -27,6 +27,7 @@ from ..errors import (
 )
 from ..keys import Key
 from ..session import BaseSession
+from .adb_text import AdbText, find_adb_text
 
 if TYPE_CHECKING:
     from ..devices.models import Device
@@ -75,6 +76,10 @@ RemoteFactory = Callable[..., AndroidTVRemote]
 # The mDNS browse seam, injected so discovery is testable without a live network.
 MdnsBrowser = Callable[[str, float], Awaitable[list[MdnsHit]]]
 
+# Builds the ADB text seam (or None when `adb` is missing), injected so text routing
+# is tested with a fake `adb` and so the binary is only located when it is needed.
+AdbTextFactory = Callable[[], AdbText | None]
+
 
 def _pack_credential(cert: str, key: str) -> str:
     """Pack the paired client cert and key PEMs into one opaque credential string."""
@@ -107,17 +112,64 @@ class AndroidTvSession(BaseSession):
 
     Owns the temp dir holding the connection's cert and key for the session's whole
     lifetime and removes it on release, so no key material outlives the session on disk.
+
+    When opted in (`text_via_adb`), text is routed over the system `adb` binary so it
+    lands even under the IME overlay; keys always stay on Remote v2. If the ADB path
+    is unavailable the session falls back to Remote v2 text and flags it so the remote
+    surface can say so (`adb_text_unavailable`).
     """
 
-    def __init__(self, remote, capabilities: Capabilities, cert_dir) -> None:
+    def __init__(
+        self,
+        remote,
+        capabilities: Capabilities,
+        cert_dir,
+        *,
+        device_ip: str = "",
+        text_via_adb: bool = False,
+        adb_text: AdbText | None = None,
+    ) -> None:
         super().__init__(capabilities)
         self._remote = remote
         self._cert_dir = cert_dir
+        self._device_ip = device_ip
+        self._text_via_adb = text_via_adb
+        self._adb_text = adb_text
+        self._adb_target: str | None = None  # resolved lazily on first ADB send
+        # Set after each send: True when an opted-in send fell back to Remote v2.
+        self.adb_text_unavailable = False
 
     async def _dispatch_key(self, key: Key) -> None:
         self._remote.send_key_command(ANDROIDTV_KEYS[key])  # synchronous library call
 
     async def _dispatch_text(self, text: str) -> None:
+        self.adb_text_unavailable = False
+        if self._text_via_adb and await self._send_via_adb(text):
+            return
+        if self._text_via_adb:
+            self.adb_text_unavailable = True  # opted in but ADB was unavailable
+        self._send_via_remote_v2(text)
+
+    async def _send_via_adb(self, text: str) -> bool:
+        """Send `text` over ADB, returning False if the ADB path is unavailable."""
+        if self._adb_text is None:  # `adb` binary missing
+            return False
+        target = await self._resolve_adb_target()
+        if target is None:  # device not reachable over wireless debugging
+            return False
+        try:
+            await self._adb_text.send_text(target, text)
+            return True
+        except Exception:
+            return False
+
+    async def _resolve_adb_target(self) -> str | None:
+        # Cache a real hit for the session; a miss (None) is re-resolved next send.
+        if self._adb_target is None:
+            self._adb_target = await self._adb_text.resolve_target(self._device_ip)
+        return self._adb_target
+
+    def _send_via_remote_v2(self, text: str) -> None:
         try:
             self._remote.send_text(text)  # synchronous library call
         except Exception as exc:
@@ -136,14 +188,17 @@ class AndroidTvAdapter:
     platform = PLATFORM
     display_name = "Android TV"
     reachability_port = 6466  # Remote v2 api/command port
+    supports_adb_text = True  # offers the opt-in ADB text path (see adb_text.py)
 
     def __init__(
         self,
         remote_factory: RemoteFactory = AndroidTVRemote,
         browse: MdnsBrowser = browse_mdns,
+        adb_text_factory: AdbTextFactory = find_adb_text,
     ) -> None:
         self._remote_factory = remote_factory
         self._browse = browse
+        self._adb_text_factory = adb_text_factory
 
     def capabilities(self) -> Capabilities:
         return _CAPABILITIES
@@ -199,7 +254,29 @@ class AndroidTvAdapter:
         except Exception as exc:
             cert_dir.cleanup()
             raise ConnectionFailedError(f"Could not connect to {device.name}") from exc
-        return AndroidTvSession(remote, _CAPABILITIES, cert_dir)
+        # Build the ADB seam only for an opted-in device, so `adb` is located lazily.
+        adb_text = self._adb_text_factory() if device.text_via_adb else None
+        return AndroidTvSession(
+            remote,
+            _CAPABILITIES,
+            cert_dir,
+            device_ip=device.ip,
+            text_via_adb=device.text_via_adb,
+            adb_text=adb_text,
+        )
+
+    async def pair_adb(self, address: str, code: str) -> bool:
+        """Run the one-time ADB wireless-debugging pairing; True if it succeeds.
+
+        Distinct from Remote v2 PIN pairing: `address` is the `ip:port` the TV shows
+        on its "Pair with code" screen. Returns False (never raising) when `adb` is
+        missing or the pairing is rejected, so the caller leaves the device unchanged.
+        """
+        adb_text = self._adb_text_factory()
+        if adb_text is None:
+            return False
+        ip, _, port = address.partition(":")
+        return await adb_text.pair(ip, port, code)
 
 
 def register(registry: "AdapterRegistry") -> None:

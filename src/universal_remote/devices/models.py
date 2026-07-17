@@ -17,6 +17,9 @@ class Device:
     credential: str | None = None
     identifier: str | None = None
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    # Opt-in: send text over the system `adb` binary instead of Remote v2, so text
+    # lands even when the Android TV "use your phone" IME overlay is up.
+    text_via_adb: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

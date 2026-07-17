@@ -7,10 +7,46 @@ from ipaddress import ip_address
 
 from pyatv.const import Protocol
 
+from universal_remote.adapters.adb_text import AdbResult, AdbText
 from universal_remote.capabilities import Capabilities
 from universal_remote.errors import PairingCancelledError
 from universal_remote.keys import Key
 from universal_remote.session import BaseSession
+
+# A realistic `adb mdns services` listing: the device answers on both the
+# tls-connect and tls-pairing services, so a resolver must pick the connect row.
+FAKE_MDNS_SERVICES = (
+    "List of discovered mdns services\n"
+    "adb-99000-abcdef\t_adb-tls-connect._tcp.\t10.0.0.5:37451\n"
+    "adb-99000-abcdef\t_adb-tls-pairing._tcp.\t10.0.0.5:42133\n"
+    "adb-11111-zzzzzz\t_adb-tls-connect._tcp.\t10.0.0.9:40100\n"
+)
+
+
+class FakeAdbRunner:
+    """Stands in for an `AdbRunner`; records argv and returns canned results.
+
+    `mdns_output` answers `adb mdns services`; `fail` holds the leading argument of
+    commands that should exit non-zero (e.g. "connect" for an unreachable device,
+    "pair" for a rejected pairing), so a test drives fallback paths without a real TV.
+    """
+
+    def __init__(self, mdns_output: str = "", fail: set[str] | None = None) -> None:
+        self.calls: list[list[str]] = []
+        self._mdns_output = mdns_output
+        self._fail = fail or set()
+
+    async def __call__(self, args: list[str]) -> AdbResult:
+        self.calls.append(args)
+        if args[:2] == ["mdns", "services"]:
+            return AdbResult(0, self._mdns_output)
+        returncode = 1 if args and args[0] in self._fail else 0
+        return AdbResult(returncode, "")
+
+
+def fake_adb_text(mdns_output: str = "", fail: set[str] | None = None) -> AdbText:
+    """An `AdbText` bound to a `FakeAdbRunner`, exposed for adapter-level tests."""
+    return AdbText(FakeAdbRunner(mdns_output=mdns_output, fail=fail))
 
 
 class FakeSession(BaseSession):
@@ -24,6 +60,9 @@ class FakeSession(BaseSession):
         # When set, dispatching any key raises it — stands in for a device-side
         # failure (timeout, dropped connection) the on-screen remote must survive.
         self.dispatch_error: Exception | None = None
+        # Mirrors AndroidTvSession's fallback flag: a test sets it True to stand in
+        # for a text send that fell back off the ADB path so the remote's status shows.
+        self.adb_text_unavailable = False
 
     async def _dispatch_key(self, key: Key) -> None:
         if self.dispatch_error is not None:
@@ -499,10 +538,19 @@ class FakeAdapter:
         pair_identifier: str | None = None,
         requires_pairing: bool = True,
         reachability_port: int | None = None,
+        adb_pair_result: bool = True,
+        supports_adb_text: bool = False,
     ) -> None:
         self.platform = platform
         self.display_name = display_name or platform
         self.requires_pairing = requires_pairing
+        # Whether this adapter offers the ADB text path (only Android TV does in
+        # production); gates the Add/Edit text-input toggle. Off by default so
+        # non-ADB device-form tests see no toggle.
+        self.supports_adb_text = supports_adb_text
+        # Scriptable ADB-text pairing; `adb_pair_calls` records the (address, code).
+        self.adb_pair_result = adb_pair_result
+        self.adb_pair_calls: list[tuple[str, str]] = []
         # None mirrors an adapter that declares no port (device stays unknown).
         self.reachability_port = reachability_port
         self._capabilities = capabilities or Capabilities(
@@ -545,6 +593,10 @@ class FakeAdapter:
         session = FakeSession(self._capabilities)
         self.sessions.append(session)
         return session
+
+    async def pair_adb(self, address: str, code: str) -> bool:
+        self.adb_pair_calls.append((address, code))
+        return self.adb_pair_result
 
 
 class FakeDiscoverAdapter:

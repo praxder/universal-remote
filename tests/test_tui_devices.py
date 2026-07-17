@@ -321,6 +321,7 @@ class TestAddDevice:
                     "platform",
                     "name",
                     "ip",
+                    "text-adb-cell",
                     "error",
                     "save",
                 ]

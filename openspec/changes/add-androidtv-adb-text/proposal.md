@@ -6,7 +6,7 @@ On Google TV / newer Android TV, the "Use the keyboard on your mobile device" IM
 
 - Add an **opt-in ADB text path** to the existing Android TV adapter. Keys, discovery, and PIN pairing stay on Remote v2; only text is routed over ADB when a device opts in.
 - Add a persisted per-device flag so a device remembers it should send text over ADB.
-- Add a TUI action to set up ADB text: guide the user to enable Developer options → Wireless debugging → "Pair with code", collect the pairing address and code, run the one-time `adb pair`, and flip the flag on success.
+- Add a text-input-mode toggle on the Add/Edit device screen, shown only for Android TV: switching it to ADB guides the user to enable Developer options → Wireless debugging → "Pair with code", collects the pairing address and code, and runs the one-time `adb pair`; the opt-in is recorded when the form is saved.
 - Route text at send time: opted-in devices send `input text` over the system `adb` binary; all others keep using Remote v2 `send_text`.
 - Fall back to Remote v2 `send_text` (with a status note) when an opted-in device's ADB path is unavailable (adb binary missing, or wireless debugging off), so app-field text still works.
 
@@ -17,11 +17,11 @@ On Google TV / newer Android TV, the "Use the keyboard on your mobile device" IM
 
 ### Modified Capabilities
 - `androidtv-adapter`: text input gains an optional ADB path. When a device is opted in, the adapter sends text via the `adb` binary (`input text`) instead of Remote v2, resolving the device's ephemeral wireless-debugging address via mDNS each session, and falls back to Remote v2 when ADB is unavailable.
-- `tui-remote`: adds a per-device "Set up text input (ADB)" flow that performs the one-time `adb pair` and records the opt-in.
+- `tui-remote`: adds an Android-TV-only text-input-mode toggle on the Add/Edit device screen; switching it to ADB performs the one-time `adb pair` and records the opt-in on save.
 
 ## Impact
 
-- **Code**: `src/universal_remote/adapters/androidtv.py` (text routing), new `src/universal_remote/adapters/adb_text.py` seam (wraps the `adb` binary), `src/universal_remote/devices/models.py` (new `text_via_adb` field), TUI (opt-in action + pairing prompts).
+- **Code**: `src/universal_remote/adapters/androidtv.py` (text routing), new `src/universal_remote/adapters/adb_text.py` seam (wraps the `adb` binary), `src/universal_remote/devices/models.py` (new `text_via_adb` field), TUI (Add/Edit text-input-mode toggle + pairing prompts).
 - **Dependencies**: requires the external `adb` binary (Android platform-tools) on the host for the ADB text path only. No new pip dependency — `adb-shell` cannot do the Android 11+ wireless-debugging pairing flow, so the design shells out to `adb`.
 - **Persistence**: `devices.json` gains an optional `text_via_adb` field; backward-compatible (`Device.from_dict` already ignores unknown keys and the field defaults to `False`).
 - **User setup**: opted-in devices require Developer options + Wireless debugging to remain enabled; the connect port is ephemeral and re-resolved via mDNS.

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical
+from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen, Screen
 from textual.widgets import (
     Button,
@@ -15,6 +15,7 @@ from textual.widgets import (
     OptionList,
     Select,
     Static,
+    Switch,
 )
 from textual.widgets.option_list import Option
 
@@ -161,6 +162,65 @@ class ConfirmDeleteScreen(ModalScreen[bool]):
         self.focus_next()
 
 
+class AdbTextSetupScreen(ModalScreen[bool]):
+    """One-time ADB wireless-debugging pairing so text lands under the IME overlay.
+
+    Guides the user to enable Developer options → Wireless debugging → Pair with
+    code, collects the pairing address and code, and runs the adapter's ADB pairing.
+    Dismisses with True on success and False on cancel; on failure it stays with a
+    status. Persistence is the caller's job (the Add/Edit form records the opt-in on
+    Save), so this screen only performs the pairing and reports the outcome.
+    """
+
+    BINDINGS = [("escape", "cancel", "Cancel")]
+
+    _GUIDANCE = (
+        "On the TV: Settings → System → Developer options → Wireless debugging → "
+        "Pair device with pairing code. Enter the address and code it shows here."
+    )
+
+    def __init__(self, platform: str) -> None:
+        super().__init__()
+        self._platform = platform
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="adb-setup"):
+            yield Label("Set up text input (ADB)", id="adb-setup-title")
+            yield Label(self._GUIDANCE, id="adb-setup-guidance")
+            yield Input(
+                placeholder="Pairing address (e.g. 10.0.0.5:37000)", id="adb-address"
+            )
+            yield Input(placeholder="Pairing code", id="adb-code")
+            yield Label("", id="adb-setup-status")
+            yield Button("Set up", id="adb-setup-submit")
+            yield Button("Cancel", id="cancel")
+
+    def on_mount(self) -> None:
+        self.query_one("#adb-address", Input).focus()
+
+    async def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "adb-setup-submit":
+            await self._setup()
+        elif event.button.id == "cancel":
+            self.action_cancel()
+
+    def action_cancel(self) -> None:
+        self.dismiss(False)
+
+    async def _setup(self) -> None:
+        address = self.query_one("#adb-address", Input).value.strip()
+        code = self.query_one("#adb-code", Input).value.strip()
+        adapter = self.app.registry.resolve(self._platform)
+        self._status("Pairing…")
+        if await adapter.pair_adb(address, code):
+            self.dismiss(True)
+        else:
+            self._status("Pairing failed — check the address and code, then try again.")
+
+    def _status(self, message: str) -> None:
+        self.query_one("#adb-setup-status", Label).update(message)
+
+
 class DeviceTypeSelect(Select):
     """A Select that moves field focus on Up/Down and opens on Enter/Space.
 
@@ -194,6 +254,9 @@ class AddDeviceScreen(Screen[None]):
     def __init__(self, existing: Device | None = None) -> None:
         super().__init__()
         self._existing = existing
+        # In-memory opt-in for ADB text; written to the device on Save. Seeded from
+        # the existing device so editing reflects its current mode.
+        self._opted_in = existing.text_via_adb if existing is not None else False
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -204,6 +267,12 @@ class AddDeviceScreen(Screen[None]):
             yield from self._device_type_cell()
             yield Input(placeholder="Name", id="name")
             yield Input(placeholder="IP address", id="ip")
+            # Shown only for Android TV (see _update_text_adb_visibility). The initial
+            # value is set via the constructor so mounting an opted-in device does not
+            # fire Switch.Changed (which would re-open the pairing modal).
+            with Horizontal(id="text-adb-cell"):
+                yield Label("Send text over ADB", id="text-adb-label")
+                yield Switch(value=self._opted_in, id="text-adb-switch")
             yield Label("", id="error")
             yield Button("Save", id="save")
         yield Footer()
@@ -228,13 +297,49 @@ class AddDeviceScreen(Screen[None]):
         if self._existing is not None:
             self.query_one("#ip", Input).value = self._existing.ip
             self.query_one("#name", Input).value = self._existing.name
+        self._update_text_adb_visibility()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "save":
             self._save()
 
-    def _selected_platform(self) -> str:
+    def on_select_changed(self, event: Select.Changed) -> None:
+        # Only the add-form platform picker; changing type re-evaluates the toggle.
+        if event.select.id == "platform":
+            self._update_text_adb_visibility()
+
+    def on_switch_changed(self, event: Switch.Changed) -> None:
+        if event.switch.id != "text-adb-switch":
+            return
+        if event.value:
+            # Switching to ADB requires a live pairing; the modal reports the outcome.
+            self.app.push_screen(
+                AdbTextSetupScreen(self._current_platform()), self._on_adb_setup_done
+            )
+        else:
+            self._opted_in = False
+
+    def _on_adb_setup_done(self, paired: bool | None) -> None:
+        if paired:
+            self._opted_in = True
+        else:
+            # Cancelled or failed: revert to standard, leaving the device not opted in.
+            self._opted_in = False
+            self.query_one("#text-adb-switch", Switch).value = False
+
+    def _current_platform(self) -> str:
+        if self._existing is not None:
+            return self._existing.platform
         return self.query_one("#platform", Select).value
+
+    def _update_text_adb_visibility(self) -> None:
+        adapter = self.app.registry.resolve(self._current_platform())
+        supported = getattr(adapter, "supports_adb_text", False)
+        self.query_one("#text-adb-cell").display = supported
+        if not supported and self._opted_in:
+            # A hidden toggle must not carry a stale opt-in from another type.
+            self._opted_in = False
+            self.query_one("#text-adb-switch", Switch).value = False
 
     def _save(self) -> None:
         ip = self.query_one("#ip", Input).value.strip()
@@ -250,10 +355,16 @@ class AddDeviceScreen(Screen[None]):
         if self._existing is not None:
             self._existing.name = name
             self._existing.ip = ip
+            self._existing.text_via_adb = self._opted_in
             self.app.store.update(self._existing)
         else:
             self.app.store.add(
-                Device(name=name, platform=self._selected_platform(), ip=ip)
+                Device(
+                    name=name,
+                    platform=self._current_platform(),
+                    ip=ip,
+                    text_via_adb=self._opted_in,
+                )
             )
         self.app.pop_screen()
         if added:

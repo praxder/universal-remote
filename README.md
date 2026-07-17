@@ -150,6 +150,19 @@ time, even while it is still scanning.
 - **Text is best-effort**, as with the other platforms: entry depends on the
   focused app's input field, and a failed send reports "not supported" rather
   than silently dropping input.
+- **Optional ADB text for overlay-proof typing.** On Google TV / newer Android TV,
+  focusing many fields raises a "use the keyboard on your mobile device" overlay
+  that silently swallows text sent over Remote v2. To make text land everywhere,
+  opt a device into the **ADB text path**: in **Manage Devices**, highlight the TV
+  and press **`t` (Text input (ADB))**. On the TV, enable **Settings → System →
+  Developer options → Wireless debugging → Pair device with pairing code**, then
+  type the address and code it shows into the app. This runs a one-time `adb pair`
+  and remembers the opt-in; text is then sent via `input text` over the system
+  `adb` binary while keys stay on Remote v2. Requires the external `adb` binary
+  (Android platform-tools) on your machine and wireless debugging left enabled on
+  the TV; if the ADB path is unavailable, text falls back to Remote v2 and the
+  remote shows a one-line "ADB text unavailable" status. Non-ASCII characters are
+  a known limitation of the ADB escaping.
 
 ## Storage
 

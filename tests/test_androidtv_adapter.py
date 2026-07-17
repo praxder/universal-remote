@@ -4,7 +4,8 @@ import os
 import pytest
 from androidtvremote2 import CannotConnect, InvalidAuth
 
-from tests.fakes import FakeAndroidTvRemoteFactory
+from tests.fakes import FAKE_MDNS_SERVICES, FakeAdbRunner, FakeAndroidTvRemoteFactory
+from universal_remote.adapters.adb_text import AdbText
 from universal_remote.adapters.androidtv import (
     ANDROIDTV_KEYS,
     DISCOVERY_SERVICE,
@@ -327,6 +328,158 @@ class TestAndroidTvText:
                 await session.send_text("hello")
 
         run(scenario())
+
+
+class TestAndroidTvAdbTextRouting:
+    def test_given_an_opted_in_device_when_text_is_sent_then_it_routes_over_adb(self):
+        factory = FakeAndroidTvRemoteFactory()
+        runner = FakeAdbRunner(mdns_output=FAKE_MDNS_SERVICES)
+        adapter = AndroidTvAdapter(
+            remote_factory=factory, adb_text_factory=lambda: AdbText(runner)
+        )
+        credential = _paired_credential()
+
+        async def scenario():
+            device = _device(ip="10.0.0.5", credential=credential, text_via_adb=True)
+            session = await adapter.connect(device)
+            await session.send_text("hi there")
+
+        run(scenario())
+
+        assert runner.calls == [
+            ["mdns", "services"],
+            ["connect", "10.0.0.5:37451"],
+            ["-s", "10.0.0.5:37451", "shell", "input", "text", "hi%sthere"],
+        ]
+        assert factory.remotes[-1].sent_text == []  # not over Remote v2
+
+    def test_given_a_non_opted_in_device_when_text_is_sent_then_it_routes_over_remote_v2(
+        self,
+    ):
+        factory = FakeAndroidTvRemoteFactory()
+        runner = FakeAdbRunner(mdns_output=FAKE_MDNS_SERVICES)
+        adapter = AndroidTvAdapter(
+            remote_factory=factory, adb_text_factory=lambda: AdbText(runner)
+        )
+        credential = _paired_credential()
+
+        async def scenario():
+            device = _device(ip="10.0.0.5", credential=credential, text_via_adb=False)
+            session = await adapter.connect(device)
+            await session.send_text("hello")
+
+        run(scenario())
+
+        assert factory.remotes[-1].sent_text == ["hello"]
+        assert runner.calls == []  # ADB never touched for a non-opted-in device
+
+    def test_given_an_opted_in_device_when_text_is_sent_twice_then_the_target_resolves_once(
+        self,
+    ):
+        factory = FakeAndroidTvRemoteFactory()
+        runner = FakeAdbRunner(mdns_output=FAKE_MDNS_SERVICES)
+        adapter = AndroidTvAdapter(
+            remote_factory=factory, adb_text_factory=lambda: AdbText(runner)
+        )
+        credential = _paired_credential()
+
+        async def scenario():
+            device = _device(ip="10.0.0.5", credential=credential, text_via_adb=True)
+            session = await adapter.connect(device)
+            await session.send_text("one")
+            await session.send_text("two")
+
+        run(scenario())
+
+        # mDNS is queried once (lazy resolve is cached), not per send.
+        assert runner.calls.count(["mdns", "services"]) == 1
+
+
+class TestAndroidTvAdbTextFallback:
+    def test_given_adb_is_missing_when_opted_in_text_is_sent_then_it_falls_back_to_remote_v2(
+        self,
+    ):
+        factory = FakeAndroidTvRemoteFactory()
+        adapter = AndroidTvAdapter(
+            remote_factory=factory,
+            adb_text_factory=lambda: None,  # `adb` not installed
+        )
+        credential = _paired_credential()
+
+        async def scenario():
+            device = _device(credential=credential, text_via_adb=True)
+            session = await adapter.connect(device)
+            await session.send_text("hello")
+            return session
+
+        session = run(scenario())
+
+        assert factory.remotes[-1].sent_text == ["hello"]
+        assert session.adb_text_unavailable is True
+
+    def test_given_the_device_is_unreachable_over_adb_when_text_is_sent_then_it_falls_back(
+        self,
+    ):
+        factory = FakeAndroidTvRemoteFactory()
+        # Empty mDNS listing: the device answers no wireless-debugging service.
+        runner = FakeAdbRunner(mdns_output="")
+        adapter = AndroidTvAdapter(
+            remote_factory=factory, adb_text_factory=lambda: AdbText(runner)
+        )
+        credential = _paired_credential()
+
+        async def scenario():
+            device = _device(credential=credential, text_via_adb=True)
+            session = await adapter.connect(device)
+            await session.send_text("hello")
+            return session
+
+        session = run(scenario())
+
+        assert factory.remotes[-1].sent_text == ["hello"]
+        assert session.adb_text_unavailable is True
+
+    def test_given_a_successful_adb_send_when_it_completes_then_unavailable_is_not_flagged(
+        self,
+    ):
+        factory = FakeAndroidTvRemoteFactory()
+        runner = FakeAdbRunner(mdns_output=FAKE_MDNS_SERVICES)
+        adapter = AndroidTvAdapter(
+            remote_factory=factory, adb_text_factory=lambda: AdbText(runner)
+        )
+        credential = _paired_credential()
+
+        async def scenario():
+            device = _device(ip="10.0.0.5", credential=credential, text_via_adb=True)
+            session = await adapter.connect(device)
+            await session.send_text("hello")
+            return session
+
+        session = run(scenario())
+
+        assert session.adb_text_unavailable is False
+
+
+class TestAndroidTvAdbPairing:
+    def test_given_a_passing_adb_pairing_when_run_then_success_is_reported(self):
+        runner = FakeAdbRunner()
+        adapter = AndroidTvAdapter(adb_text_factory=lambda: AdbText(runner))
+
+        ok = run(adapter.pair_adb("10.0.0.5:42133", "123456"))
+
+        assert ok is True
+        assert runner.calls == [["pair", "10.0.0.5:42133", "123456"]]
+
+    def test_given_a_failing_adb_pairing_when_run_then_failure_is_reported(self):
+        runner = FakeAdbRunner(fail={"pair"})
+        adapter = AndroidTvAdapter(adb_text_factory=lambda: AdbText(runner))
+
+        assert run(adapter.pair_adb("10.0.0.5:42133", "000000")) is False
+
+    def test_given_adb_is_missing_when_pairing_then_failure_is_reported(self):
+        adapter = AndroidTvAdapter(adb_text_factory=lambda: None)
+
+        assert run(adapter.pair_adb("10.0.0.5:42133", "123456")) is False
 
 
 class TestAndroidTvDiscovery:

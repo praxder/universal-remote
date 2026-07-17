@@ -37,8 +37,8 @@ Wireless debugging's connect port is ephemeral (changes on toggle/reboot). `reso
 ### Escape text as a tested pure function
 `escape_for_input_text(text)` maps spaces to `%s` and escapes shell-special characters so a single `input text` argument reproduces the intended string. Kept pure and unit-tested independently of any subprocess.
 
-### One-time ADB pairing lives in a TUI opt-in action
-"Set up text input (ADB)" guides the user (Developer options → Wireless debugging → Pair with code), collects the pairing `ip:port` + 6-digit code, runs `adb pair`, and on success sets `text_via_adb=True` and saves. Pairing address/code are ephemeral, so this must be done live, matching the manual flow that was validated.
+### The ADB text opt-in is a toggle on Add/Edit, shown only for Android TV
+The text-input mode is a toggle on the Add Device / Edit Device form, visible only when the device type is Android TV (gated on an adapter capability flag, `supports_adb_text`, mirroring the existing `requires_pairing`/`reachability_port` getattr idioms). The device list carries no text-mode action. Switching the toggle to ADB launches the pairing modal live — guiding the user (Developer options → Wireless debugging → Pair with code) and collecting the ephemeral `ip:port` + 6-digit code — because the pairing address/code are only valid momentarily. On successful pairing the opt-in is held as form intent and written to `text_via_adb` when the form is saved (forced by the Add flow, where no device exists until save); cancel/failure reverts the toggle. The pairing modal only performs `adb pair` and reports success/failure — it does not persist, keeping persistence on the form's Save alongside name/IP.
 
 ## Risks / Trade-offs
 

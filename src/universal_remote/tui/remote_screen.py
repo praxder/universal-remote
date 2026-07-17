@@ -218,6 +218,11 @@ class RemoteScreen(Screen[None]):
                 await self._session.send_text(text)
             except TextUnsupportedError:
                 self._status("Text entry is not supported on this device")
+            else:
+                # An opted-in ADB send that fell back to Remote v2 flags itself; say
+                # so rather than leaving the user wondering why setup made no change.
+                if getattr(self._session, "adb_text_unavailable", False):
+                    self._status("ADB text unavailable — sent over the standard path")
         self._exit_text_mode()
 
     def on_text_field_exit_requested(self, event: TextField.ExitRequested) -> None:
