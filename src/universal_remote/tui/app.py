@@ -23,6 +23,15 @@ class UniversalRemoteApp(App[None]):
     Screen { align: center middle; }
     #menu { width: 100%; height: auto; }
     #menu Button { width: 28; margin: 1 0; }
+    /* focus: accent text on a slightly lighter fill instead of reversing fg/bg;
+       keep the default `tall` top/bottom border so the height never changes */
+    Button:focus {
+        text-style: bold;
+        color: $accent;
+        background: $surface-lighten-1;
+        border-top: tall $surface-lighten-1;
+        border-bottom: tall $surface-lighten-1;
+    }
     /* #title width matches the TITLE_ART banner so it never wraps */
     #title { width: 42; text-align: center; margin-bottom: 1; color: $accent; }
     /* left-aligned so the multi-width banner lines keep their column alignment */
