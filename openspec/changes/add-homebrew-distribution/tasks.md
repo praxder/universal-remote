@@ -35,7 +35,7 @@
 - [x] 6.1 Merge to `main` and confirm: a release is created, version bump matches the commit types, notes are grouped by type, and the binary asset is attached
 - [x] 6.2 Confirm the tap formula was bumped to the new version + sha256
 - [x] 6.3 Run `brew install praxder/tap/universal-remote` on an arm64 Mac that did **not** build the binary; confirm it installs past Gatekeeper, launches, discovers, and `--version` matches
-- [ ] 6.4 Confirm a no-releasable-commits push to `main` produces no release (no-op)
+- [x] 6.4 Confirm a no-releasable-commits push to `main` produces no release (no-op)
 
 ## 7. Documentation
 
