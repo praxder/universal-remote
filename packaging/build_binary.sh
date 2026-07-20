@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # Build the standalone macOS arm64 binary for universal-remote.
 #
-# Produces a single self-contained executable at dist/universal-remote that runs
-# with no user-provided Python or uv. The flags below bundle Textual's framework
+# Produces a self-contained application directory at dist/universal-remote/ (an
+# --onedir bundle: the launcher at dist/universal-remote/universal-remote plus an
+# _internal/ directory of dependencies) that runs with no user-provided Python or
+# uv. Unlike --onefile, it runs in place with no per-launch temp extraction. The
+# flags below bundle Textual's framework
 # CSS and the dynamic-import runtime dependencies that PyInstaller's static
 # analysis cannot discover on its own:
 #   --collect-all textual            Textual ships CSS/data files, not just code.
@@ -17,7 +20,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 uv run pyinstaller \
-  --onefile \
+  --onedir \
   --name universal-remote \
   --collect-all textual \
   --collect-submodules universal_remote \
@@ -30,4 +33,4 @@ uv run pyinstaller \
   --noconfirm \
   packaging/entry.py
 
-echo "Built dist/universal-remote"
+echo "Built dist/universal-remote/ (launcher: dist/universal-remote/universal-remote)"

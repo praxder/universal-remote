@@ -73,7 +73,7 @@ jobs:
           echo "sha256=$sha" >> "$GITHUB_OUTPUT"
       - name: Smoke test frozen binary
         run: |
-          out="$(./dist/universal-remote --version)"
+          out="$(./dist/universal-remote/universal-remote --version)"
           echo "$out"
           echo "$out" | grep -qF "${{ needs.version.outputs.version }}" || {
             echo "version mismatch: '$out' does not contain ${{ needs.version.outputs.version }}"
