@@ -5,12 +5,23 @@ keyboard-drivable. Ships with Samsung Tizen, LG WebOS, Apple TV, Roku, Fire TV,
 and Android TV / Google TV adapters; the architecture is platform-agnostic so new
 TV platforms are "one new adapter module + register it."
 
-## Requirements
+## Install
 
-- Python 3.13 (pinned via `.python-version`)
-- [`uv`](https://docs.astral.sh/uv/)
+### Homebrew (macOS, Apple Silicon)
 
-## Install & run
+```sh
+brew install praxder/tap/universal-remote
+universal-remote
+```
+
+Installs a self-contained binary — no Python or `uv` needed. Apple Silicon
+(arm64) only; an Intel Mac gets a clear architecture error rather than a broken
+install.
+
+### From source (dev alternative)
+
+Requires Python 3.13 (pinned via `.python-version`) and
+[`uv`](https://docs.astral.sh/uv/):
 
 ```sh
 uv sync

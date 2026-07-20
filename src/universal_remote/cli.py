@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import argparse
+from importlib.metadata import version
+
 from .adapters.androidtv import register as register_androidtv
 from .adapters.appletv import register as register_appletv
 from .adapters.firetv import register as register_firetv
@@ -24,5 +27,20 @@ def build_app(store: DeviceStore | None = None) -> UniversalRemoteApp:
     return UniversalRemoteApp(store=store, registry=registry)
 
 
-def main() -> None:
+def _parse_args(argv: list[str] | None) -> argparse.Namespace:
+    """Handle ``--version``/``--help`` before the TUI; both exit before returning."""
+    parser = argparse.ArgumentParser(
+        prog="universal-remote",
+        description="A local, terminal-based universal TV remote.",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {version('universal-remote')}",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> None:
+    _parse_args(argv)
     build_app().run()
