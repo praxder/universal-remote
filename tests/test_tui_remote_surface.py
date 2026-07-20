@@ -232,7 +232,7 @@ class TestRemoteSurface:
 
         assert adapter.sessions[0].sent_keys == [Key.MUTE]
 
-    def test_given_the_remote_when_arrow_keys_pressed_then_dpad_ok_and_back_map(
+    def test_given_the_remote_when_arrow_and_backspace_pressed_then_dpad_ok_and_back_map(
         self, tmp_path
     ):
         store = _store_with_device(tmp_path)
@@ -245,7 +245,7 @@ class TestRemoteSurface:
                 await pilot.press("up")
                 await pilot.press("left")
                 await pilot.press("enter")
-                await pilot.press("escape")
+                await pilot.press("backspace")  # Back is sent to the device
                 await pilot.pause()
 
         asyncio.run(scenario())
@@ -256,6 +256,45 @@ class TestRemoteSurface:
             Key.OK,
             Key.BACK,
         ]
+
+    def test_given_the_remote_when_escape_pressed_then_it_returns_to_the_previous_page(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await pilot.press("escape")
+                await pilot.pause()
+                assert not isinstance(app.screen, RemoteScreen)
+
+        asyncio.run(scenario())
+
+        # Escape leaves the remote page; it does not send Back to the device.
+        assert Key.BACK not in adapter.sessions[0].sent_keys
+
+    def test_given_the_text_field_focused_when_backspace_pressed_then_it_edits_not_sends_back(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await pilot.press("t")  # enter the text field
+                await pilot.pause()
+                await pilot.press("a", "b", "backspace")
+                await pilot.pause()
+                assert app.screen.query_one("#text", TextField).value == "a"
+
+        asyncio.run(scenario())
+
+        assert adapter.sessions[0].sent_keys == []  # no Back while typing
 
     def test_given_the_remote_when_vim_keys_pressed_then_the_dpad_directions_map(
         self, tmp_path

@@ -162,6 +162,8 @@ class TestTextEntryFocus:
                 await pilot.press("escape")
                 await pilot.pause()
                 assert app.focused is None
+                # Escape exits only the field; the remote page stays open.
+                assert isinstance(app.screen, RemoteScreen)
 
         asyncio.run(scenario())
 

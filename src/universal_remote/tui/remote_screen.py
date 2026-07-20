@@ -94,7 +94,11 @@ class RemoteScreen(Screen[None]):
         Binding("h", "send('LEFT')", "Left", show=False),
         Binding("l", "send('RIGHT')", "Right", show=False),
         Binding("enter", "send('OK')", "OK"),
-        Binding("escape", "send('BACK')", "Back"),
+        # Backspace sends the device's Back key; Escape leaves the remote page
+        # (see the exit_remote binding below), matching Escape's back-a-page role
+        # elsewhere in the app. While the text field is focused the Input consumes
+        # Backspace to delete a character, so it never reaches here.
+        Binding("backspace", "send('BACK')", "Back"),
         Binding("space", "send('HOME')", "Home"),
         # Digit keys drive the number pad; hidden from the footer to avoid clutter.
         *(
@@ -102,7 +106,11 @@ class RemoteScreen(Screen[None]):
             for digit in range(10)
         ),
         Binding("t", "text_mode", "Text"),
-        Binding("q", "exit_remote", "Exit"),
+        # Hidden from the footer: a ninth hint does not fit the supported 80-column
+        # width, and Escape as go-back matches the rest of the app so it needs no
+        # prompt. (The prior `q` exit hint was dropped by the footer for the same
+        # width reason.)
+        Binding("escape", "exit_remote", "Exit", show=False),
     ]
 
     def __init__(

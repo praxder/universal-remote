@@ -61,11 +61,11 @@ time, even while it is still scanning.
    | --- | --- |
    | Arrows or `h` `j` `k` `l` | D-pad left/down/up/right |
    | Enter | OK |
-   | Esc | Back |
+   | Backspace | Back (sent to the TV) |
    | Space | Home |
    | `0`–`9` | Number-pad digits (ignored on TVs without a number pad) |
    | `t` | Enter the text field (type, Enter sends, Esc leaves the field) |
-   | `q` | Exit the remote |
+   | Esc | Exit the remote (back to the previous page) |
 
    Menu, channel up/down, volume, mute, the media-transport keys (play, pause,
    play/pause, rewind, fast-forward, stop), the number pad, and power are

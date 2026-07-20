@@ -171,7 +171,7 @@ The Use Remote mode SHALL present a remote resembling a physical remote with a m
 - **THEN** the remote scrolls so every button remains reachable rather than being clipped
 
 ### Requirement: Keyboard control of the remote
-The remote SHALL be fully operable from the keyboard, mapping both the arrow keys and the Vim keys `h`, `j`, `k`, and `l` to the D-pad — `h` and Left send LEFT, `j` and Down send DOWN, `k` and Up send UP, `l` and Right send RIGHT — Enter to OK, Escape to Back, and the Space bar to the Home key. The digit keys `0` through `9` SHALL send the matching number key when the active adapter supports it; on an adapter that does not support number keys, pressing a digit SHALL do nothing and SHALL NOT report an error — the hotkey behaves the same as the disabled button. Because `h` now sends the LEFT direction, the Home key SHALL no longer be bound to `h`; the on-screen Home button remains clickable with the mouse. The remaining on-screen buttons (menu, channel, and media transport) are operated by mouse only. While the text field is focused, digit keys and the D-pad letters fill the field rather than sending keys.
+The remote SHALL be fully operable from the keyboard, mapping both the arrow keys and the Vim keys `h`, `j`, `k`, and `l` to the D-pad — `h` and Left send LEFT, `j` and Down send DOWN, `k` and Up send UP, `l` and Right send RIGHT — Enter to OK, Backspace to the device's Back key, and the Space bar to the Home key. Escape SHALL leave the remote and return to the previous page rather than sending Back to the device, matching Escape's back-a-page role elsewhere in the application. The digit keys `0` through `9` SHALL send the matching number key when the active adapter supports it; on an adapter that does not support number keys, pressing a digit SHALL do nothing and SHALL NOT report an error — the hotkey behaves the same as the disabled button. Because `h` now sends the LEFT direction, the Home key SHALL no longer be bound to `h`; the on-screen Home button remains clickable with the mouse. The remaining on-screen buttons (menu, channel, and media transport) are operated by mouse only. While the text field is focused, digit keys and the D-pad letters fill the field rather than sending keys, and Backspace edits the field rather than sending the device's Back key.
 
 #### Scenario: Arrow key drives D-pad
 - **WHEN** the user presses an arrow key while the remote is focused and no text field is active
@@ -181,9 +181,17 @@ The remote SHALL be fully operable from the keyboard, mapping both the arrow key
 - **WHEN** the user presses `h`, `j`, `k`, or `l` while the remote is focused and no text field is active
 - **THEN** LEFT, DOWN, UP, or RIGHT is sent, respectively
 
-#### Scenario: Enter and Escape mapped
-- **WHEN** the user presses Enter or Escape while the remote is focused and no text field is active
-- **THEN** OK or Back is sent, respectively
+#### Scenario: Enter and Backspace mapped
+- **WHEN** the user presses Enter or Backspace while the remote is focused and no text field is active
+- **THEN** OK or Back is sent to the device, respectively
+
+#### Scenario: Escape leaves the remote
+- **WHEN** the user presses Escape while the remote is focused and no text field is active
+- **THEN** the remote closes and returns to the previous page, and no Back key is sent to the device
+
+#### Scenario: Backspace edits the focused text field
+- **WHEN** the text field is focused and the user presses Backspace
+- **THEN** a character is deleted from the field and no Back key is sent to the device
 
 #### Scenario: Space sends Home
 - **WHEN** the user presses the Space bar while the remote is focused and no text field is active
