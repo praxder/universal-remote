@@ -21,7 +21,7 @@ from ..discovery import DiscoveredDevice, MdnsHit, browse_mdns
 from ..errors import ConnectionFailedError, TextUnsupportedError
 from ..keys import Key
 from ..session import BaseSession
-from .adb_text import escape_for_input_text
+from .adb_text import build_input_text_command
 
 if TYPE_CHECKING:
     from ..devices.models import Device
@@ -168,7 +168,7 @@ class FireTvSession(BaseSession):
 
     async def _dispatch_text(self, text: str) -> None:
         try:
-            await self._device.shell(f"input text {escape_for_input_text(text)}")
+            await self._device.shell(build_input_text_command(text))
         except Exception as exc:
             raise TextUnsupportedError(
                 "Text input failed or is unsupported on this Fire TV"
