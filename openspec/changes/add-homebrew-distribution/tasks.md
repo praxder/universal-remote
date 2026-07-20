@@ -22,7 +22,7 @@
 
 - [x] 4.1 Create public repo `praxder/homebrew-tap`
 - [x] 4.2 Add `Formula/universal-remote.rb`: `desc`/`homepage`/`license`, `version` + `url` (release asset) + `sha256`, `depends_on arch: :arm64`, `bin.install "universal-remote"`, and a `test do` asserting `--version` matches the version
-- [ ] 4.3 Create a fine-grained PAT scoped to contents-write on `homebrew-tap` only; store it as the `HOMEBREW_TAP_TOKEN` secret in the `universal-remote` repo
+- [x] 4.3 Create a fine-grained PAT scoped to contents-write on `homebrew-tap` only; store it as the `HOMEBREW_TAP_TOKEN` secret in the `universal-remote` repo
 
 ## 5. Release pipeline (`.github/workflows/release.yml`, trigger `push: main`)
 
@@ -32,9 +32,9 @@
 
 ## 6. End-to-end verification
 
-- [ ] 6.1 Merge to `main` and confirm: a release is created, version bump matches the commit types, notes are grouped by type, and the binary asset is attached
-- [ ] 6.2 Confirm the tap formula was bumped to the new version + sha256
-- [ ] 6.3 Run `brew install praxder/tap/universal-remote` on an arm64 Mac that did **not** build the binary; confirm it installs past Gatekeeper, launches, discovers, and `--version` matches
+- [x] 6.1 Merge to `main` and confirm: a release is created, version bump matches the commit types, notes are grouped by type, and the binary asset is attached
+- [x] 6.2 Confirm the tap formula was bumped to the new version + sha256
+- [x] 6.3 Run `brew install praxder/tap/universal-remote` on an arm64 Mac that did **not** build the binary; confirm it installs past Gatekeeper, launches, discovers, and `--version` matches
 - [ ] 6.4 Confirm a no-releasable-commits push to `main` produces no release (no-op)
 
 ## 7. Documentation
