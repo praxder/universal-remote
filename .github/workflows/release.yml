@@ -1,0 +1,104 @@
+name: Release
+
+# Fires when development is merged into main. python-semantic-release decides
+# whether the merged conventional commits warrant a release; the build and tap
+# jobs only run when they do. The version-bump commit PSR pushes back carries
+# "[skip ci]" (see [tool.semantic_release] in pyproject.toml), which GitHub
+# honours, so it does not re-trigger this workflow.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      released: ${{ steps.release.outputs.released }}
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Semantic release
+        id: release
+        uses: python-semantic-release/python-semantic-release@v10.6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          git_committer_name: github-actions
+          git_committer_email: actions@users.noreply.github.com
+
+  build:
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    runs-on: macos-14 # Apple Silicon runner → native arm64 build, no cross-compile
+    permissions:
+      contents: write
+    outputs:
+      sha256: ${{ steps.package.outputs.sha256 }}
+    steps:
+      # Check out the tag PSR just created so the bumped pyproject version is the
+      # one baked into the frozen binary (it reads importlib.metadata at build
+      # time). Checking out the default ref would freeze the pre-bump version and
+      # fail the smoke test below.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync
+      - name: Build binary
+        run: ./packaging/build_binary.sh
+      - name: Package + checksum
+        id: package
+        run: |
+          asset="universal-remote-macos-arm64.tar.gz"
+          tar -C dist -czf "$asset" universal-remote
+          sha="$(shasum -a 256 "$asset" | awk '{print $1}')"
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+      - name: Smoke test frozen binary
+        run: |
+          out="$(./dist/universal-remote --version)"
+          echo "$out"
+          echo "$out" | grep -qF "${{ needs.release.outputs.version }}" || {
+            echo "version mismatch: '$out' does not contain ${{ needs.release.outputs.version }}"
+            exit 1
+          }
+      - name: Upload asset to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ needs.release.outputs.tag }}" universal-remote-macos-arm64.tar.gz --clobber
+
+  tap:
+    needs: [release, build]
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tap
+        uses: actions/checkout@v4
+        with:
+          repository: praxder/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }} # fine-grained PAT, contents:write on the tap only
+      - name: Rewrite formula
+        run: |
+          version="${{ needs.release.outputs.version }}"
+          sha="${{ needs.build.outputs.sha256 }}"
+          formula="Formula/universal-remote.rb"
+          sed -i -E "s|releases/download/v[^/]+/|releases/download/v${version}/|" "$formula"
+          sed -i -E "s|^  version \".*\"|  version \"${version}\"|" "$formula"
+          sed -i -E "s|^  sha256 \".*\"|  sha256 \"${sha}\"|" "$formula"
+          git diff "$formula"
+      - name: Commit + push
+        run: |
+          git config user.name github-actions
+          git config user.email actions@users.noreply.github.com
+          git add Formula/universal-remote.rb
+          git commit -m "chore: universal-remote ${{ needs.release.outputs.version }}"
+          git push
