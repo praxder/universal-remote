@@ -2,6 +2,38 @@
 
 <!-- version list -->
 
+## v1.1.1 (2026-07-20)
+
+### Bug Fixes
+
+- **adb-text**: Preserve a literal "%s" in device text input
+  ([`910b0da`](https://github.com/praxder/universal-remote/commit/910b0da992722dbc50ae1238b8e759fc66a64113))
+
+- **firetv**: Escape text before device-side input text
+  ([`b77eb52`](https://github.com/praxder/universal-remote/commit/b77eb528ad327a90b26d1c307a1b25890a4bcb05))
+
+- **tui**: Align add-form save, add vim h/l, harden mount gate
+  ([`ef9ef3a`](https://github.com/praxder/universal-remote/commit/ef9ef3af98dd3e63339bef8f995841635841b955))
+
+### Build System
+
+- **packaging**: Switch frozen binary to onedir
+  ([`7d9c40d`](https://github.com/praxder/universal-remote/commit/7d9c40de44337c56642d6c2a7eba544ed2e91be7))
+
+### Chores
+
+- **openspec**: Archive add-homebrew-distribution and sync specs
+  ([`ee6cbf7`](https://github.com/praxder/universal-remote/commit/ee6cbf7ed8db2b4db19876b2a3573697f1dd7eeb))
+
+### Documentation
+
+- **openspec**: Propose switching frozen build to onedir
+  ([`39764b3`](https://github.com/praxder/universal-remote/commit/39764b3c20e962451ca66609aac054d903332f37))
+
+- **readme**: Restructure into summary, install, features, limitations
+  ([`36cb42b`](https://github.com/praxder/universal-remote/commit/36cb42b25ef736d2a4f478b788962b7965302e62))
+
+
 ## v1.1.0 (2026-07-20)
 
 ### Chores
