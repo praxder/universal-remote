@@ -1,10 +1,14 @@
 name: Release
 
-# Fires when development is merged into main. python-semantic-release decides
-# whether the merged conventional commits warrant a release; the build and tap
-# jobs only run when they do. The version-bump commit PSR pushes back carries
-# "[skip ci]" (see [tool.semantic_release] in pyproject.toml), which GitHub
-# honours, so it does not re-trigger this workflow.
+# Fires when development is merged into main. The "Update version" job runs
+# python-semantic-release to decide whether the merged conventional commits
+# warrant a release; it bumps pyproject.toml, commits, and tags ONLY
+# (vcs_release: false — it does not create the GitHub Release). "Build" then
+# creates the GitHub Release (with PSR's grouped notes) and attaches the binary,
+# and "Update Homebrew tap" points the formula at it. Both downstream jobs run
+# only when a release happened. The bump commit PSR pushes back carries
+# "[skip ci]" (see [tool.semantic_release] in pyproject.toml), so it does not
+# re-trigger this workflow.
 on:
   push:
     branches: [main]
@@ -15,42 +19,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  version:
+    name: Update version
     runs-on: ubuntu-latest
     permissions:
       contents: write
     outputs:
-      released: ${{ steps.release.outputs.released }}
-      version: ${{ steps.release.outputs.version }}
-      tag: ${{ steps.release.outputs.tag }}
+      released: ${{ steps.version.outputs.released }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      release_notes: ${{ steps.version.outputs.release_notes }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Semantic release
-        id: release
+      - name: Bump version + tag
+        id: version
         uses: python-semantic-release/python-semantic-release@v10.6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           git_committer_name: github-actions
           git_committer_email: actions@users.noreply.github.com
+          vcs_release: "false" # bump + commit + tag only; the build job creates the release
 
   build:
-    needs: release
-    if: needs.release.outputs.released == 'true'
+    name: Build
+    needs: version
+    if: needs.version.outputs.released == 'true'
     runs-on: macos-14 # Apple Silicon runner → native arm64 build, no cross-compile
     permissions:
       contents: write
     outputs:
       sha256: ${{ steps.package.outputs.sha256 }}
     steps:
-      # Check out the tag PSR just created so the bumped pyproject version is the
-      # one baked into the frozen binary (it reads importlib.metadata at build
-      # time). Checking out the default ref would freeze the pre-bump version and
-      # fail the smoke test below.
+      # Check out the tag the version job just created so the bumped pyproject
+      # version is the one baked into the frozen binary (it reads
+      # importlib.metadata at build time). Checking out the default ref would
+      # freeze the pre-bump version and fail the smoke test below.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release.outputs.tag }}
+          ref: ${{ needs.version.outputs.tag }}
       - uses: astral-sh/setup-uv@v5
       - run: uv sync
       - name: Build binary
@@ -67,18 +75,26 @@ jobs:
         run: |
           out="$(./dist/universal-remote --version)"
           echo "$out"
-          echo "$out" | grep -qF "${{ needs.release.outputs.version }}" || {
-            echo "version mismatch: '$out' does not contain ${{ needs.release.outputs.version }}"
+          echo "$out" | grep -qF "${{ needs.version.outputs.version }}" || {
+            echo "version mismatch: '$out' does not contain ${{ needs.version.outputs.version }}"
             exit 1
           }
-      - name: Upload asset to release
+      - name: Create GitHub Release + upload asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ needs.release.outputs.tag }}" universal-remote-macos-arm64.tar.gz --clobber
+          NOTES: ${{ needs.version.outputs.release_notes }}
+        run: |
+          printf '%s' "$NOTES" > release-notes.md
+          gh release create "${{ needs.version.outputs.tag }}" \
+            universal-remote-macos-arm64.tar.gz \
+            --title "${{ needs.version.outputs.tag }}" \
+            --notes-file release-notes.md \
+            --verify-tag
 
   tap:
-    needs: [release, build]
-    if: needs.release.outputs.released == 'true'
+    name: Update Homebrew tap
+    needs: [version, build]
+    if: needs.version.outputs.released == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout tap
@@ -88,7 +104,7 @@ jobs:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }} # fine-grained PAT, contents:write on the tap only
       - name: Rewrite formula
         run: |
-          version="${{ needs.release.outputs.version }}"
+          version="${{ needs.version.outputs.version }}"
           sha="${{ needs.build.outputs.sha256 }}"
           formula="Formula/universal-remote.rb"
           sed -i -E "s|releases/download/v[^/]+/|releases/download/v${version}/|" "$formula"
@@ -100,5 +116,5 @@ jobs:
           git config user.name github-actions
           git config user.email actions@users.noreply.github.com
           git add Formula/universal-remote.rb
-          git commit -m "chore: universal-remote ${{ needs.release.outputs.version }}"
+          git commit -m "chore: universal-remote ${{ needs.version.outputs.version }}"
           git push
