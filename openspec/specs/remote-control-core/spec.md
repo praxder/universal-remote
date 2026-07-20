@@ -40,7 +40,7 @@ The system SHALL resolve a device's platform identifier to a registered adapter.
 - **THEN** the registry reports that the platform is unsupported rather than failing silently
 
 ### Requirement: Pairing lifecycle distinct from connecting
-The system SHALL model pairing as a step separate from connecting. Pairing MAY require human interaction (a TV popup or a PIN) and SHALL produce a reusable credential that the caller can persist. A prompt hook MUST be available so adapters that need a PIN can request it.
+The system SHALL model pairing as a step separate from connecting. Pairing MAY require human interaction (a TV popup or a PIN) and SHALL produce a reusable credential that the caller can persist. A prompt hook MUST be available so adapters that need a PIN can request it. An adapter MAY declare that it requires no pairing; such an adapter connects directly without producing or replaying a credential.
 
 #### Scenario: Pairing yields a credential
 - **WHEN** an adapter completes pairing with a device
@@ -49,6 +49,11 @@ The system SHALL model pairing as a step separate from connecting. Pairing MAY r
 #### Scenario: Pairing can be cancelled
 - **WHEN** the user cancels an in-progress pairing
 - **THEN** the operation stops without persisting a credential and reports cancellation
+
+#### Scenario: Adapter requires no pairing
+- **WHEN** an adapter declares that it needs no pairing
+- **THEN** the caller connects to the device directly without a pairing step
+- **AND** no credential is produced or required
 
 ### Requirement: Session send and lifecycle
 Connecting to a device with a valid credential SHALL yield a session that can send keys and text and be closed. The session MUST only act on keys the adapter declares as supported.

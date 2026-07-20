@@ -11,7 +11,7 @@ _DIGIT_BINDINGS = [
 
 
 class DeviceOptionList(OptionList):
-    """An OptionList where 1-9 open the Nth device and j/k move the highlight.
+    """An OptionList where 1-9 open the Nth device and h/j/k/l move the highlight.
 
     Saved devices occupy indices 0..device_count-1, so digit N maps to index
     N-1 and reuses the normal select action; the screen's option-selected
@@ -21,6 +21,8 @@ class DeviceOptionList(OptionList):
     BINDINGS = [
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
+        Binding("l", "cursor_down", "Down", show=False),
+        Binding("h", "cursor_up", "Up", show=False),
         *_DIGIT_BINDINGS,
     ]
 
