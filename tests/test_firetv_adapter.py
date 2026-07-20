@@ -393,6 +393,34 @@ class TestFireTvText:
 
         assert devices[0].commands == ["input text hi"]
 
+    def test_given_text_with_shell_specials_when_sent_then_it_is_escaped(self):
+        # The text is interpolated into a device-side shell line, so spaces and
+        # shell metacharacters must be escaped or "AT&T" is mangled/dropped.
+        devices: list[FakeAdbDevice] = []
+        adapter = _capturing_adapter(devices)
+
+        async def scenario():
+            session = await adapter.connect(_device())
+            await session.send_text("a b&c")
+
+        run(scenario())
+
+        assert devices[0].commands == ["input text a%sb\\&c"]
+
+    def test_given_text_with_a_literal_percent_s_when_sent_then_it_survives(self):
+        # Android's `input text` collapses "%s" to a space; a literal "%s" must be
+        # split across two calls so it lands on the device instead of a space.
+        devices: list[FakeAdbDevice] = []
+        adapter = _capturing_adapter(devices)
+
+        async def scenario():
+            session = await adapter.connect(_device())
+            await session.send_text("50%s")
+
+        run(scenario())
+
+        assert devices[0].commands == ["input text 50\\%; input text s"]
+
     def test_given_text_send_fails_when_sending_then_text_unsupported_is_reported(self):
         adapter = _capturing_adapter([], reject_text=True)
 

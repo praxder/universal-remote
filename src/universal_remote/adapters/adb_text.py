@@ -42,6 +42,37 @@ def escape_for_input_text(text: str) -> str:
     return "".join(_escape_char(char) for char in text)
 
 
+def _split_at_percent_s(text: str) -> list[str]:
+    """Split `text` after every `%` that is immediately followed by `s`.
+
+    Android's `input text` collapses the two-char sequence `%s` to a space, so a
+    literal `%s` in the text would be corrupted. Cutting between the `%` and the `s`
+    puts them in separate segments that never form `%s` within one invocation.
+    """
+    segments: list[str] = []
+    start = 0
+    for index in range(len(text) - 1):
+        if text[index] == "%" and text[index + 1] == "s":
+            segments.append(text[start : index + 1])
+            start = index + 1
+    segments.append(text[start:])
+    return segments
+
+
+def build_input_text_command(text: str) -> str:
+    """A device-side shell command that types `text` via `input text`.
+
+    Text with no literal `%s` stays a single `input text` call. When `text` contains
+    a literal `%s`, it is split there and chained as separate `input text` calls: the
+    segments concatenate on the device, but the `%s`-to-space collapse only applies
+    within one invocation, so the literal survives (see `_split_at_percent_s`).
+    """
+    return "; ".join(
+        f"input text {escape_for_input_text(segment)}"
+        for segment in _split_at_percent_s(text)
+    )
+
+
 @dataclass(frozen=True)
 class AdbResult:
     """One `adb` invocation's outcome: its exit status and combined output."""
@@ -123,7 +154,7 @@ class AdbText:
         can fall back to Remote v2 when the device is unreachable over ADB.
         """
         _check(await self._run(["connect", target]))
-        argv = ["-s", target, "shell", "input", "text", escape_for_input_text(text)]
+        argv = ["-s", target, "shell", build_input_text_command(text)]
         _check(await self._run(argv))
 
     async def pair(self, ip: str, port: str, code: str) -> bool:

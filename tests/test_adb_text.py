@@ -3,7 +3,12 @@ import asyncio
 import pytest
 
 from tests.fakes import FAKE_MDNS_SERVICES, FakeAdbRunner
-from universal_remote.adapters.adb_text import AdbError, AdbText, escape_for_input_text
+from universal_remote.adapters.adb_text import (
+    AdbError,
+    AdbText,
+    build_input_text_command,
+    escape_for_input_text,
+)
 
 
 def run(coro):
@@ -24,6 +29,16 @@ class TestEscapeForInputText:
 
     def test_given_a_dollar_sign_when_escaped_then_it_is_backslashed(self):
         assert escape_for_input_text("$HOME") == "\\$HOME"
+
+
+class TestBuildInputTextCommand:
+    def test_given_plain_text_when_built_then_a_single_input_text_call(self):
+        assert build_input_text_command("hi there") == "input text hi%sthere"
+
+    def test_given_a_literal_percent_s_when_built_then_it_is_split_across_calls(self):
+        # Android's `input text` collapses "%s" to a space, so a literal "%s" must
+        # be split between the % and the s across separate calls to survive.
+        assert build_input_text_command("50%s") == "input text 50\\%; input text s"
 
 
 class TestResolveTarget:
@@ -64,7 +79,18 @@ class TestSendText:
 
         assert runner.calls == [
             ["connect", "10.0.0.5:37451"],
-            ["-s", "10.0.0.5:37451", "shell", "input", "text", "hi%sthere"],
+            ["-s", "10.0.0.5:37451", "shell", "input text hi%sthere"],
+        ]
+
+    def test_given_a_literal_percent_s_when_sending_then_the_command_is_split(self):
+        runner = FakeAdbRunner()
+        adb = AdbText(runner)
+
+        run(adb.send_text("10.0.0.5:37451", "50%s"))
+
+        assert runner.calls == [
+            ["connect", "10.0.0.5:37451"],
+            ["-s", "10.0.0.5:37451", "shell", "input text 50\\%; input text s"],
         ]
 
     def test_given_the_connect_fails_when_sending_then_adb_error_is_raised(self):

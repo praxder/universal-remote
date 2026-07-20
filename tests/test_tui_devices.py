@@ -741,6 +741,29 @@ class TestVimNavigation:
 
         asyncio.run(scenario())
 
+    def test_given_a_device_list_when_h_and_l_pressed_then_the_highlight_moves(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+        store.add(Device(name="Bedroom", platform="fake-tv", ip="10.0.0.6"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                assert option_list.highlighted == 0
+                await pilot.press("l")
+                await pilot.pause()
+                assert option_list.highlighted == 1
+                await pilot.press("h")
+                await pilot.pause()
+                assert option_list.highlighted == 0
+
+        asyncio.run(scenario())
+
     def test_given_the_confirm_dialog_when_hjkl_pressed_then_focus_moves(
         self, tmp_path
     ):
@@ -793,6 +816,44 @@ class TestVimNavigation:
                 await pilot.pause()
                 assert name.value == "hjkl"
                 assert app.focused.id == "name"
+
+        asyncio.run(scenario())
+
+
+class TestAddFormLayout:
+    def test_given_the_add_form_when_rendered_then_save_left_aligns_with_the_fields(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                assert isinstance(app.screen, AddDeviceScreen)
+                save = app.screen.query_one("#save")
+                name = app.screen.query_one("#name", Input)
+                ip = app.screen.query_one("#ip", Input)
+                assert save.region.x == name.region.x == ip.region.x
+
+        asyncio.run(scenario())
+
+    def test_given_the_add_and_devices_banners_then_they_share_top_and_bottom_margin(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                devices = app.screen.query_one("#devices-title", Static).styles.margin
+                await _open_manual_add(pilot)
+                add = app.screen.query_one("#add-title", Static).styles.margin
+                assert (add.top, add.bottom) == (devices.top, devices.bottom)
 
         asyncio.run(scenario())
 

@@ -349,7 +349,7 @@ class TestAndroidTvAdbTextRouting:
         assert runner.calls == [
             ["mdns", "services"],
             ["connect", "10.0.0.5:37451"],
-            ["-s", "10.0.0.5:37451", "shell", "input", "text", "hi%sthere"],
+            ["-s", "10.0.0.5:37451", "shell", "input text hi%sthere"],
         ]
         assert factory.remotes[-1].sent_text == []  # not over Remote v2
 

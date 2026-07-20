@@ -39,8 +39,9 @@ class UniversalRemoteApp(App[None]):
     #title { width: 42; text-align: center; margin-bottom: 1; color: $accent; }
     /* left-aligned so the multi-width banner lines keep their column alignment */
     #devices-title { width: 36; text-align: left; margin: 1 0 1 0; color: $accent; }
-    /* wider than #devices-title so the "Add/Edit Device" banner never wraps */
-    #add-title { width: 52; text-align: left; margin: 1 0 2 0; color: $accent; }
+    /* wider than #devices-title so the "Add/Edit Device" banner never wraps;
+       same top/bottom margin as #devices-title */
+    #add-title { width: 52; text-align: left; margin: 1 0 1 0; color: $accent; }
     /* wide enough for the "Select Device" banner; padded above and below */
     #use-remote-title { width: 58; text-align: left; margin: 1 0 1 0; color: $accent; }
     /* wide enough for the "Discover" banner; padded like the Devices banner */
@@ -52,8 +53,8 @@ class UniversalRemoteApp(App[None]):
         width: auto; height: 1; margin-left: 2;
         text-style: bold; color: $accent;
     }
-    /* slight left indent on Save to offset it from the fields above */
-    #add-device #save { margin: 1 0 0 1; }
+    /* left edge aligned with the fields above (no left indent) */
+    #add-device #save { margin: 1 0 0 0; }
     /* text-input mode toggle: a labelled switch on one row, shown only for Android TV.
        Match the Inputs' filled box: $surface fill at height 3, and left/right `tall` borders
        so the fill insets by 1 col on each side exactly like an Input. Only left/right (not
@@ -133,6 +134,10 @@ class UniversalRemoteApp(App[None]):
         self.store = store or DeviceStore()
         self.registry = registry or default_registry
         self.quote_provider = quote_provider or random_quote
+        # Set true only once our own mount handler has run, so the safety net can
+        # tell a post-mount error (stay open) from a startup/compose/mount failure
+        # (fall through). See `_handle_exception`.
+        self._mount_succeeded = False
 
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
         """Drop the Maximize and Screenshot commands from the command palette."""
@@ -143,20 +148,22 @@ class UniversalRemoteApp(App[None]):
 
     def on_mount(self) -> None:
         self.push_screen(MenuScreen())
+        self._mount_succeeded = True
 
     def _handle_exception(self, error: Exception) -> None:
         """App-wide safety net: an unexpected error toasts and stays, not crashes.
 
-        Until the app has finished its initial mount, a compose/mount failure leaves
-        a half-built widget tree with no surface to toast on, so those errors fall
-        through to Textual's default teardown (`_is_mounted` is only set once the
-        app's Compose and Mount have succeeded). Once mounted, a worker or handler
-        error is logged, surfaced as an error toast, and swallowed so the session
-        survives. The `_exception` bookkeeping is preserved so `run_test()` still
-        re-raises and tests keep surfacing bugs; `run()` never re-raises it, so a
-        real session stays open.
+        Until our own `on_mount` has run there is no surface to toast on, so a
+        startup/compose/mount failure falls through to Textual's default teardown.
+        We gate on our own `_mount_succeeded` flag rather than Textual's
+        `_is_mounted`, which is set unconditionally even when compose/mount raises
+        and so cannot distinguish the two. Once mounted, a worker or handler error is
+        logged, surfaced as an error toast, and swallowed so the session survives.
+        The `_exception` bookkeeping is preserved so `run_test()` still re-raises and
+        tests keep surfacing bugs; `run()` never re-raises it, so a real session
+        stays open.
         """
-        if not self._is_mounted:
+        if not self._mount_succeeded:
             super()._handle_exception(error)
             return
         original = error.error if isinstance(error, WorkerFailed) else error
