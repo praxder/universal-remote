@@ -201,4 +201,4 @@ uv run ruff format   # format
 uv run ruff check    # lint
 ```
 
-Tests need no real TV — adapters run against in-memory fakes and mocked transport.
+Tests need no real TV — adapters run against in-memory fakes and mocked transport
