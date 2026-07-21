@@ -166,6 +166,35 @@ class TestRemoteSurface:
 
         asyncio.run(scenario())
 
+    def test_given_the_remote_when_shown_then_the_header_names_the_device_type_and_ip(
+        self, tmp_path
+    ):
+        # Arrange: a device whose platform maps to a human-readable label
+        # distinct from the raw platform identifier.
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(
+            Device(
+                name="Living Room TV",
+                platform="fake-tv",
+                ip="192.168.20.51",
+                credential="tok",
+            )
+        )
+        adapter = FakeAdapter(platform="fake-tv", display_name="Fake TV")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+
+                # Assert: name, human-readable type, and IP — no "Remote —" prefix.
+                assert (
+                    app.title
+                    == "Name: Living Room TV • Type: Fake TV • IP: 192.168.20.51"
+                )
+
+        asyncio.run(scenario())
+
     def test_given_menu_and_channel_buttons_when_clicked_then_their_keys_are_sent(
         self, tmp_path
     ):
