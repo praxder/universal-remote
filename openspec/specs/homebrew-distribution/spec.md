@@ -30,6 +30,9 @@ executable runs without a user-provided Python interpreter or `uv`, and that
 retains full runtime behavior — device discovery, pairing, and remote control
 across all bundled adapters. The bundle SHALL run directly from its unpacked
 directory and MUST NOT extract itself to a temporary directory on each launch.
+The bundle SHALL also provide a `ur` symlink beside the `universal-remote`
+launcher, resolving to the same executable, and this symlink MUST survive
+packaging into the release tarball.
 
 #### Scenario: Binary runs on a clean machine
 - **WHEN** the binary is executed on an arm64 Mac with no Python toolchain installed
@@ -43,15 +46,25 @@ directory and MUST NOT extract itself to a temporary directory on each launch.
 - **WHEN** the frozen binary is launched from its installed application directory
 - **THEN** it runs the code in place, without creating a new per-launch temporary extraction directory, so startup does not pay a bundle-unpacking cost on every run
 
+#### Scenario: The `ur` alias launches the same program
+- **WHEN** the bundle's `ur` symlink is invoked (e.g. `./ur --version`)
+- **THEN** it resolves `_internal/` via its real target and behaves identically to invoking `universal-remote`, printing the same version output
+
 ### Requirement: Homebrew tap formula
 
 A Homebrew tap `praxder/homebrew-tap` SHALL provide a `universal-remote` formula
 that installs the released binary, pinned by version and SHA-256, and guarded to the
-supported architecture.
+supported architecture. The formula SHALL place both the `universal-remote` and
+the short `ur` command onto the `PATH`, each resolving to the same installed
+executable.
 
 #### Scenario: Install via the tap
 - **WHEN** a user runs `brew install praxder/tap/universal-remote` on an arm64 Mac
 - **THEN** Homebrew downloads the pinned release asset, verifies its SHA-256, installs the executable onto the PATH, and `universal-remote --version` reports the installed version
+
+#### Scenario: Short alias is installed onto the PATH
+- **WHEN** the formula finishes installing on an arm64 Mac
+- **THEN** `ur --version` reports the installed version, identical to `universal-remote --version`
 
 #### Scenario: Unsupported architecture is rejected clearly
 - **WHEN** a user on an Intel (x86_64) Mac attempts to install the formula
@@ -60,3 +73,4 @@ supported architecture.
 #### Scenario: Formula self-test passes
 - **WHEN** Homebrew runs the formula `test do` block
 - **THEN** the installed binary responds to `--version` with output matching the formula's version, without requiring a TTY
+
