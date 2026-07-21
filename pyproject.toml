@@ -22,6 +22,8 @@ dependencies = [
 
 [project.scripts]
 universal-remote = "universal_remote.cli:main"
+# Short alias so `ur` works everywhere the console script is installed.
+ur = "universal_remote.cli:main"
 
 [dependency-groups]
 dev = [
