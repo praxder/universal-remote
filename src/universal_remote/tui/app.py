@@ -55,6 +55,8 @@ class UniversalRemoteApp(App[None]):
     }
     /* left edge aligned with the fields above (no left indent) */
     #add-device #save { margin: 1 0 0 0; }
+    /* edit-only Delete button: same left edge and top margin as Save */
+    #add-device #delete { margin: 1 0 0 0; }
     /* text-input mode toggle: a labelled switch on one row, shown only for Android TV.
        Match the Inputs' filled box: $surface fill at height 3, and left/right `tall` borders
        so the fill insets by 1 col on each side exactly like an Input. Only left/right (not

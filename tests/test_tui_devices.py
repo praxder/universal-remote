@@ -1,6 +1,6 @@
 import asyncio
 
-from textual.widgets import Input, Label, OptionList, Select, Static
+from textual.widgets import Button, Input, Label, OptionList, Select, Static
 
 from tests.fakes import FakeAdapter
 from universal_remote.devices.models import Device
@@ -713,6 +713,136 @@ class TestEditAndDelete:
                 await pilot.press("up")
                 await pilot.pause()
                 assert app.focused.id == "confirm"
+
+        asyncio.run(scenario())
+
+
+class TestEditScreenDelete:
+    def test_given_the_edit_flow_when_opened_then_delete_shows_below_save(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                save = app.screen.query_one("#save", Button)
+                delete = app.screen.query_one("#delete", Button)
+                assert delete.region.x == save.region.x
+                assert delete.region.y > save.region.y
+
+        asyncio.run(scenario())
+
+    def test_given_the_add_flow_when_opened_then_no_delete_button(self, tmp_path):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                assert isinstance(app.screen, AddDeviceScreen)
+                assert len(app.screen.query("#delete")) == 0
+
+        asyncio.run(scenario())
+
+    def test_given_the_edit_flow_when_delete_pressed_then_confirm_prompt_shows(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                await pilot.click("#delete")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                assert [d.name for d in store.list()] == ["Living Room"]
+
+        asyncio.run(scenario())
+
+    def test_given_the_edit_delete_when_confirmed_then_removed_and_back_to_list(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                await pilot.click("#delete")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                await pilot.click("#confirm")
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+                option_list = app.screen.query_one("#device-list", OptionList)
+                # only the add row remains; the deleted device is gone from the list
+                assert option_list.get_option_at_index(0).id == "__add__"
+
+        asyncio.run(scenario())
+
+        assert store.list() == []
+
+    def test_given_the_edit_delete_when_cancelled_then_kept_and_stays_on_edit(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                await pilot.click("#delete")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                await pilot.click("#cancel")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+
+        asyncio.run(scenario())
+
+        assert [d.name for d in store.list()] == ["Living Room"]
+
+    def test_given_save_focused_on_edit_when_down_pressed_then_delete_is_focused(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                app.screen.query_one("#save", Button).focus()
+                await pilot.pause()
+                assert app.focused.id == "save"
+                await pilot.press("down")
+                await pilot.pause()
+                assert app.focused.id == "delete"
 
         asyncio.run(scenario())
 
