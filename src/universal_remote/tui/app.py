@@ -11,6 +11,7 @@ from typing import Callable, Iterable
 from ..devices.store import DeviceStore
 from ..error_log import log_exception
 from ..errors import UniversalRemoteError
+from ..preferences.store import Preferences, PreferencesStore
 from ..registry import AdapterRegistry
 from ..registry import registry as default_registry
 from .menu import MenuScreen
@@ -26,6 +27,10 @@ class UniversalRemoteApp(App[None]):
     Screen { align: center middle; }
     #menu { width: 100%; height: auto; }
     #menu Button { width: 28; margin: 1 0; }
+    /* Settings entry: a bottom-left button docked above the Footer (which docks
+       last, so it stays below this). Left-aligned; the centered #menu is untouched. */
+    #settings-bar { dock: bottom; height: auto; width: 100%; align-horizontal: left; }
+    #settings-bar Button { width: auto; margin-left: 1; }
     /* focus: accent text on a slightly lighter fill instead of reversing fg/bg;
        keep the default `tall` top/bottom border so the height never changes */
     Button:focus {
@@ -46,6 +51,12 @@ class UniversalRemoteApp(App[None]):
     #use-remote-title { width: 58; text-align: left; margin: 1 0 1 0; color: $accent; }
     /* wide enough for the "Discover" banner; padded like the Devices banner */
     #discover-title { width: 40; text-align: left; margin: 1 0 1 0; color: $accent; }
+    /* wide enough for the "Settings" banner; padded like the other banners */
+    #settings-title { width: 40; text-align: left; margin: 1 0 1 0; color: $accent; }
+    /* Settings rows: same width as the menu buttons; the version is muted, not a row */
+    #settings { width: 100%; height: auto; }
+    #settings Button { width: 40; margin: 1 0; }
+    #settings #version { width: 40; margin-top: 1; color: $text-muted; }
     /* the "searching" indicator: an animated spinner + bold text, hidden once done */
     #discover-status { height: 1; margin-top: 1; }
     #discover-status LoadingIndicator { width: 8; height: 1; color: $accent; }
@@ -131,11 +142,13 @@ class UniversalRemoteApp(App[None]):
         store: DeviceStore | None = None,
         registry: AdapterRegistry | None = None,
         quote_provider: Callable[[], Quote | None] | None = None,
+        preferences: PreferencesStore | None = None,
     ) -> None:
         super().__init__()
         self.store = store or DeviceStore()
         self.registry = registry or default_registry
         self.quote_provider = quote_provider or random_quote
+        self.preferences = preferences or PreferencesStore()
         # Set true only once our own mount handler has run, so the safety net can
         # tell a post-mount error (stay open) from a startup/compose/mount failure
         # (fall through). See `_handle_exception`.
@@ -148,7 +161,21 @@ class UniversalRemoteApp(App[None]):
                 continue
             yield command
 
+    def watch_theme(self, theme_name: str) -> None:
+        """Persist every theme change, wherever it originates.
+
+        Textual dispatches both its own private `_watch_theme` and this public
+        watcher, so a change from the Settings picker or the command palette is
+        saved here without touching framework internals.
+        """
+        self.preferences.save(Preferences(theme=theme_name))
+
     def on_mount(self) -> None:
+        saved = self.preferences.load().theme
+        # Ignore a saved name that is no longer registered (e.g. removed by a
+        # Textual upgrade) so `_validate_theme` cannot raise; the default stands.
+        if saved in self.available_themes:
+            self.theme = saved
         self.push_screen(MenuScreen())
         self._mount_succeeded = True
 

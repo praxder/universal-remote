@@ -5,12 +5,13 @@ from __future__ import annotations
 from rich.markup import escape
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Center, Vertical
+from textual.containers import Center, Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 
 from .devices_screen import DeviceListScreen
 from .remote_flow import UseRemoteScreen
+from .settings_screen import SettingsScreen
 
 TITLE_ART = r""" _   _       _                          _ 
 | | | |_ __ (_)_   _____ _ __ ___  __ _| |
@@ -29,6 +30,7 @@ class MenuScreen(Screen[None]):
     BINDINGS = [
         ("d", "manage_devices", "Manage Devices"),
         ("r", "use_remote", "Use Remote"),
+        ("s", "settings", "Settings"),
         Binding("up", "app.focus_previous", "Previous", show=False),
         Binding("down", "app.focus_next", "Next", show=False),
         Binding("k", "app.focus_previous", "Previous", show=False),
@@ -55,6 +57,10 @@ class MenuScreen(Screen[None]):
                         f"— {escape(quote.character)}, {escape(quote.source)}",
                         id="quote",
                     )
+        # Docked bottom-left above the Footer; kept out of #menu so the centered
+        # title/buttons/quote are unaffected.
+        with Horizontal(id="settings-bar"):
+            yield Button("Settings", id="settings")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -62,9 +68,14 @@ class MenuScreen(Screen[None]):
             self.action_manage_devices()
         elif event.button.id == "use":
             self.action_use_remote()
+        elif event.button.id == "settings":
+            self.action_settings()
 
     def action_manage_devices(self) -> None:
         self.app.push_screen(DeviceListScreen())
 
     def action_use_remote(self) -> None:
         self.app.push_screen(UseRemoteScreen())
+
+    def action_settings(self) -> None:
+        self.app.push_screen(SettingsScreen())

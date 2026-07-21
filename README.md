@@ -60,12 +60,16 @@ transport. To build the standalone binary yourself, run
 `./packaging/build_binary.sh`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
 commit and release conventions.
 
+The Settings page links to [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md),
+generated from the locked runtime dependencies. Regenerate it when those
+dependencies change (the file's header carries the exact commands).
+
 ## Features
 
 Every screen is reachable by **mouse** (click anything) and by **keyboard**. The
 app opens on a landing menu with two modes — **Manage Devices** and
-**Use Remote** — and a footer that always shows the keys available on the current
-screen.
+**Use Remote** — a **Settings** page (`s`, or the bottom-left button), and a
+footer that always shows the keys available on the current screen.
 
 ![Landing menu](docs/screenshots/home.png)
 
@@ -140,8 +144,12 @@ channel keys, and so on.
   jump straight to it.
 - **Command palette.** `Ctrl+P` opens a fuzzy command palette (shown as
   `^p palette` in the footer) for everything the current screen offers.
-- **Theme switching.** Change the whole app's color theme from the command
-  palette (`Ctrl+P` → *Change theme*).
+- **Settings page.** Press `s` on the menu (or click the bottom-left button) to
+  open Settings: pick a theme, view the third-party licenses and the project
+  repo, and see the app version. Key rebinding is a placeholder for now.
+- **Theme switching.** Change the whole app's color theme from Settings or the
+  command palette (`Ctrl+P` → *Change theme*). Your choice is remembered across
+  runs.
 - **A movie quote on every launch.** The landing menu greets you with a random
   film/TV quote.
 - **Stays up.** An unexpected error mid-session is caught, shown as a brief error
@@ -149,7 +157,8 @@ channel keys, and so on.
   traceback lands in `~/.config/universal-remote/error.log` for investigation.
 - **Secrets stay local.** Devices and pairing credentials live in
   `~/.config/universal-remote/devices.json` (or `$XDG_CONFIG_HOME`), written
-  owner-only (`0600`) since the file holds credentials.
+  owner-only (`0600`) since the file holds credentials. App preferences (the
+  saved theme) live beside it in `settings.json`, created on first change.
 
 ## Known limitations & future work
 
