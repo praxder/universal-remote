@@ -15,12 +15,12 @@
 
 ## 4. Update the Homebrew tap formula (external repo `praxder/homebrew-tap`)
 
-- [ ] 4.1 In `Formula/universal-remote.rb`, change the `install` block to install the onedir tree into the formula prefix (e.g. `libexec.install Dir["*"]`) and symlink the launcher onto the PATH (e.g. `bin.install_symlink libexec/"universal-remote"`).
+- [x] 4.1 In `Formula/universal-remote.rb`, change the `install` block to install the onedir tree into the formula prefix (e.g. `libexec.install Dir["*"]`) and symlink the launcher onto the PATH (e.g. `bin.install_symlink libexec/"universal-remote"`).
 - [x] 4.2 Verify the `sed`-based rewrite in the `release.yml` `tap` job still matches (it edits `version`, `url`, and `sha256` lines only — not the `install` block).
-- [ ] 4.3 Confirm the formula `test do` block still passes: installed `universal-remote --version` matches the formula version without a TTY.
+- [x] 4.3 Confirm the formula `test do` block still passes: installed `universal-remote --version` matches the formula version without a TTY.
 
 ## 5. Verify end to end
 
-- [ ] 5.1 Install from the tap on a clean arm64 Mac (or a fresh prefix) and confirm `universal-remote` launches the TUI, discovers/pairs/controls a device, and starts at roughly `uv run` speed rather than ~4s.
+- [x] 5.1 Install from the tap on a clean arm64 Mac (or a fresh prefix) and confirm `universal-remote` launches the TUI, discovers/pairs/controls a device, and starts at roughly `uv run` speed rather than ~4s.
 - [x] 5.2 Run the existing test suite (`uv run pytest`) to confirm no regressions from the packaging change.
 - [x] 5.3 Run `openspec validate switch-frozen-build-to-onedir` and confirm the change validates.

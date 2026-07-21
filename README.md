@@ -14,12 +14,13 @@ platform-agnostic, so supporting a new TV platform is one new adapter module.
 
 ```sh
 brew install praxder/tap/universal-remote
-universal-remote
+ur   # or the full name: universal-remote
 ```
 
-Installs a self-contained binary — no Python or `uv` needed. Apple Silicon
-(arm64) only; an Intel Mac gets a clear architecture error rather than a broken
-install.
+Installs a self-contained binary — no Python or `uv` needed. The formula puts
+both `ur` and `universal-remote` on your PATH; they're the same program. Apple
+Silicon (arm64) only; an Intel Mac gets a clear architecture error rather than a
+broken install.
 
 ### Download from GitHub Releases
 
@@ -31,7 +32,7 @@ flag once after extracting:
 ```sh
 tar -xzf universal-remote-macos-arm64.tar.gz
 xattr -d com.apple.quarantine ./universal-remote   # clears the Gatekeeper block
-./universal-remote
+./ur   # or ./universal-remote — a `ur` symlink ships beside the launcher
 ```
 
 Apple Silicon macOS only, same as the Homebrew build.
@@ -43,7 +44,7 @@ Runs anywhere Python 3.13 does. Requires Python 3.13 (pinned via
 
 ```sh
 uv sync
-uv run universal-remote
+uv run ur   # or: uv run universal-remote
 ```
 
 Development commands:

@@ -170,7 +170,10 @@ class RemoteScreen(Screen[None]):
         # Show the device in the header instead of a dedicated title row; restore
         # the app title when the remote closes so other screens are unaffected.
         self._previous_title = self.app.title
-        self.app.title = f"Remote — {self._device.name}"
+        display_type = self.app.registry.resolve(self._device.platform).display_name
+        self.app.title = (
+            f"Name: {self._device.name} • Type: {display_type} • IP: {self._device.ip}"
+        )
         for key in Key:
             if not self._capabilities.supports(key):
                 self.query_one(f"#key-{key.name.lower()}", Button).disabled = True

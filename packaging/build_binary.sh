@@ -33,4 +33,9 @@ uv run pyinstaller \
   --noconfirm \
   packaging/entry.py
 
-echo "Built dist/universal-remote/ (launcher: dist/universal-remote/universal-remote)"
+# Short alias: a `ur` symlink beside the launcher. The onedir bootloader resolves
+# _internal/ via the symlink's real target, so `./ur` works identically. `tar`
+# preserves the symlink into the release asset, so direct-download users get it too.
+ln -sf universal-remote dist/universal-remote/ur
+
+echo "Built dist/universal-remote/ (launchers: dist/universal-remote/{universal-remote,ur})"

@@ -1,26 +1,4 @@
-# homebrew-distribution Specification
-
-## Purpose
-TBD - created by syncing change add-homebrew-distribution. Update Purpose after archive.
-## Requirements
-### Requirement: Non-interactive version and help flags
-
-The CLI entry point (`universal_remote.cli:main`) SHALL handle `--version` and
-`--help` and exit successfully **before** the Textual application is started, so the
-binary is usable in a non-TTY environment (CI, the Homebrew formula test). The
-`--version` output MUST include the package version resolved at runtime.
-
-#### Scenario: Version flag prints and exits without launching the TUI
-- **WHEN** the binary is invoked as `universal-remote --version` with no controlling terminal
-- **THEN** it prints a line containing the current version (e.g. `universal-remote 0.2.0`) to stdout and exits with status 0 without constructing or running the Textual app
-
-#### Scenario: Help flag prints usage and exits
-- **WHEN** the binary is invoked as `universal-remote --help`
-- **THEN** it prints usage text and exits with status 0 without launching the TUI
-
-#### Scenario: No arguments launches the remote
-- **WHEN** the binary is invoked with no arguments in a terminal
-- **THEN** it registers the adapters and launches the Textual app as before
+## MODIFIED Requirements
 
 ### Requirement: Standalone macOS arm64 binary
 
@@ -73,4 +51,3 @@ executable.
 #### Scenario: Formula self-test passes
 - **WHEN** Homebrew runs the formula `test do` block
 - **THEN** the installed binary responds to `--version` with output matching the formula's version, without requiring a TTY
-

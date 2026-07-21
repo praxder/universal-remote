@@ -309,6 +309,8 @@ class AddDeviceScreen(Screen[None]):
                 yield Switch(value=self._opted_in, id="text-adb-switch")
             yield Label("", id="error")
             yield Button("Save", id="save")
+            if self._existing is not None:
+                yield Button("Delete", id="delete", variant="error")
         yield Footer()
 
     def _device_type_cell(self):
@@ -336,6 +338,16 @@ class AddDeviceScreen(Screen[None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "save":
             self._save()
+        elif event.button.id == "delete":
+            self._delete()
+
+    def _delete(self) -> None:
+        def _on_confirm(confirmed: bool | None) -> None:
+            if confirmed:
+                self.app.store.delete(self._existing.id)
+                self.app.pop_screen()
+
+        self.app.push_screen(ConfirmDeleteScreen(self._existing.name), _on_confirm)
 
     def on_select_changed(self, event: Select.Changed) -> None:
         # Only the add-form platform picker; changing type re-evaluates the toggle.
