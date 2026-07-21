@@ -8,7 +8,7 @@ from samsungtvws.async_remote import SamsungTVWSAsyncRemote
 from samsungtvws.remote import SendInputString, SendRemoteKey
 
 from ..capabilities import Capabilities
-from ..discovery import DiscoveredDevice, SsdpHit, resolve_upnp_name, search_ssdp
+from ..discovery import DiscoveredDevice, MdnsHit, browse_mdns
 from ..errors import ConnectionFailedError, TextUnsupportedError
 from ..keys import Key
 from ..session import BaseSession
@@ -19,8 +19,10 @@ if TYPE_CHECKING:
 
 PLATFORM = "samsung-tizen"
 APP_NAME = "UniversalRemote"
-# The Samsung SSDP search target; the friendly name comes from the UPnP device XML.
-DISCOVERY_TARGET = "urn:samsung.com:device:RemoteControlReceiver:1"
+# Modern Tizen TVs answer AirPlay's mDNS service; the instance name is the friendly
+# name. Apple TVs and LG answer it too, so discovery filters to Samsung by TXT.
+DISCOVERY_SERVICE = "_airplay._tcp.local."
+_MANUFACTURER_TXT_KEY = "manufacturer"
 CONTROL_PORT = 8002  # wss control channel; 8001 would be plain ws
 _PAIR_TIMEOUT = 30  # seconds to allow for tapping "Allow" on the TV
 _CONNECT_TIMEOUT = 10  # seconds to reach the TV before treating it as unreachable
@@ -58,9 +60,17 @@ _CAPABILITIES = Capabilities(keys=frozenset(SAMSUNG_KEYS), text=True)
 # Factory so tests can inject a fake transport in place of the real remote.
 RemoteFactory = Callable[..., SamsungTVWSAsyncRemote]
 
-# Discovery seams, injected so discovery is testable without a live network.
-SsdpSearcher = Callable[[str, float], Awaitable[list[SsdpHit]]]
-NameResolver = Callable[[str], Awaitable[str | None]]
+# The mDNS browse seam, injected so discovery is testable without a live network.
+MdnsBrowser = Callable[[str, float], Awaitable[list[MdnsHit]]]
+
+
+def _is_samsung(hit: MdnsHit) -> bool:
+    """True when a hit's AirPlay manufacturer TXT identifies it as a Samsung TV.
+
+    A TXT key present with no value decodes to None, so coerce before matching.
+    """
+    manufacturer = hit.properties.get(_MANUFACTURER_TXT_KEY) or ""
+    return manufacturer.lower().startswith("samsung")
 
 
 class SamsungSession(BaseSession):
@@ -98,31 +108,25 @@ class SamsungTizenAdapter:
         self,
         remote_factory: RemoteFactory = SamsungTVWSAsyncRemote,
         connect_timeout: float = _CONNECT_TIMEOUT,
-        search: SsdpSearcher = search_ssdp,
-        resolve_name: NameResolver = resolve_upnp_name,
+        browse: MdnsBrowser = browse_mdns,
     ) -> None:
         self._remote_factory = remote_factory
         self._connect_timeout = connect_timeout
-        self._search = search
-        self._resolve_name = resolve_name
+        self._browse = browse
 
     def capabilities(self) -> Capabilities:
         return _CAPABILITIES
 
     async def discover(self, timeout: float) -> list[DiscoveredDevice]:
-        # SSDP finds Samsung IPs; the friendly name is a separate best-effort UPnP
-        # read, so a failed name resolution still yields the device (named by IP).
-        hits = await self._search(DISCOVERY_TARGET, timeout)
-        devices = []
-        for hit in hits:
-            try:
-                name = await self._resolve_name(hit.location)
-            except Exception:
-                name = None
-            devices.append(
-                DiscoveredDevice(name=name or "", platform=PLATFORM, ip=hit.ip)
-            )
-        return devices
+        # AirPlay's mDNS is answered by Apple TVs and LG too, so keep only hits whose
+        # manufacturer TXT identifies Samsung. The instance name is the friendly name;
+        # a blank one falls back to the IP inside DiscoveredDevice.
+        hits = await self._browse(DISCOVERY_SERVICE, timeout)
+        return [
+            DiscoveredDevice(name=hit.name, platform=PLATFORM, ip=hit.ip)
+            for hit in hits
+            if _is_samsung(hit)
+        ]
 
     async def pair(self, device: "Device", *, prompt=None) -> str:
         remote = self._remote_factory(

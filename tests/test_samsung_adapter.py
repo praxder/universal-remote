@@ -4,14 +4,14 @@ import pytest
 
 from tests.fakes import FakeSamsungRemote
 from universal_remote.adapters.samsung import (
-    DISCOVERY_TARGET,
+    DISCOVERY_SERVICE,
     PLATFORM,
     SAMSUNG_KEYS,
     SamsungTizenAdapter,
     register,
 )
 from universal_remote.devices.models import Device
-from universal_remote.discovery import DiscoveredDevice, SsdpHit
+from universal_remote.discovery import DiscoveredDevice, MdnsHit
 from universal_remote.errors import ConnectionFailedError, TextUnsupportedError
 from universal_remote.keys import Key
 from universal_remote.registry import AdapterRegistry
@@ -189,47 +189,72 @@ class TestSamsungText:
 
 
 class TestSamsungDiscovery:
-    def test_given_ssdp_responders_when_discovering_then_the_upnp_name_is_resolved(
-        self,
-    ):
-        seen_targets: list[str] = []
-        seen_locations: list[str] = []
+    def test_given_a_samsung_airplay_hit_when_discovering_then_it_is_reported(self):
+        # A Samsung TV answers _airplay._tcp and tags its manufacturer as Samsung;
+        # it is reported under the samsung-tizen platform with its instance name/IP.
+        seen: list[str] = []
 
-        async def fake_search(target, timeout):
-            seen_targets.append(target)
-            return [SsdpHit(ip="10.0.0.5", location="http://10.0.0.5:7676/dmr.xml")]
+        async def fake_browse(service_type, timeout):
+            seen.append(service_type)
+            return [
+                MdnsHit(
+                    name="Living Room TV",
+                    ip="10.0.0.5",
+                    properties={"manufacturer": "Samsung Electronics"},
+                )
+            ]
 
-        async def fake_resolve_name(location):
-            seen_locations.append(location)
-            return "Living Room TV"
-
-        adapter = SamsungTizenAdapter(
-            search=fake_search, resolve_name=fake_resolve_name
-        )
+        adapter = SamsungTizenAdapter(browse=fake_browse)
 
         found = run(adapter.discover(timeout=3))
 
         assert found == [
             DiscoveredDevice(name="Living Room TV", platform=PLATFORM, ip="10.0.0.5")
         ]
-        assert seen_targets == [DISCOVERY_TARGET]
-        assert seen_locations == ["http://10.0.0.5:7676/dmr.xml"]
+        assert seen == [DISCOVERY_SERVICE]
 
-    def test_given_the_platform_when_discovering_then_it_is_the_registered_identifier(
+    def test_given_a_non_samsung_airplay_hit_when_discovering_then_it_is_filtered_out(
         self,
     ):
-        # The saved device's platform must resolve in the registry, so discovery
-        # stamps the adapter's own platform ("samsung-tizen"), never a loose string.
-        async def fake_search(target, timeout):
-            return [SsdpHit(ip="10.0.0.5", location="http://10.0.0.5/d")]
+        # Apple TVs and LG answer the same _airplay._tcp browse; only Samsung
+        # responders are kept, so the manufacturer TXT filter drops the rest.
+        async def fake_browse(service_type, timeout):
+            return [
+                MdnsHit(
+                    name="Apple TV", ip="10.0.0.6", properties={"manufacturer": "Apple"}
+                ),
+                MdnsHit(
+                    name="LG TV", ip="10.0.0.7", properties={"manufacturer": "LGE"}
+                ),
+                MdnsHit(name="No Maker", ip="10.0.0.8", properties={}),
+                # A valueless manufacturer TXT decodes to None; it must be dropped,
+                # not crash the whole scan.
+                MdnsHit(name="Empty", ip="10.0.0.9", properties={"manufacturer": None}),
+            ]
 
-        async def fake_resolve_name(location):
-            return "Den"
-
-        adapter = SamsungTizenAdapter(
-            search=fake_search, resolve_name=fake_resolve_name
-        )
+        adapter = SamsungTizenAdapter(browse=fake_browse)
 
         found = run(adapter.discover(timeout=3))
 
+        assert found == []
+
+    def test_given_a_samsung_hit_with_a_blank_name_when_discovering_then_ip_is_used(
+        self,
+    ):
+        # A Samsung hit (manufacturer still tags it) with no instance name falls
+        # back to its IP via DiscoveredDevice.
+        async def fake_browse(service_type, timeout):
+            return [
+                MdnsHit(
+                    name="",
+                    ip="10.0.0.5",
+                    properties={"manufacturer": "Samsung"},
+                )
+            ]
+
+        adapter = SamsungTizenAdapter(browse=fake_browse)
+
+        found = run(adapter.discover(timeout=3))
+
+        assert found[0].name == "10.0.0.5"
         assert found[0].platform == "samsung-tizen"
