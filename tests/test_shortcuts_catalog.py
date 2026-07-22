@@ -5,6 +5,7 @@ from universal_remote.tui.shortcuts import (
     conflicts,
     display_label,
     effective_key,
+    is_bare_modifier,
     is_reserved,
 )
 
@@ -112,6 +113,18 @@ class TestReservedCatalog:
         assert palette.default_key == "ctrl+p"
         assert palette.target is None
 
+    def test_given_the_catalog_when_read_then_the_focus_nav_keys_are_reserved(self):
+        by_id = _by_id()
+
+        focus_next = by_id["framework.focus_next"]
+        focus_prev = by_id["framework.focus_prev"]
+        assert focus_next.editable is False
+        assert focus_next.default_key == "tab"
+        assert focus_next.target is None
+        assert focus_prev.editable is False
+        assert focus_prev.default_key == "shift+tab"
+        assert focus_prev.target is None
+
     def test_given_the_remote_device_actions_when_read_then_each_maps_to_a_real_key(
         self,
     ):
@@ -141,15 +154,13 @@ class TestEffectiveKey:
 
 
 class TestConflictsAndReserved:
-    def test_given_a_same_scope_key_when_checked_then_it_conflicts(self):
-        # remote.text defaults to `t`; assigning Mute the same key clashes on-screen.
+    def test_given_a_key_another_action_uses_when_checked_then_it_conflicts(self):
+        # remote.text defaults to `t`; assigning Mute the same key clashes.
         assert conflicts("remote.mute", "t", {}) is True
 
-    def test_given_a_home_key_reused_on_the_remote_when_checked_then_it_is_allowed(
-        self,
-    ):
-        # `d` is a Home default; Home and Remote never share a screen.
-        assert conflicts("remote.vol_up", "d", {}) is False
+    def test_given_a_key_used_on_another_surface_when_checked_then_it_conflicts(self):
+        # `d` is a Home default; shortcuts are globally unique, so the remote can't reuse it.
+        assert conflicts("remote.vol_up", "d", {}) is True
 
     def test_given_go_back_assigned_a_remote_key_when_checked_then_it_conflicts(self):
         assert conflicts("global.go_back", "t", {}) is True
@@ -159,9 +170,17 @@ class TestConflictsAndReserved:
         assert is_reserved("enter") is True
         assert is_reserved("ctrl+p") is True
         assert is_reserved("up") is True
+        assert is_reserved("tab") is True
+        assert is_reserved("shift+tab") is True
 
     def test_given_a_free_key_when_checked_then_is_reserved_is_false(self):
         assert is_reserved("v") is False
+
+    def test_given_a_bare_modifier_when_checked_then_it_is_unassignable(self):
+        assert is_bare_modifier("shift") is True
+        assert is_bare_modifier("ctrl") is True
+        assert is_bare_modifier("d") is False
+        assert is_bare_modifier("ctrl+p") is False
 
     def test_given_an_actions_own_default_when_checked_then_it_is_exempt(self):
         # OK legitimately defaults to `enter`, itself a reserved key.

@@ -16,12 +16,16 @@ from ..registry import AdapterRegistry
 from ..registry import registry as default_registry
 from .menu import MenuScreen
 from .quotes import Quote, random_quote
+from .shortcuts_screen import ShortcutsCommandProvider
 
 
 class UniversalRemoteApp(App[None]):
     """Launches into the entry menu; screens read `store` and `registry` off the app."""
 
     TITLE = "Universal Remote"
+
+    # Add the read-only "Keyboard Shortcuts" entry to the default command palette.
+    COMMANDS = App.COMMANDS | {ShortcutsCommandProvider}
 
     CSS = """
     Screen { align: center middle; }

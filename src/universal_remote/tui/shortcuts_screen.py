@@ -12,7 +12,9 @@ from __future__ import annotations
 from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.binding import Binding
+from textual.command import DiscoveryHit, Hit, Hits, Provider
+from textual.containers import Center, Horizontal, Vertical
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, DataTable, Footer, Header, Label, Static
 
@@ -22,9 +24,16 @@ from .shortcuts import (
     conflicting_label,
     display_label,
     effective_key,
+    is_bare_modifier,
     is_reserved,
     rebuild_shortcuts,
 )
+
+TITLE_ART = r""" ____  _                _             _
+/ ___|| |__   ___  _ __| |_ ___ _   _| |_ ___
+\___ \| '_ \ / _ \| '__| __/ __| | | | __/ __|
+ ___) | | | | (_) | |  | || (__| |_| | |_\__ \
+|____/|_| |_|\___/|_|   \__\___|\__,_|\__|___/"""
 
 _BY_ID = {action.id: action for action in CATALOG}
 
@@ -47,16 +56,16 @@ class ShortcutsScreen(Screen[None]):
     DEFAULT_CSS = """
     ShortcutsScreen { align: center top; }
     #shortcuts { width: 100%; height: 1fr; }
-    #shortcuts-title {
-        width: 100%; text-align: center; margin: 1 0; text-style: bold; color: $accent;
-    }
+    /* width matches the TITLE_ART banner so it never wraps; Center handles alignment */
+    #shortcuts-title { width: 46; text-align: left; margin: 1 0; color: $accent; }
     #shortcuts-table { height: 1fr; width: 100%; }
     """
 
     def compose(self) -> ComposeResult:
         yield Header()
         with Vertical(id="shortcuts"):
-            yield Static("Keyboard Shortcuts", id="shortcuts-title")
+            with Center():
+                yield Static(TITLE_ART, id="shortcuts-title")
             yield DataTable(id="shortcuts-table", cursor_type="row")
         yield Footer()
 
@@ -112,12 +121,14 @@ class CaptureModal(ModalScreen[str | None]):
     DEFAULT_CSS = """
     CaptureModal { align: center middle; background: $background 60%; }
     #capture {
-        width: auto; height: auto; padding: 1 2;
+        width: auto; height: auto; padding: 2 4; align-horizontal: center;
         border: thick $primary; background: $surface;
     }
     #capture Label { width: 100%; text-align: center; }
+    #capture-prompt { margin-bottom: 1; }
     #capture-hint { color: $text-muted; margin-bottom: 1; }
-    #capture Button { width: 16; margin-top: 1; }
+    #capture-buttons { width: auto; height: auto; }
+    #capture-buttons Button { width: 12; margin: 0 1; }
     """
 
     def __init__(self, action_id: str) -> None:
@@ -127,27 +138,33 @@ class CaptureModal(ModalScreen[str | None]):
     def compose(self) -> ComposeResult:
         with Vertical(id="capture"):
             yield Label(f"Press a key for {self._action.label}…", id="capture-prompt")
-            yield Label("Delete clears · Esc cancels", id="capture-hint")
-            # Mouse-only: keys are captured by the modal, so the button must not
-            # steal focus and swallow the next keypress.
-            cancel = Button("Cancel", id="capture-cancel")
-            cancel.can_focus = False
-            yield cancel
+            yield Label(
+                "Any key assigns · DEL clears · Cancel dismisses", id="capture-hint"
+            )
+            # Mouse-only: every keypress is captured as a shortcut, so the buttons
+            # must not take focus and swallow it. Cancel/clear are therefore click-only.
+            with Horizontal(id="capture-buttons"):
+                for button_id, text in (
+                    ("capture-del", "DEL"),
+                    ("capture-cancel", "Cancel"),
+                ):
+                    button = Button(text, id=button_id)
+                    button.can_focus = False
+                    yield button
 
     def on_key(self, event: events.Key) -> None:
-        # The modal captures every key: Escape cancels, Delete clears, anything else
-        # is a candidate shortcut. Stop the event so it never reaches the bindings.
+        # Every key is a candidate shortcut, including Escape and Delete. Cancel and
+        # clear are the mouse-only buttons. Stop the event so it never reaches the
+        # bindings.
         event.stop()
         event.prevent_default()
-        if event.key == "escape":
-            self.dismiss(None)
-        elif event.key == "delete":
-            self._clear()
-        else:
-            self._assign(event.key)
+        self._assign(event.key)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        self.dismiss(None)  # Cancel
+        if event.button.id == "capture-del":
+            self._clear()
+        else:
+            self.dismiss(None)  # Cancel
 
     def _assign(self, key: str) -> None:
         overrides = self.app.shortcut_overrides
@@ -155,6 +172,12 @@ class CaptureModal(ModalScreen[str | None]):
             if is_reserved(key):
                 self.app.notify(
                     f"{display_label(key)} is reserved and can't be assigned.",
+                    severity="error",
+                )
+                return
+            if is_bare_modifier(key):
+                self.app.notify(
+                    f"{display_label(key)} can't be assigned on its own.",
                     severity="error",
                 )
                 return
@@ -183,3 +206,71 @@ class CaptureModal(ModalScreen[str | None]):
         self.app.persist_preferences()
         self.app.apply_shortcuts()
         self.dismiss(self._action.id)
+
+
+class ShortcutsViewModal(ModalScreen[None]):
+    """A read-only list of every action and its current shortcut.
+
+    Opened from the command palette so the user can check bindings from any screen.
+    Unlike `ShortcutsScreen`, rows cannot be activated and there is no capture — the
+    view offers no way to change a shortcut.
+    """
+
+    BINDINGS = [Binding("escape", "close", "Close")]
+
+    DEFAULT_CSS = """
+    ShortcutsViewModal { align: center middle; background: $background 60%; }
+    #shortcuts-view {
+        width: 70%; height: 80%; padding: 1 2;
+        border: thick $primary; background: $surface;
+    }
+    #shortcuts-view-title {
+        width: 100%; text-align: center; text-style: bold; margin-bottom: 1;
+    }
+    #shortcuts-view-table { width: 100%; height: 1fr; }
+    """
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="shortcuts-view"):
+            yield Label("Keyboard Shortcuts", id="shortcuts-view-title")
+            yield DataTable(id="shortcuts-view-table", cursor_type="row")
+
+    def on_mount(self) -> None:
+        table = self.query_one(DataTable)
+        table.add_column("Action", key="action")
+        table.add_column("Shortcut", key="shortcut")
+        for action in CATALOG:
+            table.add_row(
+                action.label,
+                _shortcut_text(action, self.app.shortcut_overrides),
+                key=action.id,
+            )
+        table.focus()
+
+    def action_close(self) -> None:
+        self.dismiss()
+
+
+class ShortcutsCommandProvider(Provider):
+    """Adds one 'Keyboard Shortcuts' entry to the command palette that opens the
+    read-only `ShortcutsViewModal`."""
+
+    _DISPLAY = "Keyboard Shortcuts"
+    _HELP = "View current shortcuts (read-only)"
+
+    async def discover(self) -> Hits:
+        yield DiscoveryHit(self._DISPLAY, self._show, help=self._HELP)
+
+    async def search(self, query: str) -> Hits:
+        matcher = self.matcher(query)
+        score = matcher.match(self._DISPLAY)
+        if score > 0:
+            yield Hit(
+                score,
+                matcher.highlight(self._DISPLAY),
+                self._show,
+                help=self._HELP,
+            )
+
+    def _show(self) -> None:
+        self.app.push_screen(ShortcutsViewModal())

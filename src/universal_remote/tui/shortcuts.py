@@ -127,6 +127,25 @@ CATALOG: list[Action] = [
         editable=False,
         show=False,
     ),
+    # Reserved focus-navigation keys — handled natively by Textual, never assignable.
+    Action(
+        "framework.focus_next",
+        "Focus Next",
+        Scope.GLOBAL,
+        "tab",
+        None,
+        editable=False,
+        show=False,
+    ),
+    Action(
+        "framework.focus_prev",
+        "Focus Previous",
+        Scope.GLOBAL,
+        "shift+tab",
+        None,
+        editable=False,
+        show=False,
+    ),
 ]
 
 _BY_ID: dict[str, Action] = {action.id: action for action in CATALOG}
@@ -140,14 +159,6 @@ RESERVED_KEYS: frozenset[str] = frozenset(
     for key in (action.default_key, *action.aliases)
     if key
 )
-
-# Which scopes share a surface with the action being edited. Home and Remote never
-# coexist; Go Back (Global) is active on the remote, so it overlaps Remote.
-_OVERLAP: dict[Scope, set[Scope]] = {
-    Scope.HOME: {Scope.HOME},
-    Scope.REMOTE: {Scope.REMOTE, Scope.GLOBAL},
-    Scope.GLOBAL: {Scope.GLOBAL, Scope.REMOTE},
-}
 
 _NAMED_DISPLAY = {"escape": "ESC", "question_mark": "?", "plus": "+", "minus": "-"}
 
@@ -168,20 +179,33 @@ def is_reserved(key: str) -> bool:
     return key in RESERVED_KEYS
 
 
+# A lone modifier press (Shift, Ctrl, …) is never a valid shortcut. Most terminals
+# never deliver one, but the Kitty keyboard protocol can, so reject it defensively.
+_MODIFIER_ONLY: frozenset[str] = frozenset(
+    {"shift", "ctrl", "alt", "super", "meta", "hyper"}
+)
+
+
+def is_bare_modifier(key: str) -> bool:
+    """Whether `key` is a lone modifier press, which can never be a shortcut."""
+    return key in _MODIFIER_ONLY
+
+
 def conflicting_label(
     action_id: str, key: str, overrides: dict[str, str]
 ) -> str | None:
-    """The label of the action already holding `key` on a shared surface, else None.
+    """The label of the action already holding `key` anywhere, else None.
 
-    An action's own default is exempt, so a default that coincides with another
-    binding (or a reserved key) is never flagged.
+    Shortcuts are globally unique: a key maps to at most one action across the whole
+    app, so the check scans every editable action regardless of surface. An action's
+    own default is exempt, so a default that coincides with another binding (or a
+    reserved key) is never flagged.
     """
     action = _BY_ID[action_id]
     if key == action.default_key:
         return None
-    scopes = _OVERLAP[action.scope]
     for other in CATALOG:
-        if other.id == action_id or not other.editable or other.scope not in scopes:
+        if other.id == action_id or not other.editable:
             continue
         if effective_key(other.id, overrides) == key:
             return other.label
@@ -189,7 +213,7 @@ def conflicting_label(
 
 
 def conflicts(action_id: str, key: str, overrides: dict[str, str]) -> bool:
-    """Whether `key` is already used by another editable action on a shared surface."""
+    """Whether `key` is already used by any other editable action, app-wide."""
     return conflicting_label(action_id, key, overrides) is not None
 
 

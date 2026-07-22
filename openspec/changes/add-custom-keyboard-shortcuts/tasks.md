@@ -47,3 +47,15 @@
 - [ ] 7.2 Refresh the Settings screenshot if the row label changed; add a Keyboard Shortcuts screenshot.
 - [x] 7.3 Run formatter, linter, and the full test suite; fix any failures.
 - [ ] 7.4 Manually exercise: open Shortcuts from Settings, assign a formerly-unbound remote key and confirm it works live, hit a conflict and a reserved key (toast shown), clear a shortcut, restart and confirm persistence.
+
+## 8. Revisions (global shortcuts, ESC-assignable, Tab reserved, ASCII header, palette view)
+
+> These reverse/extend decisions from sections 1–6; the shipped code (27/29) needs rework. Fix the tests that now assert the old behavior as you go.
+
+- [x] 8.1 **Global conflicts.** Remove `Scope`-based overlap from `shortcuts.py`: delete `_OVERLAP`, make `conflicting_label` scan all editable actions (excluding self + own default). Keep the `scope`/surface field only for per-screen target binding. Invert `tests/test_shortcuts_catalog.py::test_given_a_home_key_reused_on_the_remote_when_checked_then_it_is_allowed` (now conflicts) and replace the `test_tui_shortcuts.py` same-scope framing with a global-uniqueness assertion.
+- [x] 8.2 **Tab + bare modifiers reserved.** Add `Focus Next` (`tab`) and `Focus Previous` (`shift+tab`) as `editable=False, target=None` catalog entries (like Activate Control). `RESERVED_KEYS` derives them; add a catalog test that `tab`/`shift+tab` are reserved and a modal test that assigning Tab is refused with a toast. Also add `is_bare_modifier()` (rejects a lone `shift`/`ctrl`/`alt`/`super`/`meta`/`hyper`) and reject it in the capture modal with a toast.
+- [x] 8.3 **ESC assignable + mouse-only exits.** In `CaptureModal`: remove the `escape`→cancel and `delete`→clear key handling so every key (incl. `escape`, `delete`) routes through `_assign`. Add a mouse-only **DEL** button (`can_focus = False`) that clears; keep the mouse-only **Cancel** button. Update `tests/test_tui_shortcuts.py`: `..._escape_is_pressed_then_the_shortcut_is_unchanged` → escape is assigned; `..._delete_is_pressed_then_the_shortcut_is_cleared` → clear via a DEL-button click; keep the Cancel-button test.
+- [x] 8.4 **Modal padding.** Increase `#capture` interior padding and the vertical spacing between prompt, hint, and button row (CSS-only in `shortcuts_screen.py`).
+- [x] 8.5 **ASCII banner.** Replace `Static("Keyboard Shortcuts")` with a `TITLE_ART` raw-string banner + matching `#shortcuts-title` width CSS in `app.py`, following `menu.py`/`settings_screen.py`. Verify visually (export_screenshot → PNG → view) at 80 cols so it does not wrap.
+- [x] 8.6 **Command palette view.** Add an `App.COMMANDS` provider yielding one "Keyboard Shortcuts" command that dismisses the palette and pushes a read-only `ModalScreen` (a `DataTable` of Action | Shortcut formatted via `display_label`, no capture). Tests: the command exists; selecting it opens the modal; the modal has no editable affordance.
+- [x] 8.7 Run formatter, linter, and the full test suite; fix failures. Re-do the manual pass in 7.4 covering ESC-assign, Tab-refused, DEL-button clear, the palette view, and a cross-surface conflict now being rejected.

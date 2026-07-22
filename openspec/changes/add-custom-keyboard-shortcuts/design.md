@@ -25,11 +25,13 @@ Textual 8.2.8 ships a keymap system (`App.set_keymap`, `Binding.id`, `BindingsMa
 
 Decision: a `shortcuts` module exposes the action catalog and an `effective_key(action_id)` resolver (`overrides.get(id, default)`). Each catalog entry carries an `editable` flag; reserved entries (`editable=False`) have fixed keys the override map can never change. Each screen builds its own bindings on construct/mount by iterating the catalog for its scope and calling `self._bindings.bind(effective_key, action_target, id=action_id, description=label)`, skipping actions whose effective key is empty. This one mechanism handles defaults, overrides, and empties uniformly, and the same catalog + override map drives the conflict check. (Alternative — keymap for existing bindings plus `bind()` for the empties — was rejected as two mechanisms doing one job.)
 
-### Scope-aware conflict detection
-A key conflicts only when another action that can be active on the same screen already uses it. Scopes: **Home** (menu only), **Remote** (remote only), **Global** = Go Back (every screen except the root menu). Home and Remote never coexist, so they may reuse a key; Go Back overlaps Remote, so it must not collide with a remote key. The check runs against the effective map filtered to scopes that share a surface with the action being edited. (Alternative — global uniqueness across all actions — is simpler to explain but needlessly forbids harmless Home/Remote reuse and mislabels the arrow keys, which the remote D-pad legitimately shares with focus-nav.)
+### Global key uniqueness
+Every shortcut is unique across the whole app: a key maps to at most one action anywhere. `conflicting_label` scans all editable catalog actions (no scope filter) and returns the label of any that already holds the key, excluding the action being edited and its own default. This replaces the earlier scope-aware overlap check — `_OVERLAP` is removed.
+
+The catalog keeps a lightweight per-surface tag (`scope`: Home / Global / Remote) for one purpose only — knowing which screen binds which action's *target* (the menu has no `action_send`, so it cannot bind remote actions). That tag no longer influences conflict detection. Trade-off: global uniqueness forbids the previously-allowed Home/Remote key reuse — the user chose this simplification deliberately. It invalidates no shipped default, because the editable defaults are already globally distinct (`d`/`r`/`s`/`q`/`escape`/`enter`/`backspace`/`space`/`0`–`9`/`t`).
 
 ### Reserved entries: fixed, and shown disabled
-Reserved is modeled as non-editable catalog entries (`editable=False`) rather than a hardcoded key list. The reserved entries are the four D-pad directional actions (each fixed to an arrow with an `h`/`j`/`k`/`l` alias) plus two framework entries that are not device actions — Activate Control (`enter`) and Command Palette (`ctrl+p`). The reserved-key set the assignment check uses is *derived* from these entries' keys and aliases, so there is one source of truth.
+Reserved is modeled as non-editable catalog entries (`editable=False`) rather than a hardcoded key list. The reserved entries are the four D-pad directional actions (each fixed to an arrow with an `h`/`j`/`k`/`l` alias) plus the framework entries that are not device actions — Activate Control (`enter`), Command Palette (`ctrl+p`), and focus navigation Tab (`tab`) and Shift+Tab (`shift+tab`). The reserved-key set the assignment check uses is *derived* from these entries' keys and aliases, so there is one source of truth. (Bare modifier keys like Shift alone are not reserved entries — terminals do not deliver them as key events, so there is nothing to capture or block; Tab/Shift+Tab are the real focus-nav keys worth reserving.)
 
 Reserved entries appear in the Shortcuts table as **disabled rows** so the user can see the key is in use but cannot capture it — the D-pad becomes visible instead of a hidden alias. A new assignment to a reserved key is rejected with a toast so the user can't brick a screen (e.g. Settings→Enter). A rebindable action's own default is exempt from the reserved and conflict checks; with the D-pad no longer rebindable, that exemption now serves exactly one case: OK defaulting to `enter`.
 
@@ -45,14 +47,25 @@ On save, the app walks `screen_stack`, and for each screen that carries catalogu
 `Preferences` gains `shortcuts: dict[str, str]` (action id → key); only non-default entries are stored. `PreferencesStore.load/save` read/write it alongside `theme` with the same best-effort semantics. `App.on_mount` loads it into the app's override map before pushing the menu; every save re-writes the file (theme untouched).
 
 ### Key capture, cancel, and normalization
-The capture modal is a small `ModalScreen` that intercepts the next `Key` event, takes `event.key` (Textual's canonical long form, e.g. `question_mark`, `plus`), and routes it through validate → assign. **Delete** clears the shortcut; **Escape** and a **Cancel button** close the modal without changing anything. (This *reverses* an earlier plan where Escape cleared — once an explicit Cancel exists, Escape following it is the conventional keyboard cancel, and Delete remains the "delete the shortcut" gesture.) Normalization piggybacks on Textual's own long-form key names so stored keys match what `bind()` expects.
+The capture modal is a small `ModalScreen` that intercepts the next `Key` event, takes `event.key` (Textual's canonical long form, e.g. `question_mark`, `plus`), and routes it through validate → assign. **Every** key is a candidate shortcut, including **Escape** and **Delete** — Escape is no longer a reserved word and no longer cancels. The modal dismisses only three ways: a key press (assign, subject to the reserved/conflict checks), clicking a **Cancel** button (no change), or clicking a **DEL** button (clear the shortcut). Both buttons are mouse-only (`can_focus = False`) so they never swallow the captured key; consequently there is no keyboard-only cancel or clear path — a keyboard user who opens the modal assigns whatever they press next. Normalization piggybacks on Textual's own long-form key names so stored keys match what `bind()` expects.
+
+Consequence to note: `escape` is Go Back's default, so under global uniqueness Escape is owned by Go Back. Assigning Escape to another action is refused (conflict) until Go Back is first rebound or cleared — expected, not a bug.
 
 ### Readable shortcut labels
 The table renders a friendly, uppercase label rather than the raw stored key: `+` between a modifier and key becomes `-` (e.g. `ctrl+p` → `CTRL-P`), named keys get short forms (`space` → `SPACE`, `escape` → `ESC`, `question_mark` → `?`), and single letters uppercase (`d` → `D`). This is display-only — capture still stores and binds Textual's long form. The formatter only labels what Textual actually reports; modifiers a terminal never delivers (e.g. `cmd`) are not captured, just formatted if they ever appear.
 
+### ASCII-art banner header
+The Keyboard Shortcuts screen replaces its plain `Static("Keyboard Shortcuts")` with a `TITLE_ART` raw-string banner rendered via `Static(TITLE_ART, id="shortcuts-title")`, matching every other screen (`menu.py`, `settings_screen.py`, etc.) plus an explicit-width `#shortcuts-title` rule in `app.py`'s CSS so the multi-line banner never wraps. Verified visually at 80 columns.
+
+### Command palette read-only shortcuts view
+`App.COMMANDS` gains one `Provider` yielding a single "Keyboard Shortcuts" command. Selecting it dismisses the palette and pushes a read-only `ModalScreen` whose `DataTable` lists every catalog entry and its current shortcut (via `display_label`), with no capture affordance. This is a viewer for context from any screen, distinct from the editable Keyboard Shortcuts screen reached through Settings.
+
+### Modal padding
+The capture modal gains more interior padding and vertical spacing between its three stacked elements (prompt, hint, button row) — a CSS-only change to `#capture` and its children in `shortcuts_screen.py`.
+
 ## Risks / Trade-offs
 
-- **Escape/Delete can't be captured as shortcuts** → Escape is the modal's cancel and Delete is its clear gesture. Acceptable: Go Back keeps `escape` as its exempt default (assigned to it, not captured through the modal), and no action needs to be *newly* bound to Escape or Delete.
+- **No keyboard escape from the capture modal** → with Cancel/DEL mouse-only and every key assigning, a keyboard-only user cannot back out without assigning something. Accepted per the explicit requirement; the mouse buttons are the escape hatch, and a mis-assign is trivially redone.
 - **Live rebuild touches every mounted screen** → more moving parts and test surface than apply-on-restart. Mitigation: a single `rebuild_shortcuts()` contract, exercised by tests that assign on the Shortcuts screen and assert the binding fires on the underlying screen.
 - **Catalog and code drift** → the catalog must list exactly the real actions/handlers. Mitigation: a test that asserts every catalog action id resolves to a real screen action target, and every remote action maps to a `Key`.
 - **Backspace stays the remote's device Back key** while `escape` is Go Back — two different "backs" that could confuse. Mitigation: they are distinct catalogued actions with distinct labels ("Back" vs "Go Back") in the table.
@@ -64,6 +77,9 @@ Purely additive; no stored-data migration. An old `settings.json` with only `the
 
 ## Resolved Questions
 
-- **Modal cancel vs clear** → the modal gets an explicit **Cancel** affordance (a Cancel button and the Escape key) that closes without changing the shortcut; **Delete** clears. This reverses the earlier "Escape clears" plan (see the capture decision above) — flagged here so it's catchable in review.
+- **Modal cancel vs clear** → cancel and clear are **mouse-only buttons** (Cancel, DEL); every key press assigns, including Escape and Delete. This reverses the prior "Escape/Cancel-button cancels, Delete-key clears" plan so that Escape becomes an assignable shortcut (see the capture decision above) — flagged here so it's catchable in review.
+- **Scopes** → removed. Conflicts are global (a key maps to one action app-wide); the `scope` tag survives only as an internal per-surface binding hint, not a conflict rule.
+- **Command palette shortcuts view** → a single palette command opens a read-only modal listing all shortcuts; it does not edit (editing stays on the Settings → Keyboard Shortcuts screen).
+- **Tab / bare modifiers** → Tab and Shift+Tab are reserved (focus nav); bare modifier presses (e.g. Shift) are not delivered by terminals, so no special handling is needed.
 - **Vim aliases on the remote** → dissolved. The premise was "if the user rebinds the D-pad." The D-pad is now **reserved and not rebindable**, so the arrows and `h`/`j`/`k`/`l` are both fixed and both shown in the table as a disabled row; nothing follows or drops.
 - **Shortcut display form** → render a friendly uppercase label (e.g. `CTRL-P`, `SPACE`, `ESC`), not the raw long-form string (see the "Readable shortcut labels" decision above).
