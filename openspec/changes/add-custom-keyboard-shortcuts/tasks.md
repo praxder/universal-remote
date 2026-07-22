@@ -44,7 +44,7 @@
 ## 7. Docs + preflight
 
 - [x] 7.1 Update `README.md` and any key-binding docs to mention customizable shortcuts and the Settings entry.
-- [ ] 7.2 Refresh the Settings screenshot if the row label changed; add a Keyboard Shortcuts screenshot.
+- [x] 7.2 Refresh the Settings screenshot if the row label changed; add a Keyboard Shortcuts screenshot.
 - [x] 7.3 Run formatter, linter, and the full test suite; fix any failures.
 - [ ] 7.4 Manually exercise: open Shortcuts from Settings, assign a formerly-unbound remote key and confirm it works live, hit a conflict and a reserved key (toast shown), clear a shortcut, restart and confirm persistence.
 

@@ -151,16 +151,25 @@ returns to the menu:
 - **Theme** — opens the built-in theme picker (the same one the command palette
   offers). The pick applies instantly and is **remembered across runs**, whether
   you change it here or from the palette.
-- **Keyboard Shortcuts** — opens a screen listing every action and its shortcut.
-  Press Enter on a row to capture a new key (Delete clears it, Esc cancels);
-  conflicts and reserved keys (the D-pad, Enter, `Ctrl+P`) are refused with a
-  toast. Changes apply immediately and are **remembered across runs**.
+- **Keyboard Shortcuts** — opens a screen listing every action and its shortcut,
+  grouped under **Home / Global / Remote** headings. Press Enter on a row to open
+  the capture modal, then press the key you want — **any key becomes the shortcut,
+  Esc included**; the mouse-only **Delete** and **Cancel** buttons clear it or back
+  out. Every shortcut is unique app-wide: a key already taken by another action, or
+  a reserved key, is refused with a toast and nothing changes. Reserved keys — the
+  D-pad, Enter, `Ctrl+P`, and `Tab`/`Shift+Tab` — show as dimmed rows so you can
+  see they're in use but fixed. Changes apply immediately and are **remembered
+  across runs**.
 - **Third-party licenses** — opens the generated
   [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) on GitHub in your browser.
 - **Open in GitHub** — opens the project repository in your browser.
 - **Version** — shows the installed app version (a non-interactive label).
 
 ![Settings](docs/screenshots/settings.png)
+
+The Keyboard Shortcuts screen itself:
+
+![Keyboard Shortcuts](docs/screenshots/shortcuts.png)
 
 ### Keyboard tricks & other niceties
 
@@ -169,7 +178,11 @@ returns to the menu:
 - **Number shortcuts.** In any device list, press a device's number (`1`–`9`) to
   jump straight to it.
 - **Command palette.** `Ctrl+P` opens a fuzzy command palette (shown as
-  `^p palette` in the footer) for everything the current screen offers.
+  `^p palette` in the footer) for everything the current screen offers — including
+  a **Keyboard Shortcuts** entry that pops a read-only cheat sheet of every binding
+  from any screen.
+
+  ![Shortcuts cheat sheet from the command palette](docs/screenshots/shortcuts-palette.png)
 - **Customizable shortcuts.** Rebind the menu, remote, and Go Back keys — and
   assign the on-screen-only remote buttons a key — from **Settings → Keyboard
   Shortcuts**. Your choices are remembered across runs.
