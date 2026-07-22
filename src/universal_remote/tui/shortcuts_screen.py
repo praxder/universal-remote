@@ -46,6 +46,51 @@ def _shortcut_text(action, overrides: dict[str, str]) -> str:
     return display_label(effective_key(action.id, overrides))
 
 
+# Surfaces, in display order. Every catalog action falls under exactly one, so the
+# table can group its rows under a bold header per surface.
+_GROUPS: tuple[tuple[Scope, str], ...] = (
+    (Scope.HOME, "Home"),
+    (Scope.GLOBAL, "Global"),
+    (Scope.REMOTE, "Remote"),
+)
+
+
+def _populate_shortcuts_table(
+    table: DataTable, overrides: dict[str, str]
+) -> str | None:
+    """Fill `table` with catalog rows grouped by surface under bold header rows.
+
+    A blank spacer and a bold header row precede each group. Those rows carry sentinel
+    keys (not action ids) so selection ignores them. Reserved rows are dimmed. Returns
+    the key of the first selectable action row so the caller can place the cursor there.
+    """
+    table.add_column("Action", key="action")
+    table.add_column("Shortcut", key="shortcut")
+    first_action: str | None = None
+    for index, (scope, label) in enumerate(_GROUPS):
+        actions = [action for action in CATALOG if action.scope is scope]
+        if not actions:
+            continue
+        if index:
+            table.add_row("", "", key=f"__spacer__{scope.value}")
+        table.add_row(
+            Text(label.upper(), style="bold"), "", key=f"__group__{scope.value}"
+        )
+        for action in actions:
+            text = _shortcut_text(action, overrides)
+            if action.editable:
+                table.add_row(action.label, text, key=action.id)
+                first_action = first_action or action.id
+            else:
+                # Reserved rows are dimmed and cannot be activated for capture.
+                table.add_row(
+                    Text(action.label, style="dim"),
+                    Text(text, style="dim"),
+                    key=action.id,
+                )
+    return first_action
+
+
 class ShortcutsScreen(Screen[None]):
     """Lists every action and its shortcut; rebindable rows open the capture modal."""
 
@@ -72,28 +117,15 @@ class ShortcutsScreen(Screen[None]):
     def on_mount(self) -> None:
         rebuild_shortcuts(self, self.app.shortcut_overrides, self.SHORTCUT_SCOPES)
         table = self.query_one(DataTable)
-        table.add_column("Action", key="action")
-        table.add_column("Shortcut", key="shortcut")
-        for action in CATALOG:
-            self._add_row(table, action)
+        first = _populate_shortcuts_table(table, self.app.shortcut_overrides)
+        if first is not None:
+            table.move_cursor(row=table.get_row_index(first))
         table.focus()
 
-    def _add_row(self, table: DataTable, action) -> None:
-        text = _shortcut_text(action, self.app.shortcut_overrides)
-        if action.editable:
-            table.add_row(action.label, text, key=action.id)
-        else:
-            # Reserved rows are dimmed and cannot be activated for capture.
-            table.add_row(
-                Text(action.label, style="dim"),
-                Text(text, style="dim"),
-                key=action.id,
-            )
-
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        action = _BY_ID[event.row_key.value]
-        if not action.editable:
-            return  # reserved rows are display-only
+        action = _BY_ID.get(event.row_key.value)
+        if action is None or not action.editable:
+            return  # group headers, spacers, and reserved rows are display-only
         self.app.push_screen(CaptureModal(action.id), self._on_captured)
 
     def _on_captured(self, action_id: str | None) -> None:
@@ -126,7 +158,6 @@ class CaptureModal(ModalScreen[str | None]):
     }
     #capture Label { width: 100%; text-align: center; }
     #capture-prompt { margin-bottom: 1; }
-    #capture-hint { color: $text-muted; margin-bottom: 1; }
     #capture-buttons { width: auto; height: auto; }
     #capture-buttons Button { width: 12; margin: 0 1; }
     """
@@ -137,15 +168,12 @@ class CaptureModal(ModalScreen[str | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="capture"):
-            yield Label(f"Press a key for {self._action.label}…", id="capture-prompt")
-            yield Label(
-                "Any key assigns · DEL clears · Cancel dismisses", id="capture-hint"
-            )
+            yield Label(f"Press any key for {self._action.label}…", id="capture-prompt")
             # Mouse-only: every keypress is captured as a shortcut, so the buttons
             # must not take focus and swallow it. Cancel/clear are therefore click-only.
             with Horizontal(id="capture-buttons"):
                 for button_id, text in (
-                    ("capture-del", "DEL"),
+                    ("capture-del", "Delete"),
                     ("capture-cancel", "Cancel"),
                 ):
                     button = Button(text, id=button_id)
@@ -237,14 +265,9 @@ class ShortcutsViewModal(ModalScreen[None]):
 
     def on_mount(self) -> None:
         table = self.query_one(DataTable)
-        table.add_column("Action", key="action")
-        table.add_column("Shortcut", key="shortcut")
-        for action in CATALOG:
-            table.add_row(
-                action.label,
-                _shortcut_text(action, self.app.shortcut_overrides),
-                key=action.id,
-            )
+        first = _populate_shortcuts_table(table, self.app.shortcut_overrides)
+        if first is not None:
+            table.move_cursor(row=table.get_row_index(first))
         table.focus()
 
     def action_close(self) -> None:

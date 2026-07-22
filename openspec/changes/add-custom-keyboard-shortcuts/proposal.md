@@ -4,7 +4,7 @@ The Settings screen ships a disabled "Key Bindings (coming soon)" row. Keyboard-
 
 ## What Changes
 
-- A new **Keyboard Shortcuts** screen, reached from Settings (the "coming soon" row becomes live). It lists every action in one table — `Action | Shortcut` — where the shortcut may be blank; reserved actions (the D-pad, Enter, the command palette) appear as **disabled rows** so users can see the keys are in use but fixed.
+- A new **Keyboard Shortcuts** screen, reached from Settings (the "coming soon" row becomes live). It lists every action in one table — `Action | Shortcut` — **grouped under bold surface headings (Home / Global / Remote)** so the user can see which actions apply where; the shortcut may be blank, and reserved actions (the D-pad, Enter, the command palette) appear as **disabled rows** so users can see the keys are in use but fixed.
 - Pressing Enter on a rebindable row opens a **capture modal** ("press a key"); the next keypress — **including Escape** — becomes that action's shortcut. The modal dismisses only three ways: pressing a key (assign), clicking a **Cancel** button (no change), or clicking a **DEL** button (clear the shortcut). Both buttons are mouse-only (they never take keyboard focus), so every keypress is captured as a shortcut — there is no keyboard cancel/clear path.
 - Shortcuts are shown in a **readable form** (e.g. `CTRL-P`, `SPACE`, `ESC`) rather than raw internal key names.
 - An **action catalog** of every rebindable action, grouped by the surface each is active on (this grouping only decides which screen binds which action — it does **not** scope conflicts):

@@ -29,12 +29,17 @@ The catalog SHALL also include reserved entries for framework keys that are not 
 
 ### Requirement: Keyboard Shortcuts screen lists actions and shortcuts
 
-The application SHALL provide a Keyboard Shortcuts screen, reached from the Settings screen. The screen SHALL present a table with one row per catalogued entry — both rebindable and reserved — showing the entry's label and its current shortcut, where the shortcut cell MAY be empty when a rebindable action has none. Reserved entries SHALL be shown as disabled (non-activatable) rows so the user can see the key is in use but cannot change it. Every rebindable row MUST be reachable by keyboard and by mouse, and the user MUST be able to return from the screen to Settings.
+The application SHALL provide a Keyboard Shortcuts screen, reached from the Settings screen. The screen SHALL present a single table with one row per catalogued entry — both rebindable and reserved — showing the entry's label and its current shortcut, where the shortcut cell MAY be empty when a rebindable action has none. The rows SHALL be grouped by surface (Home, Global, Remote) under a non-activatable heading row per group so the user can see which actions apply where. Reserved entries SHALL be shown as disabled (non-activatable) rows so the user can see the key is in use but cannot change it. Every rebindable row MUST be reachable by keyboard and by mouse, and the user MUST be able to return from the screen to Settings.
 
 #### Scenario: Screen lists all actions
 
 - **WHEN** the user opens the Keyboard Shortcuts screen
 - **THEN** it shows a table with a row for every catalogued entry and each row's current shortcut
+
+#### Scenario: Actions are grouped under surface headings
+
+- **WHEN** the table is displayed
+- **THEN** the rows appear under Home, Global, and Remote heading rows, and activating a heading row does nothing
 
 #### Scenario: Reserved entries are shown disabled
 

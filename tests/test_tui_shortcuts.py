@@ -39,7 +39,7 @@ async def _open_modal(app, pilot, action_id):
 
 
 class TestShortcutsTable:
-    def test_given_the_screen_when_shown_then_a_row_per_catalog_entry_is_listed(
+    def test_given_the_screen_when_shown_then_every_action_is_listed_under_a_group(
         self, tmp_path
     ):
         async def scenario():
@@ -48,7 +48,26 @@ class TestShortcutsTable:
                 app.push_screen(ShortcutsScreen())
                 await pilot.pause()
                 table = app.screen.query_one(DataTable)
-                assert table.row_count == len(CATALOG)
+                for action in CATALOG:
+                    table.get_row_index(action.id)  # raises if the row is missing
+                for scope in ("home", "global", "remote"):
+                    table.get_row_index(f"__group__{scope}")  # surface header row
+
+        asyncio.run(scenario())
+
+    def test_given_a_group_header_when_activated_then_no_capture_modal_opens(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test(size=_SIZE) as pilot:
+                app.push_screen(ShortcutsScreen())
+                await pilot.pause()
+                table = app.screen.query_one(DataTable)
+                table.move_cursor(row=table.get_row_index("__group__remote"))
+                await pilot.press("enter")
+                await pilot.pause()
+                assert isinstance(app.screen, ShortcutsScreen)  # not a modal
 
         asyncio.run(scenario())
 
@@ -316,7 +335,8 @@ class TestCommandPalette:
                 await pilot.pause()
                 assert isinstance(app.screen, ShortcutsViewModal)
                 table = app.screen.query_one(DataTable)
-                assert table.row_count == len(CATALOG)
+                for action in CATALOG:
+                    table.get_row_index(action.id)  # every action listed
 
         asyncio.run(scenario())
 
