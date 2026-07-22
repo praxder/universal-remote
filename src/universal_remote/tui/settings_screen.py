@@ -8,7 +8,7 @@ from typing import Callable
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical
+from textual.containers import Center, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 
@@ -26,7 +26,15 @@ LICENSES_URL = f"{REPO_URL}/blob/main/THIRD_PARTY_LICENSES.md"
 class SettingsScreen(Screen[None]):
     """App-level settings, reached from the home menu."""
 
-    BINDINGS = [Binding("escape,q", "back", "Back")]
+    BINDINGS = [
+        Binding("escape,q", "back", "Back"),
+        Binding("up", "app.focus_previous", "Previous", show=False),
+        Binding("down", "app.focus_next", "Next", show=False),
+        Binding("k", "app.focus_previous", "Previous", show=False),
+        Binding("h", "app.focus_previous", "Previous", show=False),
+        Binding("j", "app.focus_next", "Next", show=False),
+        Binding("l", "app.focus_next", "Next", show=False),
+    ]
 
     def __init__(self, url_opener: Callable[[str], object] | None = None) -> None:
         super().__init__()
@@ -35,12 +43,20 @@ class SettingsScreen(Screen[None]):
     def compose(self) -> ComposeResult:
         yield Header()
         with Vertical(id="settings"):
-            yield Static(TITLE_ART, id="settings-title")
-            yield Button("Theme", id="theme")
-            yield Button("Key Bindings (coming soon)", id="keybindings", disabled=True)
-            yield Button("Third-party licenses", id="licenses")
-            yield Button("GitHub repo", id="repo")
-            yield Static(f"Version {version('universal-remote')}", id="version")
+            with Center():
+                yield Static(TITLE_ART, id="settings-title")
+            with Center():
+                yield Button("Theme", id="theme")
+            with Center():
+                yield Button(
+                    "Key Bindings (coming soon)", id="keybindings", disabled=True
+                )
+            with Center():
+                yield Button("Third-party licenses", id="licenses")
+            with Center():
+                yield Button("Open in GitHub", id="repo")
+            with Center():
+                yield Static(f"Version {version('universal-remote')}", id="version")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

@@ -59,7 +59,7 @@ class TestSettingsScreen:
         async def scenario():
             opened = []
             app = _app(tmp_path)
-            async with app.run_test() as pilot:
+            async with app.run_test(size=(100, 40)) as pilot:
                 app.push_screen(SettingsScreen(url_opener=opened.append))
                 await pilot.pause()
                 await pilot.click("#licenses")
@@ -72,7 +72,7 @@ class TestSettingsScreen:
         async def scenario():
             opened = []
             app = _app(tmp_path)
-            async with app.run_test() as pilot:
+            async with app.run_test(size=(100, 40)) as pilot:
                 app.push_screen(SettingsScreen(url_opener=opened.append))
                 await pilot.pause()
                 await pilot.click("#repo")
@@ -143,5 +143,48 @@ class TestSettingsScreen:
                 await pilot.press("q")
                 await pilot.pause()
                 assert isinstance(app.screen, MenuScreen)
+
+        asyncio.run(scenario())
+
+    def test_given_focus_on_theme_when_j_then_focus_moves_past_the_disabled_row(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test() as pilot:
+                app.push_screen(SettingsScreen())
+                await pilot.pause()
+                app.screen.set_focus(app.screen.query_one("#theme", Button))
+                await pilot.press("j")
+                assert app.focused is not None
+                assert app.focused.id == "licenses"
+
+        asyncio.run(scenario())
+
+    def test_given_focus_on_theme_when_k_then_focus_cycles_to_the_last_row(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test() as pilot:
+                app.push_screen(SettingsScreen())
+                await pilot.pause()
+                app.screen.set_focus(app.screen.query_one("#theme", Button))
+                await pilot.press("k")
+                assert app.focused is not None
+                assert app.focused.id == "repo"
+
+        asyncio.run(scenario())
+
+    def test_given_focus_on_repo_when_l_then_focus_cycles_to_theme(self, tmp_path):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test() as pilot:
+                app.push_screen(SettingsScreen())
+                await pilot.pause()
+                app.screen.set_focus(app.screen.query_one("#repo", Button))
+                await pilot.press("l")
+                assert app.focused is not None
+                assert app.focused.id == "theme"
 
         asyncio.run(scenario())

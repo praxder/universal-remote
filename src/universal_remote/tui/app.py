@@ -30,7 +30,7 @@ class UniversalRemoteApp(App[None]):
     /* Settings entry: a bottom-left button docked above the Footer (which docks
        last, so it stays below this). Left-aligned; the centered #menu is untouched. */
     #settings-bar { dock: bottom; height: auto; width: 100%; align-horizontal: left; }
-    #settings-bar Button { width: auto; margin-left: 1; }
+    #settings-bar Button { width: auto; margin: 0 0 1 2; }
     /* focus: accent text on a slightly lighter fill instead of reversing fg/bg;
        keep the default `tall` top/bottom border so the height never changes */
     Button:focus {
@@ -53,10 +53,10 @@ class UniversalRemoteApp(App[None]):
     #discover-title { width: 40; text-align: left; margin: 1 0 1 0; color: $accent; }
     /* wide enough for the "Settings" banner; padded like the other banners */
     #settings-title { width: 40; text-align: left; margin: 1 0 1 0; color: $accent; }
-    /* Settings rows: same width as the menu buttons; the version is muted, not a row */
+    /* Settings rows: each wrapped in Center; the version is a muted, non-interactive label */
     #settings { width: 100%; height: auto; }
-    #settings Button { width: 40; margin: 1 0; }
-    #settings #version { width: 40; margin-top: 1; color: $text-muted; }
+    #settings Button { width: 40; margin-bottom: 1; }
+    #settings #version { width: auto; margin-top: 1; color: $text-muted; }
     /* the "searching" indicator: an animated spinner + bold text, hidden once done */
     #discover-status { height: 1; margin-top: 1; }
     #discover-status LoadingIndicator { width: 8; height: 1; color: $accent; }

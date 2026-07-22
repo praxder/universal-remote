@@ -136,6 +136,22 @@ buttons. Buttons the connected TV doesn't support are shown disabled — Apple T
 has no mute, Roku has no discrete play/pause/stop or number pad, Fire TV has no
 channel keys, and so on.
 
+### Settings
+
+Open **Settings** from the menu with `s` or the bottom-left button. Every row is
+reachable by mouse and by keyboard (arrows or `h` `j` `k` `l`), and `Esc`/`q`
+returns to the menu:
+
+- **Theme** — opens the built-in theme picker (the same one the command palette
+  offers). The pick applies instantly and is **remembered across runs**, whether
+  you change it here or from the palette.
+- **Key Bindings** — a placeholder for a future key-rebinding screen; not active
+  yet.
+- **Third-party licenses** — opens the generated
+  [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) on GitHub in your browser.
+- **Open in GitHub** — opens the project repository in your browser.
+- **Version** — shows the installed app version (a non-interactive label).
+
 ### Keyboard tricks & other niceties
 
 - **Vim-style navigation.** `h` `j` `k` `l` move through menus and lists
@@ -144,9 +160,8 @@ channel keys, and so on.
   jump straight to it.
 - **Command palette.** `Ctrl+P` opens a fuzzy command palette (shown as
   `^p palette` in the footer) for everything the current screen offers.
-- **Settings page.** Press `s` on the menu (or click the bottom-left button) to
-  open Settings: pick a theme, view the third-party licenses and the project
-  repo, and see the app version. Key rebinding is a placeholder for now.
+- **Settings page.** Press `s` on the menu (or click the bottom-left button) for
+  theme, licenses, repo, and version — see [Settings](#settings) above.
 - **Theme switching.** Change the whole app's color theme from Settings or the
   command palette (`Ctrl+P` → *Change theme*). Your choice is remembered across
   runs.
