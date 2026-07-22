@@ -45,3 +45,24 @@ class TestPreferencesStorePersistence:
         PreferencesStore(path=path).save(Preferences(theme="gruvbox"))
 
         assert PreferencesStore(path=path).load() == Preferences(theme="gruvbox")
+
+    def test_given_theme_and_shortcuts_when_reloaded_then_both_round_trip(
+        self, tmp_path
+    ):
+        path = tmp_path / "settings.json"
+        preferences = Preferences(theme="gruvbox", shortcuts={"remote.vol_up": "="})
+
+        PreferencesStore(path=path).save(preferences)
+
+        assert PreferencesStore(path=path).load() == preferences
+
+    def test_given_an_old_file_with_only_a_theme_when_loaded_then_shortcuts_are_empty(
+        self, tmp_path
+    ):
+        path = tmp_path / "settings.json"
+        path.write_text('{"theme": "nord"}')
+
+        loaded = PreferencesStore(path=path).load()
+
+        assert loaded.theme == "nord"
+        assert loaded.shortcuts == {}

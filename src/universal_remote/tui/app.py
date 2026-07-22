@@ -149,6 +149,10 @@ class UniversalRemoteApp(App[None]):
         self.registry = registry or default_registry
         self.quote_provider = quote_provider or random_quote
         self.preferences = preferences or PreferencesStore()
+        # Action id -> key overrides for the catalogued shortcuts; populated from the
+        # saved preferences on mount (see `on_mount`) and edited live from the
+        # Keyboard Shortcuts screen. Screens read this to build their bindings.
+        self.shortcut_overrides: dict[str, str] = {}
         # Set true only once our own mount handler has run, so the safety net can
         # tell a post-mount error (stay open) from a startup/compose/mount failure
         # (fall through). See `_handle_exception`.
@@ -166,16 +170,41 @@ class UniversalRemoteApp(App[None]):
 
         Textual dispatches both its own private `_watch_theme` and this public
         watcher, so a change from the Settings picker or the command palette is
-        saved here without touching framework internals.
+        saved here without touching framework internals. The current shortcuts ride
+        along so saving the theme never drops them.
         """
-        self.preferences.save(Preferences(theme=theme_name))
+        self.persist_preferences()
+
+    def persist_preferences(self) -> None:
+        """Write the current theme and shortcuts together, best-effort."""
+        self.preferences.save(
+            Preferences(theme=self.theme, shortcuts=dict(self.shortcut_overrides))
+        )
+
+    def apply_shortcuts(self) -> None:
+        """Rebuild the catalogued bindings of every mounted screen from the overrides.
+
+        Called after a shortcut is assigned or cleared so the change takes effect
+        without a restart across the whole screen stack.
+        """
+        from .shortcuts import rebuild_shortcuts
+
+        for screen in self.screen_stack:
+            scopes = getattr(screen, "SHORTCUT_SCOPES", None)
+            if scopes:
+                hide = getattr(screen, "SHORTCUT_HIDE", ())
+                rebuild_shortcuts(screen, self.shortcut_overrides, scopes, hide=hide)
 
     def on_mount(self) -> None:
-        saved = self.preferences.load().theme
-        # Ignore a saved name that is no longer registered (e.g. removed by a
+        preferences = self.preferences.load()
+        # Load saved shortcuts into the override map before the menu is pushed, so
+        # its bindings (and every later screen's) build from them. `update` keeps any
+        # overrides set directly on the app (e.g. in tests) when none are saved.
+        self.shortcut_overrides.update(preferences.shortcuts)
+        # Ignore a saved theme that is no longer registered (e.g. removed by a
         # Textual upgrade) so `_validate_theme` cannot raise; the default stands.
-        if saved in self.available_themes:
-            self.theme = saved
+        if preferences.theme in self.available_themes:
+            self.theme = preferences.theme
         self.push_screen(MenuScreen())
         self._mount_succeeded = True
 

@@ -13,6 +13,7 @@ from universal_remote.tui.settings_screen import (
     REPO_URL,
     SettingsScreen,
 )
+from universal_remote.tui.shortcuts_screen import ShortcutsScreen
 
 
 def _app(tmp_path):
@@ -81,7 +82,7 @@ class TestSettingsScreen:
 
         asyncio.run(scenario())
 
-    def test_given_the_key_bindings_row_when_shown_then_it_is_a_disabled_placeholder(
+    def test_given_the_keyboard_shortcuts_row_when_shown_then_it_is_enabled(
         self, tmp_path
     ):
         async def scenario():
@@ -89,7 +90,21 @@ class TestSettingsScreen:
             async with app.run_test() as pilot:
                 app.push_screen(SettingsScreen())
                 await pilot.pause()
-                assert app.screen.query_one("#keybindings", Button).disabled is True
+                assert app.screen.query_one("#keybindings", Button).disabled is False
+
+        asyncio.run(scenario())
+
+    def test_given_the_keyboard_shortcuts_row_when_activated_then_the_screen_opens(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test(size=(100, 50)) as pilot:
+                app.push_screen(SettingsScreen())
+                await pilot.pause()
+                await pilot.click("#keybindings")
+                await pilot.pause()
+                assert isinstance(app.screen, ShortcutsScreen)
 
         asyncio.run(scenario())
 
@@ -146,7 +161,7 @@ class TestSettingsScreen:
 
         asyncio.run(scenario())
 
-    def test_given_focus_on_theme_when_j_then_focus_moves_past_the_disabled_row(
+    def test_given_focus_on_theme_when_j_then_focus_moves_to_the_shortcuts_row(
         self, tmp_path
     ):
         async def scenario():
@@ -157,7 +172,7 @@ class TestSettingsScreen:
                 app.screen.set_focus(app.screen.query_one("#theme", Button))
                 await pilot.press("j")
                 assert app.focused is not None
-                assert app.focused.id == "licenses"
+                assert app.focused.id == "keybindings"
 
         asyncio.run(scenario())
 

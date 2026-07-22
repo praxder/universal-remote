@@ -464,6 +464,26 @@ class TestRemoteSurface:
 
         assert adapter.sessions[0].sent_keys == []
 
+    def test_given_an_override_for_a_formerly_unbound_key_when_pressed_then_it_sends(
+        self, tmp_path
+    ):
+        # Volume Up has no default shortcut; an override binds it so the key works
+        # live on the remote, as the keyboard-shortcuts feature promises.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                app.shortcut_overrides["remote.vol_up"] = "v"
+                await _goto_remote(app, pilot)
+                await pilot.press("v")
+                await pilot.pause()
+
+        asyncio.run(scenario())
+
+        assert adapter.sessions[0].sent_keys == [Key.VOL_UP]
+
     def test_given_a_key_dispatch_fails_when_pressed_then_the_remote_survives(
         self, tmp_path
     ):

@@ -12,6 +12,7 @@ from textual.widgets import Button, Footer, Header, Static
 from .devices_screen import DeviceListScreen
 from .remote_flow import UseRemoteScreen
 from .settings_screen import SettingsScreen
+from .shortcuts import Scope, rebuild_shortcuts
 
 TITLE_ART = r""" _   _       _                          _ 
 | | | |_ __ (_)_   _____ _ __ ___  __ _| |
@@ -27,18 +28,22 @@ TITLE_ART = r""" _   _       _                          _
 
 
 class MenuScreen(Screen[None]):
+    # The Manage Devices / Use Remote / Settings / Quit hotkeys are catalogued Home
+    # actions, built from the override map on mount (see `on_mount`); only the
+    # focus-navigation keys stay hard-coded here.
+    SHORTCUT_SCOPES = frozenset({Scope.HOME})
+
     BINDINGS = [
-        ("d", "manage_devices", "Manage Devices"),
-        ("r", "use_remote", "Use Remote"),
-        ("s", "settings", "Settings"),
         Binding("up", "app.focus_previous", "Previous", show=False),
         Binding("down", "app.focus_next", "Next", show=False),
         Binding("k", "app.focus_previous", "Previous", show=False),
         Binding("h", "app.focus_previous", "Previous", show=False),
         Binding("j", "app.focus_next", "Next", show=False),
         Binding("l", "app.focus_next", "Next", show=False),
-        ("q", "app.quit", "Quit"),
     ]
+
+    def on_mount(self) -> None:
+        rebuild_shortcuts(self, self.app.shortcut_overrides, self.SHORTCUT_SCOPES)
 
     def compose(self) -> ComposeResult:
         yield Header()

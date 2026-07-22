@@ -126,7 +126,7 @@ Then the remote appears. Drive it by mouse or keyboard:
 | Space | Home |
 | `0`–`9` | Number-pad digits |
 | `t` | Enter the text field (type, Enter sends, Esc leaves) |
-| Esc | Exit the remote |
+| Esc | Go Back — leaves the remote (the app-wide back key) |
 
 ![The remote](docs/screenshots/remote.png)
 
@@ -135,6 +135,12 @@ play/pause, rewind, fast-forward, stop), the number pad, and power are on-screen
 buttons. Buttons the connected TV doesn't support are shown disabled — Apple TV
 has no mute, Roku has no discrete play/pause/stop or number pad, Fire TV has no
 channel keys, and so on.
+
+Every key above is a **default you can change**, and the on-screen-only buttons
+(menu, channel, volume, mute, and the media-transport keys) can be **given** a
+keyboard shortcut — see [Keyboard Shortcuts](#settings) in Settings. The D-pad
+directions (arrows and `h` `j` `k` `l`) are reserved for navigation and stay
+fixed.
 
 ### Settings
 
@@ -145,8 +151,10 @@ returns to the menu:
 - **Theme** — opens the built-in theme picker (the same one the command palette
   offers). The pick applies instantly and is **remembered across runs**, whether
   you change it here or from the palette.
-- **Key Bindings** — a placeholder for a future key-rebinding screen; not active
-  yet.
+- **Keyboard Shortcuts** — opens a screen listing every action and its shortcut.
+  Press Enter on a row to capture a new key (Delete clears it, Esc cancels);
+  conflicts and reserved keys (the D-pad, Enter, `Ctrl+P`) are refused with a
+  toast. Changes apply immediately and are **remembered across runs**.
 - **Third-party licenses** — opens the generated
   [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) on GitHub in your browser.
 - **Open in GitHub** — opens the project repository in your browser.
@@ -162,6 +170,9 @@ returns to the menu:
   jump straight to it.
 - **Command palette.** `Ctrl+P` opens a fuzzy command palette (shown as
   `^p palette` in the footer) for everything the current screen offers.
+- **Customizable shortcuts.** Rebind the menu, remote, and Go Back keys — and
+  assign the on-screen-only remote buttons a key — from **Settings → Keyboard
+  Shortcuts**. Your choices are remembered across runs.
 - **Settings page.** Press `s` on the menu (or click the bottom-left button) for
   theme, licenses, repo, and version — see [Settings](#settings) above.
 - **Theme switching.** Change the whole app's color theme from Settings or the
@@ -175,7 +186,8 @@ returns to the menu:
 - **Secrets stay local.** Devices and pairing credentials live in
   `~/.config/universal-remote/devices.json` (or `$XDG_CONFIG_HOME`), written
   owner-only (`0600`) since the file holds credentials. App preferences (the
-  saved theme) live beside it in `settings.json`, created on first change.
+  saved theme and any custom keyboard shortcuts) live beside it in
+  `settings.json`, created on first change.
 
 ## Known limitations & future work
 

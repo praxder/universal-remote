@@ -6,6 +6,7 @@ from universal_remote.devices.store import DeviceStore
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
 from universal_remote.tui.devices_screen import DeviceListScreen
+from universal_remote.tui.menu import MenuScreen
 from universal_remote.tui.quotes import Quote
 from universal_remote.tui.remote_flow import UseRemoteScreen
 from universal_remote.tui.settings_screen import SettingsScreen
@@ -211,6 +212,36 @@ class TestMenu:
             async with app.run_test() as pilot:
                 await pilot.pause()
                 assert len(app.screen.query("#quote")) == 0
+
+        asyncio.run(scenario())
+
+    def test_given_a_home_action_rebound_when_the_new_key_is_pressed_then_it_fires(
+        self, tmp_path
+    ):
+        app = _app(tmp_path)
+        app.shortcut_overrides["home.manage_devices"] = "x"
+
+        async def scenario():
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                await pilot.press("x")
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+
+        asyncio.run(scenario())
+
+    def test_given_a_home_action_rebound_when_the_default_key_is_pressed_then_nothing(
+        self, tmp_path
+    ):
+        app = _app(tmp_path)
+        app.shortcut_overrides["home.manage_devices"] = "x"
+
+        async def scenario():
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                await pilot.press("d")  # the former default no longer fires
+                await pilot.pause()
+                assert isinstance(app.screen, MenuScreen)
 
         asyncio.run(scenario())
 

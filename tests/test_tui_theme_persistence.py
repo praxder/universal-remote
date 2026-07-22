@@ -6,6 +6,7 @@ from universal_remote.devices.store import DeviceStore
 from universal_remote.preferences.store import Preferences, PreferencesStore
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
+from universal_remote.tui.devices_screen import DeviceListScreen
 from universal_remote.tui.menu import MenuScreen
 
 
@@ -64,6 +65,38 @@ class TestThemePersistence:
             async with app.run_test() as pilot:
                 await pilot.pause()
                 assert app.theme == DEFAULT_THEME
+
+        asyncio.run(scenario())
+
+    def test_given_a_saved_shortcut_when_the_app_launches_then_it_is_applied(
+        self, tmp_path
+    ):
+        async def scenario():
+            prefs = PreferencesStore(path=tmp_path / "settings.json")
+            prefs.save(Preferences(shortcuts={"home.manage_devices": "x"}))
+            app = _app(tmp_path, preferences=prefs)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                await pilot.press("x")  # the custom key works from launch
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+
+        asyncio.run(scenario())
+
+    def test_given_a_saved_theme_and_shortcut_when_saving_a_theme_then_shortcut_stays(
+        self, tmp_path
+    ):
+        async def scenario():
+            prefs = PreferencesStore(path=tmp_path / "settings.json")
+            prefs.save(Preferences(theme="nord", shortcuts={"remote.vol_up": "v"}))
+            app = _app(tmp_path, preferences=prefs)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.theme = "gruvbox"  # changing the theme must not drop shortcuts
+                await pilot.pause()
+                reloaded = prefs.load()
+                assert reloaded.theme == "gruvbox"
+                assert reloaded.shortcuts == {"remote.vol_up": "v"}
 
         asyncio.run(scenario())
 

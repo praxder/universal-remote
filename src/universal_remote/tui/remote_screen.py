@@ -13,6 +13,7 @@ from textual.widgets import Button, Footer, Header, Input, Label
 
 from ..errors import TextUnsupportedError, UnsupportedKeyError
 from ..keys import Key
+from .shortcuts import Scope, rebuild_shortcuts
 
 if TYPE_CHECKING:
     from ..capabilities import Capabilities
@@ -84,34 +85,16 @@ class RemoteScreen(Screen[None]):
     #numpad Button { margin: 0; width: 100%; }
     """
 
-    BINDINGS = [
-        Binding("up", "send('UP')", "Up"),
-        Binding("down", "send('DOWN')", "Down"),
-        Binding("left", "send('LEFT')", "Left"),
-        Binding("right", "send('RIGHT')", "Right"),
-        Binding("k", "send('UP')", "Up", show=False),
-        Binding("j", "send('DOWN')", "Down", show=False),
-        Binding("h", "send('LEFT')", "Left", show=False),
-        Binding("l", "send('RIGHT')", "Right", show=False),
-        Binding("enter", "send('OK')", "OK"),
-        # Backspace sends the device's Back key; Escape leaves the remote page
-        # (see the exit_remote binding below), matching Escape's back-a-page role
-        # elsewhere in the app. While the text field is focused the Input consumes
-        # Backspace to delete a character, so it never reaches here.
-        Binding("backspace", "send('BACK')", "Back"),
-        Binding("space", "send('HOME')", "Home"),
-        # Digit keys drive the number pad; hidden from the footer to avoid clutter.
-        *(
-            Binding(str(digit), f"send('NUM_{digit}')", show=False)
-            for digit in range(10)
-        ),
-        Binding("t", "text_mode", "Text"),
-        # Hidden from the footer: a ninth hint does not fit the supported 80-column
-        # width, and Escape as go-back matches the rest of the app so it needs no
-        # prompt. (The prior `q` exit hint was dropped by the footer for the same
-        # width reason.)
-        Binding("escape", "exit_remote", "Exit", show=False),
-    ]
+    # Every remote hotkey is a catalogued action, built from the override map on
+    # mount. The D-pad directions (arrows + `hjkl`) are reserved and always bind;
+    # OK/Back/Home/digits/text and the twelve formerly click-only keys are
+    # rebindable. Go Back (the Global action, default Escape) is bound but kept out
+    # of the footer — a ninth hint does not fit the supported 80-column width, and
+    # Escape as go-back matches the rest of the app so it needs no prompt. While the
+    # text field is focused the Input consumes Backspace and the letters/digits, so
+    # they never reach these bindings.
+    SHORTCUT_SCOPES = frozenset({Scope.REMOTE, Scope.GLOBAL})
+    SHORTCUT_HIDE = frozenset({"global.go_back"})
 
     def __init__(
         self,
@@ -167,6 +150,12 @@ class RemoteScreen(Screen[None]):
         yield Footer()
 
     def on_mount(self) -> None:
+        rebuild_shortcuts(
+            self,
+            self.app.shortcut_overrides,
+            self.SHORTCUT_SCOPES,
+            hide=self.SHORTCUT_HIDE,
+        )
         # Show the device in the header instead of a dedicated title row; restore
         # the app title when the remote closes so other screens are unaffected.
         self._previous_title = self.app.title
@@ -249,6 +238,8 @@ class RemoteScreen(Screen[None]):
         field.disabled = True
         self.set_focus(None)
 
-    async def action_exit_remote(self) -> None:
+    async def action_go_back(self) -> None:
+        # The remote's Go Back closes the live session before popping the screen;
+        # every other screen's Go Back just pops.
         await self._session.close()
         self.app.pop_screen()
