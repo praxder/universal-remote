@@ -4,7 +4,7 @@
 TBD - created by archiving change scaffold-samsung-remote. Update Purpose after archive.
 ## Requirements
 ### Requirement: Menu-driven entry with two modes
-The application SHALL launch into a menu offering two modes: Manage Devices and Use Remote. Both modes MUST be reachable by keyboard and by mouse.
+The application SHALL launch into a menu offering two modes: Manage Devices and Use Remote. Both modes MUST be reachable by keyboard and by mouse. The menu SHALL also present a Settings entry point — a "Settings" button docked in the bottom-left corner of the screen, plus an `s` key binding — that opens the Settings screen. The Settings entry point MUST be reachable by keyboard (the `s` key) and by mouse (clicking the button). Adding the Settings entry point SHALL NOT change the centered layout of the existing menu content (title, mode buttons, and movie quote).
 
 #### Scenario: Menu offers both modes
 - **WHEN** the application starts
@@ -13,6 +13,14 @@ The application SHALL launch into a menu offering two modes: Manage Devices and 
 #### Scenario: Mode reachable by keyboard and mouse
 - **WHEN** the user selects a mode with the keyboard or by clicking it
 - **THEN** the application navigates to that mode
+
+#### Scenario: Settings reachable by key
+- **WHEN** the user presses the `s` key on the menu
+- **THEN** the application opens the Settings screen
+
+#### Scenario: Settings reachable by button
+- **WHEN** the user clicks the bottom-left Settings button on the menu
+- **THEN** the application opens the Settings screen
 
 ### Requirement: Device management screens
 The Manage Devices mode SHALL present a "Devices" ASCII-art banner, the saved devices, and an always-present add entry as the last row of the list, backed by the device store and exposing add, edit, and delete. When one or more devices are saved, the mode SHALL list the devices first, then a separator, then the add entry; when no devices are saved, the list SHALL show only the add entry. Selecting the add entry — by Enter or by mouse click — SHALL open device discovery (see the "Add device via discovery" requirement). Selecting a device row — by Enter or by mouse click — SHALL open that device for editing. Deleting a device SHALL be triggered either by the Backspace key while a device row is highlighted on the list, or by a Delete button on the edit screen (shown only when editing a device, never when adding), and SHALL require the user to confirm before the device is removed: the system SHALL present the same confirmation prompt naming the device, remove the device only when the user confirms, and leave the store unchanged when the user cancels. When deletion is confirmed from the edit screen, the application SHALL return to the saved-device list, which SHALL no longer show the removed device. The confirmation prompt SHALL default keyboard focus to its cancel action and SHALL let the user move focus between its confirm and cancel actions with the arrow keys. Pressing Backspace while the add entry is highlighted SHALL do nothing. The add and edit screen SHALL present an ASCII-art banner titled "Add Device" when adding and "Edit Device" when editing, styled with the same top and bottom margin as the "Devices" banner. The add and edit screen SHALL order its cells as device type, then name, then IP address. When adding, the device type SHALL be a selector offering the registered platforms by their human-readable names and defaulting to the first; when editing, the device type SHALL be shown as a read-only cell while the name and IP address remain editable. When editing, the screen SHALL show a Delete button below Save, aligned to the same left edge; the add screen SHALL NOT show a Delete button. The device-type cell, the name and IP address cells, the Save button, and — when editing — the Delete button SHALL be reachable both by Tab and by the Up and Down arrow keys — Up moves focus to the previous cell and Down to the next — while the Left and Right arrows continue to move the text cursor within a focused input. Because the Up and Down arrows navigate between cells, the device-type dropdown SHALL open on Enter or Space rather than on an arrow key. The Save button's left edge SHALL be aligned with the cells above it.
