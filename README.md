@@ -152,6 +152,8 @@ returns to the menu:
 - **Open in GitHub** — opens the project repository in your browser.
 - **Version** — shows the installed app version (a non-interactive label).
 
+![Settings](docs/screenshots/settings.png)
+
 ### Keyboard tricks & other niceties
 
 - **Vim-style navigation.** `h` `j` `k` `l` move through menus and lists
