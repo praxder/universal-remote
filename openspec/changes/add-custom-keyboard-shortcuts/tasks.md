@@ -1,10 +1,11 @@
 ## 1. Action catalog + effective-key resolver
 
-- [ ] 1.1 Add a failing test `tests/test_shortcuts_catalog.py`: the catalog lists the 4 Home actions (`d`/`r`/`s`/`q`), the Global `go_back` (`escape`), and 30 Remote actions (29 `Key` members + `text`), each with id, label, scope, and default key; the 12 click-only remote keys default to no key.
-- [ ] 1.2 Add a failing test: every Remote action id maps to a real `Key` enum member, and every catalog action has a unique id.
-- [ ] 1.3 Create `src/universal_remote/tui/shortcuts.py` with a `Scope` enum (`HOME`/`GLOBAL`/`REMOTE`), an `Action` dataclass `(id, label, scope, default_key, target)`, the `CATALOG` list, and `effective_key(action_id, overrides)` returning `overrides.get(id, default)`.
-- [ ] 1.4 Add `conflicts(action_id, key, overrides)` and `is_reserved(action_id, key)` helpers: reserved = arrows + `hjkl` + `enter` + `ctrl+p`, exempting the action's own default; conflict = scope-aware (Home/Remote may reuse, Global overlaps Remote).
-- [ ] 1.5 Add failing tests for 1.4: same-scope reuse rejected, Home↔Remote reuse allowed, `go_back` vs a remote key rejected, reserved key rejected, an action's default is exempt. Run tasks 1.1–1.5 green.
+- [ ] 1.1 Add a failing test `tests/test_shortcuts_catalog.py`: the catalog lists the 4 rebindable Home actions (`d`/`r`/`s`/`q`), the Global `go_back` (`escape`), and 26 rebindable Remote actions (25 `Key` members + `text`), each with id, label, scope, and default key; the 12 click-only remote keys default to no key.
+- [ ] 1.2 Add a failing test: the catalog also lists the reserved entries — the 4 D-pad directional actions (arrow key + `hjkl` alias each) and the two framework entries Activate Control (`enter`) and Command Palette (`ctrl+p`) — each marked non-editable; every device action maps to a real `Key` enum member (framework entries map to none), and every entry id is unique.
+- [ ] 1.3 Create `src/universal_remote/tui/shortcuts.py` with a `Scope` enum (`HOME`/`GLOBAL`/`REMOTE`), an `Action` dataclass `(id, label, scope, default_key, target, editable=True, aliases=())`, the `CATALOG` list (rebindable + reserved entries), and `effective_key(action_id, overrides)` returning `overrides.get(id, default)` (reserved entries ignore overrides).
+- [ ] 1.4 Add `conflicts(action_id, key, overrides)` and `is_reserved(key)` helpers: the reserved-key set is *derived* from the keys and aliases of the non-editable catalog entries; the conflict check is scope-aware (Home/Remote may reuse, Global overlaps Remote) and exempts an action's own default from both checks.
+- [ ] 1.5 Add failing tests for 1.4: same-scope reuse rejected, Home↔Remote reuse allowed, `go_back` vs a remote key rejected, a reserved key (`j`, `enter`, `ctrl+p`) rejected, and an action's default exempt (OK keeps `enter`). Run tasks 1.1–1.5 green.
+- [ ] 1.6 Add a failing test for a `display_label(key)` formatter (`ctrl+p` → `CTRL-P`, `space` → `SPACE`, `escape` → `ESC`, `d` → `D`, empty → blank); implement it in `shortcuts.py`. Run green.
 
 ## 2. Persist shortcuts in preferences
 
@@ -16,7 +17,7 @@
 
 - [ ] 3.1 Add a failing test in `tests/test_tui_remote_surface.py`: with an override assigning a formerly-unbound key (e.g. Volume Up → `=`), pressing it on the remote sends that `Key` on a supporting adapter.
 - [ ] 3.2 Add a `rebuild_shortcuts(overrides)` helper (shared mixin or module function) that clears an instance's catalog bindings and re-adds, via `self._bindings.bind(key, target, id=…, description=label)`, every catalog action for the screen's scope whose effective key is non-empty, then calls `refresh_bindings()`.
-- [ ] 3.3 Use the helper in `MenuScreen` (Home scope incl. Quit) and `RemoteScreen` (Remote scope incl. Text), reading overrides from `self.app`, replacing the hardcoded literal `BINDINGS` for catalogued actions (keep focus-nav `hjkl`/arrows and the D-pad `hjkl` aliases as fixed bindings).
+- [ ] 3.3 Use the helper in `MenuScreen` (Home scope incl. Quit) and `RemoteScreen` (Remote scope incl. Text), reading overrides from `self.app`, replacing the hardcoded literal `BINDINGS` for catalogued actions. The reserved D-pad directional entries bind their fixed arrow keys and `hjkl` aliases and never consult overrides.
 - [ ] 3.4 Add a failing test: assigning a Home action a custom key triggers it on the menu and the default no longer fires. Run 3.1–3.4 green.
 
 ## 4. Unified Go Back action
@@ -27,10 +28,10 @@
 
 ## 5. Keyboard Shortcuts screen + capture modal
 
-- [ ] 5.1 Add a failing test `tests/test_tui_shortcuts.py`: opening the screen shows a table with a row per catalog action and its current shortcut (blank when none).
-- [ ] 5.2 Add failing tests: Enter on a row opens the capture modal; pressing an available key assigns it (row updates, persisted); pressing Delete or Escape clears it.
+- [ ] 5.1 Add a failing test `tests/test_tui_shortcuts.py`: opening the screen shows a table with a row per catalog entry and its shortcut rendered via `display_label` (blank when none); reserved entries (D-pad, Activate Control, Command Palette) appear as disabled rows that cannot be activated.
+- [ ] 5.2 Add failing tests: Enter on a rebindable row opens the capture modal; pressing an available key assigns it (row updates, persisted); pressing Delete clears it; pressing Escape or clicking Cancel closes the modal leaving the shortcut unchanged.
 - [ ] 5.3 Add failing tests: assigning a taken key (same-scope or `go_back` vs remote) is refused, leaves the shortcut unchanged, and shows an error toast; assigning a reserved key is refused with a toast.
-- [ ] 5.4 Create `src/universal_remote/tui/shortcuts_screen.py`: a `ShortcutsScreen` with a `DataTable` (Action | Shortcut) built from the catalog + app overrides, and a `CaptureModal` `ModalScreen` that reads the next key, routes through `is_reserved`/`conflicts`, and on success updates overrides + persists + rebuilds mounted screens (Delete/Escape → clear).
+- [ ] 5.4 Create `src/universal_remote/tui/shortcuts_screen.py`: a `ShortcutsScreen` with a `DataTable` (Action | Shortcut) built from the catalog + app overrides (reserved rows shown disabled, shortcuts formatted via `display_label`), and a `CaptureModal` `ModalScreen` with a Cancel button that reads the next key, routes through `is_reserved`/`conflicts`, and on success updates overrides + persists + rebuilds mounted screens (Delete → clear; Escape/Cancel → close with no change).
 - [ ] 5.5 On any assign/clear, save via `PreferencesStore` and call `rebuild_shortcuts` across `self.app.screen_stack`. Run 5.1–5.3 green.
 
 ## 6. Wire Settings entry + startup application

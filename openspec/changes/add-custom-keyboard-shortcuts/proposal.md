@@ -4,14 +4,15 @@ The Settings screen ships a disabled "Key Bindings (coming soon)" row. Keyboard-
 
 ## What Changes
 
-- A new **Keyboard Shortcuts** screen, reached from Settings (the "coming soon" row becomes live). It lists every rebindable action in one table — `Action | Shortcut` — where the shortcut may be blank.
-- Pressing Enter on a row opens a **capture modal** ("press a key"); the next keypress becomes that action's shortcut. Delete or Escape in the modal **clears** the shortcut (back to none).
-- A rebindable **action catalog** across three scopes:
-  - **Home**: Manage Devices (`d`), Use Remote (`r`), Settings (`s`), Quit (`q`).
-  - **Global**: Go Back (`escape`) — the app-wide back-a-page action, unified across every screen (on the remote it also closes the session).
-  - **Remote**: all 29 remote keys plus Text entry (`t`). The 12 click-only keys (Vol±, Ch±, Mute, Menu, Play, Pause, Play/Pause, Rewind, Fast-forward, Stop) start with **no** shortcut and become assignable.
+- A new **Keyboard Shortcuts** screen, reached from Settings (the "coming soon" row becomes live). It lists every action in one table — `Action | Shortcut` — where the shortcut may be blank; reserved actions (the D-pad, Enter, the command palette) appear as **disabled rows** so users can see the keys are in use but fixed.
+- Pressing Enter on a rebindable row opens a **capture modal** ("press a key"); the next keypress becomes that action's shortcut. **Delete** in the modal **clears** the shortcut (back to none); **Escape or a Cancel button** closes the modal **without changing** the shortcut.
+- Shortcuts are shown in a **readable form** (e.g. `CTRL-P`, `SPACE`, `ESC`) rather than raw internal key names.
+- An **action catalog** across three scopes:
+  - **Home**: Manage Devices (`d`), Use Remote (`r`), Settings (`s`), Quit (`q`) — all rebindable.
+  - **Global**: Go Back (`escape`) — the app-wide back-a-page action, unified across every screen (on the remote it also closes the session), rebindable.
+  - **Remote**: 26 rebindable actions — OK, Back, Home, digits 0–9, Text entry (`t`), and the 12 click-only keys (Vol±, Ch±, Mute, Menu, Play, Pause, Play/Pause, Rewind, Fast-forward, Stop) which start with **no** shortcut and become assignable — **plus** the four D-pad directional keys (Up/Down/Left/Right), which are **reserved** (fixed to the arrows with `h`/`j`/`k`/`l` aliases) and cannot be rebound.
 - **Scope-aware conflict rejection**: assigning a key already taken by another action that can be active on the same screen is refused — the shortcut is **not** set and a toast reports "`<key>` is already taken by `<Action>`". Home and Remote actions never share a screen, so they may reuse a key; Go Back (active everywhere) must not collide with a Remote key.
-- **Reserved keys**: a new assignment to a key owned by non-rebindable machinery — focus navigation (arrow keys and `h`/`j`/`k`/`l`), Enter (activate the focused control), and the command palette (`ctrl+p`) — is refused with a toast. Existing default bindings are exempt (e.g. Remote Up legitimately defaults to the Up arrow).
+- **Reserved keys**: the D-pad directional keys (arrows and `h`/`j`/`k`/`l`), Enter (activate the focused control), and the command palette (`ctrl+p`) cannot be assigned to any action, and they are **shown in the table as disabled rows** so users can see the keys are in use but fixed. A rebindable action's existing default is exempt (e.g. OK legitimately defaults to Enter).
 - Changes take effect **immediately**: on save, the bindings of every mounted screen are rebuilt so the new shortcut works without a restart.
 - Custom shortcuts **persist** in the existing preferences file (`settings.json`) as a `shortcuts` map of action id → key, loaded and applied at startup.
 
@@ -25,7 +26,7 @@ The Settings screen ships a disabled "Key Bindings (coming soon)" row. Keyboard-
 
 - `tui-settings`: the "Key Bindings" placeholder row becomes a working "Keyboard Shortcuts" row that opens the new screen.
 - `app-preferences`: the preferences file gains a persisted `shortcuts` map (action id → key) alongside the theme, loaded at startup and applied to the app's bindings.
-- `tui-remote`: the documented home, remote, and back key mappings become **defaults** that the user may rebind via `keyboard-shortcuts`; the click-only remote keys become assignable; and the app-wide Escape "back a page" is exposed as the customizable Go Back action.
+- `tui-remote`: the documented home, remote, and back key mappings become **defaults** that the user may rebind via `keyboard-shortcuts` (except the D-pad directional keys, which stay **reserved** and fixed); the click-only remote keys become assignable; and the app-wide Escape "back a page" is exposed as the customizable Go Back action.
 
 ## Impact
 

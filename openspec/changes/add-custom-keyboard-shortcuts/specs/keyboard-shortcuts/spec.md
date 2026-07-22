@@ -2,36 +2,48 @@
 
 ### Requirement: Rebindable action catalog
 
-The application SHALL define a catalog of rebindable actions. Each action SHALL have a stable identifier, a human-readable label, a scope, and a default key that MAY be empty (no shortcut). The scopes SHALL be:
+The application SHALL define a catalog of actions that drives both the screen key bindings and the Keyboard Shortcuts table. Each entry SHALL have a stable identifier, a human-readable label, a scope, a flag for whether it is rebindable, and a default key that MAY be empty (no shortcut). Rebindable entries MAY be reassigned by the user; reserved entries are fixed and MUST NOT be changed. The scopes SHALL be:
 
-- **Home** — active only on the entry menu: Manage Devices (default `d`), Use Remote (default `r`), Settings (default `s`), Quit (default `q`).
-- **Global** — active on every screen except the root menu: Go Back (default `escape`).
-- **Remote** — active only on the remote surface: all 29 device keys (Up, Down, Left, Right, OK, Back, Home, Volume Up, Volume Down, Mute, Menu, Channel Up, Channel Down, Play, Pause, Play/Pause, Rewind, Fast-forward, Stop, and number keys 0–9) plus Text entry (default `t`).
+- **Home** — active only on the entry menu: Manage Devices (`d`), Use Remote (`r`), Settings (`s`), Quit (`q`), all rebindable.
+- **Global** — active on every screen except the root menu: Go Back (`escape`), rebindable.
+- **Remote** — active only on the remote surface: twenty-six rebindable device actions — OK, Back, Home, Volume Up, Volume Down, Mute, Menu, Channel Up, Channel Down, Play, Pause, Play/Pause, Rewind, Fast-forward, Stop, the number keys 0–9, and Text entry (`t`) — plus four **reserved** D-pad directional actions (Up, Down, Left, Right).
 
-Directional and OK/Back/Home/digit remote actions SHALL keep their current default keys; the twelve click-only keys (Volume Up, Volume Down, Mute, Menu, Channel Up, Channel Down, Play, Pause, Play/Pause, Rewind, Fast-forward, Stop) SHALL default to no shortcut.
+The four D-pad directional actions SHALL be reserved: each is fixed to its arrow key with the matching Vim key (`h`/`j`/`k`/`l`) as a fixed alias, and neither key may be reassigned. OK SHALL default to `enter`, Back to `backspace`, Home to `space`, and the number keys to `0`–`9`. The twelve formerly mouse-only keys (Volume Up, Volume Down, Mute, Menu, Channel Up, Channel Down, Play, Pause, Play/Pause, Rewind, Fast-forward, Stop) SHALL default to no shortcut.
+
+The catalog SHALL also include reserved entries for framework keys that are not device actions — Activate Control (`enter`) and Command Palette (`ctrl+p`) — so the user can see those keys are in use.
 
 #### Scenario: Every rebindable action is catalogued
 
 - **WHEN** the application enumerates its rebindable actions
-- **THEN** the catalog contains the four Home actions, the Global Go Back action, and the thirty Remote actions, each with an id, label, scope, and default key
+- **THEN** the catalog contains the four Home actions, the Global Go Back action, and the twenty-six rebindable Remote actions, each with an id, label, scope, and default key
+
+#### Scenario: Reserved entries are catalogued and marked fixed
+
+- **WHEN** the application enumerates its reserved entries
+- **THEN** the catalog contains the four D-pad directional actions and the framework keys (Activate Control and Command Palette), each marked as reserved and not rebindable
 
 #### Scenario: Some actions start with no shortcut
 
 - **WHEN** the catalog is read before any customization
-- **THEN** the twelve click-only remote keys have no default key while every other action has one
+- **THEN** the twelve formerly mouse-only remote keys have no default key while every other rebindable action has one
 
 ### Requirement: Keyboard Shortcuts screen lists actions and shortcuts
 
-The application SHALL provide a Keyboard Shortcuts screen, reached from the Settings screen. The screen SHALL present a table with one row per catalogued action showing the action's label and its current shortcut, where the shortcut cell MAY be empty when the action has none. Every row MUST be reachable by keyboard and by mouse, and the user MUST be able to return from the screen to Settings.
+The application SHALL provide a Keyboard Shortcuts screen, reached from the Settings screen. The screen SHALL present a table with one row per catalogued entry — both rebindable and reserved — showing the entry's label and its current shortcut, where the shortcut cell MAY be empty when a rebindable action has none. Reserved entries SHALL be shown as disabled (non-activatable) rows so the user can see the key is in use but cannot change it. Every rebindable row MUST be reachable by keyboard and by mouse, and the user MUST be able to return from the screen to Settings.
 
 #### Scenario: Screen lists all actions
 
 - **WHEN** the user opens the Keyboard Shortcuts screen
-- **THEN** it shows a table with a row for every catalogued action and each row's current shortcut
+- **THEN** it shows a table with a row for every catalogued entry and each row's current shortcut
+
+#### Scenario: Reserved entries are shown disabled
+
+- **WHEN** the table is displayed
+- **THEN** the reserved entries (the D-pad directions, Activate Control, and Command Palette) appear as disabled rows that cannot be activated for capture
 
 #### Scenario: Actions without a shortcut show as blank
 
-- **WHEN** an action has no shortcut assigned
+- **WHEN** a rebindable action has no shortcut assigned
 - **THEN** its row is shown with an empty shortcut cell
 
 #### Scenario: Return to Settings
@@ -39,9 +51,23 @@ The application SHALL provide a Keyboard Shortcuts screen, reached from the Sett
 - **WHEN** the user leaves the Keyboard Shortcuts screen
 - **THEN** the application returns to the Settings screen
 
-### Requirement: Assign or clear a shortcut by capture
+### Requirement: Shortcuts are displayed in a readable form
 
-Activating a row (Enter or click) SHALL open a capture modal prompting the user to press a key. The next key the user presses SHALL be normalized to its canonical long form and, subject to the conflict and reserved-key rules, assigned as that action's shortcut, after which the modal closes and the row updates. Pressing Delete or Escape in the capture modal SHALL clear the action's shortcut (leaving it with none) and close the modal.
+Every shortcut shown in the table SHALL be rendered as an uppercase label rather than its raw internal key name: modifier-plus-key combinations SHALL be joined with a hyphen (for example `ctrl+p` shown as `CTRL-P`), and named keys SHALL use a short friendly form (for example `space` as `SPACE`, `escape` as `ESC`). A reserved D-pad row SHALL show both its arrow key and its Vim alias (for example `UP` / `K`).
+
+#### Scenario: Modifier combination is shown in friendly form
+
+- **WHEN** a shortcut is a modifier combination such as `ctrl+p`
+- **THEN** the table shows it as `CTRL-P`
+
+#### Scenario: Named key is shown in friendly form
+
+- **WHEN** a shortcut is a named key such as `space` or `escape`
+- **THEN** the table shows a short uppercase label such as `SPACE` or `ESC`
+
+### Requirement: Assign, clear, or cancel from the capture modal
+
+Activating a rebindable row (Enter or click) SHALL open a capture modal prompting the user to press a key. The next key the user presses SHALL be normalized to its canonical long form and, subject to the conflict and reserved-key rules, assigned as that action's shortcut, after which the modal closes and the row updates. Pressing Delete in the modal SHALL clear the action's shortcut (leaving it with none) and close the modal. The modal SHALL offer a Cancel affordance — a Cancel button and the Escape key — that closes the modal without changing the shortcut.
 
 #### Scenario: Capture assigns a new shortcut
 
@@ -53,10 +79,10 @@ Activating a row (Enter or click) SHALL open a capture modal prompting the user 
 - **WHEN** the user activates a row and presses Delete in the capture modal
 - **THEN** the action's shortcut is cleared, the modal closes, and the row shows an empty shortcut cell
 
-#### Scenario: Escape clears a shortcut
+#### Scenario: Cancel leaves the shortcut unchanged
 
-- **WHEN** the user activates a row and presses Escape in the capture modal
-- **THEN** the action's shortcut is cleared and the modal closes
+- **WHEN** the user activates a row and presses Escape or clicks Cancel in the capture modal
+- **THEN** the modal closes and the action's shortcut is unchanged
 
 ### Requirement: Conflicting shortcuts are rejected
 
@@ -79,16 +105,16 @@ An assignment SHALL be refused when the chosen key is already used by another ac
 
 ### Requirement: Reserved keys cannot be assigned
 
-A new assignment to a key reserved by non-rebindable machinery SHALL be refused with an error toast. The reserved keys SHALL include the focus-navigation keys (the arrow keys and `h`, `j`, `k`, `l`), Enter (activates the focused control), and the command-palette key (`ctrl+p`). An action's existing default binding SHALL be exempt from this rule so that defaults which coincide with reserved keys (for example, the remote Up key defaulting to the Up arrow) remain valid.
+A new assignment to a key reserved by a fixed catalog entry SHALL be refused with an error toast. The reserved keys SHALL be those held by the reserved entries: the D-pad directional keys (the arrow keys and `h`, `j`, `k`, `l`), Enter (Activate Control), and the command-palette key (`ctrl+p`). A rebindable action's existing default binding SHALL be exempt from this rule so that a default which coincides with a reserved key (for example OK defaulting to Enter) remains valid.
 
 #### Scenario: Assigning a reserved key is refused
 
-- **WHEN** the user tries to assign an action a focus-navigation key such as `j`, Enter, or `ctrl+p`
+- **WHEN** the user tries to assign a rebindable action a reserved key such as `j`, Enter, or `ctrl+p`
 - **THEN** the assignment is refused and a toast explains the key is reserved
 
-#### Scenario: Defaults on reserved keys remain valid
+#### Scenario: A default on a reserved key remains valid
 
-- **WHEN** an action's default key is itself a reserved key, such as the remote Up key on the Up arrow
+- **WHEN** a rebindable action's default key is itself a reserved key, such as OK defaulting to Enter
 - **THEN** that default binding is honored and is not flagged as reserved
 
 ### Requirement: Custom shortcuts apply immediately
