@@ -123,6 +123,39 @@ class TestShortcutsTable:
 
         asyncio.run(scenario())
 
+    def test_given_the_table_when_j_pressed_then_the_cursor_moves_down_one_row(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test(size=_SIZE) as pilot:
+                app.push_screen(ShortcutsScreen())
+                await pilot.pause()
+                table = app.screen.query_one(DataTable)
+                start = table.cursor_row
+                await pilot.press("j")
+                await pilot.pause()
+                assert table.cursor_row == start + 1
+
+        asyncio.run(scenario())
+
+    def test_given_the_table_when_k_pressed_then_the_cursor_moves_up_one_row(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test(size=_SIZE) as pilot:
+                app.push_screen(ShortcutsScreen())
+                await pilot.pause()
+                table = app.screen.query_one(DataTable)
+                table.move_cursor(row=table.cursor_row + 1)
+                start = table.cursor_row
+                await pilot.press("k")
+                await pilot.pause()
+                assert table.cursor_row == start - 1
+
+        asyncio.run(scenario())
+
 
 class TestCaptureModal:
     def test_given_a_rebindable_row_when_activated_then_the_capture_modal_opens(
@@ -366,6 +399,22 @@ class TestCommandPalette:
                 hits[0].command()
                 await pilot.pause()
                 assert isinstance(app.screen, ShortcutsViewModal)
+
+        asyncio.run(scenario())
+
+    def test_given_the_read_only_view_when_j_pressed_then_the_cursor_moves_down(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test(size=_SIZE) as pilot:
+                app.push_screen(ShortcutsViewModal())
+                await pilot.pause()
+                table = app.screen.query_one(DataTable)
+                start = table.cursor_row
+                await pilot.press("j")
+                await pilot.pause()
+                assert table.cursor_row == start + 1
 
         asyncio.run(scenario())
 

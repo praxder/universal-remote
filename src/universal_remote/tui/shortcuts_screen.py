@@ -91,8 +91,30 @@ def _populate_shortcuts_table(
     return first_action
 
 
-class ShortcutsScreen(Screen[None]):
+# j/k mirror Down/Up, matching the Remote surface's D-pad aliases, and stay hidden
+# from the footer to keep its eight-hint fit. Declared on each screen (Textual only
+# merges BINDINGS from DOMNode subclasses, not from the mixin); `rebuild_shortcuts`
+# never clears them since they carry no catalog id.
+_VIM_ROW_NAV_BINDINGS = [
+    Binding("j", "cursor_down", "Down", show=False),
+    Binding("k", "cursor_up", "Up", show=False),
+]
+
+
+class _VimRowNavigation:
+    """Delegates the j/k Vim actions to the screen's sole DataTable cursor."""
+
+    def action_cursor_down(self) -> None:
+        self.query_one(DataTable).action_cursor_down()
+
+    def action_cursor_up(self) -> None:
+        self.query_one(DataTable).action_cursor_up()
+
+
+class ShortcutsScreen(_VimRowNavigation, Screen[None]):
     """Lists every action and its shortcut; rebindable rows open the capture modal."""
+
+    BINDINGS = _VIM_ROW_NAV_BINDINGS
 
     # Go Back (Escape by default) returns to Settings; built on mount like every
     # other non-root screen.
@@ -236,7 +258,7 @@ class CaptureModal(ModalScreen[str | None]):
         self.dismiss(self._action.id)
 
 
-class ShortcutsViewModal(ModalScreen[None]):
+class ShortcutsViewModal(_VimRowNavigation, ModalScreen[None]):
     """A read-only list of every action and its current shortcut.
 
     Opened from the command palette so the user can check bindings from any screen.
@@ -244,7 +266,7 @@ class ShortcutsViewModal(ModalScreen[None]):
     view offers no way to change a shortcut.
     """
 
-    BINDINGS = [Binding("escape", "close", "Close")]
+    BINDINGS = [Binding("escape", "close", "Close"), *_VIM_ROW_NAV_BINDINGS]
 
     DEFAULT_CSS = """
     ShortcutsViewModal { align: center middle; background: $background 60%; }
