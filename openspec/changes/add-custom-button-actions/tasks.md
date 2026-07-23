@@ -1,6 +1,6 @@
 ## 1. Prerequisite
 
-- [ ] 1.1 Confirm Phase 1 (`add-custom-remote-buttons`) is implemented and archived so the custom-button row, Button Config modal, and `custom_buttons` persistence exist in the live code and specs
+- [x] 1.1 Confirm Phase 1 (`add-custom-remote-buttons`) is implemented and archived so the custom-button row, Button Config modal, and `custom_buttons` persistence exist in the live code and specs
 
 ## 2. Persistence: action stored in the custom-button entry
 
@@ -41,3 +41,4 @@
 - [ ] 7.2 Update in-repo docs for custom-button actions (assigning Run Custom Script, file vs inline, results visibility)
 - [ ] 7.3 Run the formatter and linter; fix all warnings
 - [ ] 7.4 Run the full test suite and fix any failures
+- [ ] 7.5 Before archiving: reconcile the two `tui-remote` MODIFIED scenarios the archive drop-guard will flag (they change scenarios Phase 1 put in the live specs). "Clicking a custom button opens its configuration" → keep that live header, narrow its WHEN to the no-action case, and add "Clicking a button with an action runs it". "Action Type is a disabled placeholder" → a genuine flip to active with no truthful in-place edit; MODIFIED can't express a single-scenario removal, so decide the mechanism at archive time (last resort `openspec archive --no-validate`)

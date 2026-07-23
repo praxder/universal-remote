@@ -4,7 +4,7 @@ Phase 1 (`add-custom-remote-buttons`) delivers the five-button custom row, the B
 
 Phase 2 attaches behavior to those buttons: an extensible action catalog whose first (and, for now, only) action is Run Custom Script. This is the app's first feature that executes arbitrary user-provided shell, so the execution seam and its trust boundary are the load-bearing parts.
 
-**This change stacks on Phase 1.** Its `tui-remote` deltas MODIFY requirements that Phase 1 introduces, so Phase 1 must be implemented and archived (its deltas synced into the live specs) before Phase 2 is applied. Authoring Phase 2 now captures the decisions; it is not implementable until Phase 1 lands.
+**This change stacks on Phase 1, which is now archived.** Its `tui-remote` deltas MODIFY requirements Phase 1 introduced; those are live now, so Phase 2 is ready to apply.
 
 ## Goals / Non-Goals
 
@@ -19,7 +19,7 @@ Phase 2 attaches behavior to those buttons: an extensible action catalog whose f
 - Any action type beyond Run Custom Script (the catalog is built to extend; the entries are not).
 - Sandboxing, permission prompts, or vetting of script contents (see trust model).
 - Cross-device action sync or import/export.
-- Deciding Phase 1's own open questions (scope-selector widget, residual text-status placement) — those belong to Phase 1.
+- Revisiting Phase-1 decisions (the scope-selector widget, the text-entry modal) — those are settled in the archived Phase 1.
 
 ## Decisions
 
@@ -30,6 +30,7 @@ Actions are modeled as a small typed catalog (each action type has an id, a disp
 ### Decision: Run-on-click iff an action is set; edit gesture opens config
 A custom button with a resolved action RUNS it on click. A button with no action opens the Button Config modal (unchanged from Phase 1). To re-edit a button that has an action, the user uses a distinct **edit gesture** rather than a plain click.
 - **Edit gesture**: preferred is an explicit *edit-mode key* on the remote (press it, then click/activate a custom button to open its config) because Textual has no reliable long-press and terminals commonly intercept alt/option-click. A modifier-click MAY be offered where the terminal delivers modifier state on mouse events, but the edit-mode key is the guaranteed path. **Resolve the exact binding during implementation** against Textual's mouse-event modifier support and the existing remote key map (must not collide with a reserved D-pad/Vim key).
+- **Keyboard interaction with Phase-1 shortcuts**: Phase 1 already added five rebindable "Activate Custom Button 1–5" shortcuts that mirror a click. In Phase 2 that mirror means they RUN a configured button's action (and open config for an inert one) — so those shortcuts are the keyboard *run* path, and the edit gesture is the keyboard *configure* path for a button that has an action. Both flow through the shared `_activate_custom` / config dispatch, so activation stays identical whether it came from a click or a shortcut.
 - **Why**: A physical-remote feel means click = fire. The Phase-1 rule "click runs iff the button has a runnable action" was written to switch on here.
 
 ### Decision: Run Script config modal — source toggle, results toggle, REMOTE_IP helpline
@@ -77,7 +78,7 @@ The action resolves most-specific-first exactly like the title (device → type 
 
 - **Arbitrary code execution** → by design; mitigated only by being the user's own scripts on their own machine and by documenting the trust boundary. The timeout bounds runaway/hung scripts but is not a security boundary.
 - **Hung or long-running script** → the bounded timeout kills it and reports failure; the worker keeps the UI responsive meanwhile.
-- **Stacking on unarchived Phase 1** → Phase 2's `tui-remote` MODIFIED requirements have no live baseline until Phase 1 archives; `openspec validate` may flag this until then. Expected for a stacked change — implement/archive Phase 1 first.
+- **Archiving Phase 2 later** → the `tui-remote` MODIFIED requirements change two scenarios Phase 1 put in the live specs — "Clicking a custom button opens its configuration" (narrowed to the no-action case, plus a new run-it scenario) and "Action Type is a disabled placeholder" (flips to active). The archive drop-guard will flag both. Keep the header and edit in place for the first; the second is a genuine flip with no in-place edit, so it is an archive-time decision (see tasks). This is not a blocker for applying Phase 2.
 - **`TextArea` availability/behavior** → confirm Textual's `TextArea` fits the inline-script editor (multi-line, focus, Escape handling within a modal) during implementation.
 - **File-source path validation** → a missing/non-executable path should fail like a non-zero exit (error toast or result modal), not crash the remote — handle in the runner.
 
@@ -87,7 +88,7 @@ No data migration. Phase-1 entries without an `"action"` field load as title-onl
 
 ## Open Questions
 
-- **Edit gesture binding**: exact edit-mode key (and whether to also accept a modifier-click where supported), pending Textual mouse-modifier support and the reserved-key map.
+- **Edit gesture binding**: exact edit-mode key (and whether to also accept a modifier-click where supported), pending Textual mouse-modifier support and the reserved-key map. The edit gesture is the keyboard *configure* path; Phase-1's "Activate Custom Button 1–5" shortcuts are the keyboard *run* path (they mirror a click), so the two must stay distinct.
 - **Inline shell**: confirm `/bin/sh -c` vs. honoring a shebang / `$SHELL` for inline scripts.
 - **Timeout value**: confirm the default (~30s) and whether it should be configurable per action.
 - **Result modal output limits**: how much stdout/stderr to show (truncate very long output?).

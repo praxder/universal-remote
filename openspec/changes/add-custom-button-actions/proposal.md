@@ -2,7 +2,7 @@
 
 Phase 1 (`add-custom-remote-buttons`) put five relabel-able custom buttons on the remote and the layered per-scope persistence behind them — but the buttons are inert. Phase 2 makes them do something: it adds an extensible action catalog and its first action, Run Custom Script, so a user can attach a shell script (file or inline) to a button and fire it from the remote. This is the payoff the Phase-1 surface was built for.
 
-**Depends on `add-custom-remote-buttons` (Phase 1).** Phase 2 assumes Phase 1's custom-button row, config modal, and `custom_buttons` persistence are implemented and its spec deltas archived into the live specs. Implement and archive Phase 1 first.
+**Builds on `add-custom-remote-buttons` (Phase 1), now archived.** Phase 1's custom-button row, config modal, and layered `custom_buttons` persistence are implemented and its spec deltas are synced into the live specs, so Phase 2 is ready to apply.
 
 ## What Changes
 
