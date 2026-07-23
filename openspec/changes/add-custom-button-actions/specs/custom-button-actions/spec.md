@@ -31,7 +31,7 @@ The Run Script configuration modal SHALL offer a source toggle between Script Fi
 - **THEN** no action is stored and the button is unchanged
 
 ### Requirement: Non-blocking script execution with REMOTE_IP
-Running a custom button's Run Custom Script action SHALL execute the configured shell script without blocking the user interface, in a background worker using an asynchronous subprocess. The script's environment SHALL include `REMOTE_IP` set to the connected device's IP address; `REMOTE_IP` SHALL be the only value the application injects. Execution SHALL be bounded by a timeout that terminates a script still running when it elapses, and a terminated script SHALL be treated as a failure. A script that cannot be started (for example, a missing script-file path) SHALL be reported as a failure rather than crashing the remote.
+Running a custom button's Run Custom Script action SHALL execute the configured shell script without blocking the user interface, in a background worker using an asynchronous subprocess. The script's environment SHALL include `REMOTE_IP` set to the connected device's IP address; `REMOTE_IP` SHALL be the only value the application injects. Execution SHALL be bounded by a fixed 30-second timeout, not user-configurable, that terminates a script still running when it elapses, and a terminated script SHALL be treated as a failure. A script that cannot be started (for example, a missing script-file path) SHALL be reported as a failure rather than crashing the remote.
 
 #### Scenario: Script runs without freezing the UI
 - **WHEN** the user activates a custom button whose action is a long-running script
@@ -50,7 +50,7 @@ Running a custom button's Run Custom Script action SHALL execute the configured 
 - **THEN** the run is reported as a failure and the remote does not crash
 
 ### Requirement: Script results visibility
-The Results choice stored with a Run Custom Script action SHALL control how a run surfaces its outcome. When Don't Show is selected, a successful run (zero exit code) SHALL produce no visible output, and a failed run (non-zero exit, timeout, or start failure) SHALL raise an error notification describing the failure. When Show is selected, both success and failure SHALL be presented in a result modal reporting the outcome together with the script's output and exit code.
+The Results choice stored with a Run Custom Script action SHALL control how a run surfaces its outcome. When Don't Show is selected, a successful run (zero exit code) SHALL produce no visible output, and a failed run (non-zero exit, timeout, or start failure) SHALL raise an error notification describing the failure. When Show is selected, both success and failure SHALL be presented in a result modal reporting the outcome together with the script's exit code and its full output (stdout and stderr); the modal SHALL be scrollable so that long output is presented in full rather than truncated.
 
 #### Scenario: Quiet success when results hidden
 - **WHEN** a script configured with Don't Show exits successfully
@@ -62,7 +62,7 @@ The Results choice stored with a Run Custom Script action SHALL control how a ru
 
 #### Scenario: Result shown when results visible
 - **WHEN** a script configured with Show finishes, whether it succeeds or fails
-- **THEN** a result modal reports the outcome with the script's output and exit code
+- **THEN** a scrollable result modal reports the outcome with the script's exit code and its full, untruncated output
 
 ### Requirement: User-shell trust boundary
 The Run Custom Script action SHALL execute arbitrary shell provided by the user, on the user's own machine, under the user's own privileges. The application SHALL NOT sandbox, vet, or restrict script contents, and the execution timeout SHALL serve as a reliability guard rather than a security control. This trust boundary SHALL be documented so that running user-authored shell is a deliberate, disclosed capability.

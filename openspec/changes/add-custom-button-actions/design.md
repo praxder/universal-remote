@@ -29,8 +29,8 @@ Actions are modeled as a small typed catalog (each action type has an id, a disp
 
 ### Decision: Run-on-click iff an action is set; edit gesture opens config
 A custom button with a resolved action RUNS it on click. A button with no action opens the Button Config modal (unchanged from Phase 1). To re-edit a button that has an action, the user uses a distinct **edit gesture** rather than a plain click.
-- **Edit gesture**: preferred is an explicit *edit-mode key* on the remote (press it, then click/activate a custom button to open its config) because Textual has no reliable long-press and terminals commonly intercept alt/option-click. A modifier-click MAY be offered where the terminal delivers modifier state on mouse events, but the edit-mode key is the guaranteed path. **Resolve the exact binding during implementation** against Textual's mouse-event modifier support and the existing remote key map (must not collide with a reserved D-pad/Vim key).
-- **Keyboard interaction with Phase-1 shortcuts**: Phase 1 already added five rebindable "Activate Custom Button 1–5" shortcuts that mirror a click. In Phase 2 that mirror means they RUN a configured button's action (and open config for an inert one) — so those shortcuts are the keyboard *run* path, and the edit gesture is the keyboard *configure* path for a button that has an action. Both flow through the shared `_activate_custom` / config dispatch, so activation stays identical whether it came from a click or a shortcut.
+- **Edit gesture**: an explicit *edit-mode key* on the remote — press it to arm edit-mode, then activate a custom button (click it, or press its shortcut) to open that button's config; the mode clears after one activation. This is the guaranteed path because a modifier-click cannot carry the intent reliably: Cmd+Click is structurally undetectable (the xterm mouse protocol has no Command-key bit and Textual exposes only `shift`/`meta`(=Alt/Option)/`ctrl` on a click), and Alt/Option- or Shift+Click are commonly hijacked by macOS terminals for text selection. The edit-mode key needs no mouse-modifier support and works on every terminal. **Resolve the exact keycap during implementation** against the existing remote key map (must not collide with a reserved D-pad/Vim key); the mechanism (arm → next activation configures → clear) is settled.
+- **Keyboard interaction with Phase-1 shortcuts**: Phase 1 already added five rebindable "Activate Custom Button 1–5" shortcuts that mirror a click. In Phase 2 that mirror means they RUN a configured button's action (and open config for an inert one) — so those shortcuts are the keyboard *run* path. Arming edit-mode flips the next activation to the *configure* path, and it flips click and shortcut alike, so a shortcut still behaves identically to a click (both run when edit-mode is off, both configure when it is armed). All of it flows through the shared `_activate_custom` / config dispatch, so activation stays identical whether it came from a click or a shortcut.
 - **Why**: A physical-remote feel means click = fire. The Phase-1 rule "click runs iff the button has a runnable action" was written to switch on here.
 
 ### Decision: Run Script config modal — source toggle, results toggle, REMOTE_IP helpline
@@ -47,12 +47,12 @@ Reached by: custom-button click (no action) → Button Config modal → Action T
 
 ### Decision: Non-blocking execution model with an explicit trust boundary
 Scripts run in a Textual worker via an asyncio subprocess so the event loop never blocks. Concrete choices:
-- **Invocation**: inline scripts run as `/bin/sh -c <script>`; file scripts execute the given path. (Confirm inline shell during implementation; `/bin/sh` is the portable default.)
+- **Invocation**: inline scripts run as `/bin/sh -c <script>`; file scripts execute the given path. `/bin/sh` is used unconditionally for inline scripts — no shebang parsing and no `$SHELL` honoring.
 - **Environment**: the process environment plus `REMOTE_IP=<device.ip>` — the connected device's IP, available on the remote screen as `self._device.ip`. This is the only injected value.
-- **Timeout**: a bounded timeout (target ~30s) kills a hung script; on timeout the run is treated as a failure. The exact value is a safety net, tunable during implementation.
+- **Timeout**: a fixed 30-second timeout kills a hung script; on timeout the run is treated as a failure. The value is not user-configurable in this phase (a later change can add per-action configuration if it proves necessary).
 - **Results visibility** (from the Results toggle):
   - **Don't Show** → success is silent (no UI); a non-zero exit (or timeout/spawn failure) raises an **error toast** naming the failure.
-  - **Show** → a result modal reports success or failure with the script's output (stdout/stderr) and exit code.
+  - **Show** → a result modal reports success or failure with the script's exit code and its full output (stdout/stderr), shown in a scrollable modal so long output is never truncated.
 - **Why**: TUI responsiveness is non-negotiable; the user chose the quiet-unless-error vs. always-show split.
 
 ### Decision: Trust model — user's own shell on the user's own machine
@@ -88,7 +88,4 @@ No data migration. Phase-1 entries without an `"action"` field load as title-onl
 
 ## Open Questions
 
-- **Edit gesture binding**: exact edit-mode key (and whether to also accept a modifier-click where supported), pending Textual mouse-modifier support and the reserved-key map. The edit gesture is the keyboard *configure* path; Phase-1's "Activate Custom Button 1–5" shortcuts are the keyboard *run* path (they mirror a click), so the two must stay distinct.
-- **Inline shell**: confirm `/bin/sh -c` vs. honoring a shebang / `$SHELL` for inline scripts.
-- **Timeout value**: confirm the default (~30s) and whether it should be configurable per action.
-- **Result modal output limits**: how much stdout/stderr to show (truncate very long output?).
+All resolved during scoping: inline scripts run under `/bin/sh -c` (no shebang/`$SHELL` honoring); the execution timeout is a fixed, non-configurable 30 seconds; the Show result modal presents full, untruncated output in a scrollable view; and the edit gesture is an edit-mode key followed by a custom-button activation (Cmd+Click having been ruled out as structurally undetectable in a terminal). The only detail deferred to implementation is the exact edit-mode keycap, chosen against the reserved remote key map.
