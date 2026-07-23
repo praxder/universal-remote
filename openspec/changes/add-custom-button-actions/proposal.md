@@ -11,7 +11,7 @@ Phase 1 (`add-custom-remote-buttons`) put five relabel-able custom buttons on th
 - **Add the Run Script config modal.** It offers a source toggle (Script File / Inline Script): file shows a one-line path input to a shell script; inline shows a multi-line editor for a shell script. A helpline states that `REMOTE_IP` is set in the script's environment to the connected device's IP. A Results toggle (Don't Show / Show) selects how output surfaces. OK / Cancel.
 - **Run a configured button on click.** A custom button that has an action RUNS it on click; a button with no action still opens config (the Phase-1 rule "click runs iff the button has an action" now has its left branch). Re-editing a configured-with-action button uses a distinct edit gesture (edit-mode key or modifier-click — see design).
 - **Execute scripts without blocking the UI.** Scripts run in a background worker via an async subprocess, with `REMOTE_IP` in the environment, a bounded timeout that kills a hung script, and results surfaced per the Results toggle: Don't Show → silent on success, an error toast on a non-zero exit; Show → a result modal with success/failure and output.
-- **Persist the action** alongside the Phase-1 title in each custom-button entry (the entry is already an object for this reason), keyed by the same device / device-type / global scopes.
+- **Persist the action** alongside the Phase-1 title in each custom-button entry (the entry is already an object for this reason), keyed by the same device / device-type / global scopes and resolved jointly with the title (the entry resolves as a unit).
 
 ## Capabilities
 
@@ -20,7 +20,7 @@ Phase 1 (`add-custom-remote-buttons`) put five relabel-able custom buttons on th
 
 ### Modified Capabilities
 - `tui-remote`: The custom-button click now runs an assigned action (or opens config when none); the Action Type control becomes active and opens the Action Type list; the Run Script config modal is added; a configured-with-action button gains an edit gesture. (Modifies requirements introduced by Phase 1.)
-- `app-preferences`: Each custom-button entry additionally persists its assigned action, at the same three scopes as the title, resolved most-specific-first. (Adds to the Phase-1 persistence.)
+- `app-preferences`: Each custom-button entry additionally persists its assigned action, at the same three scopes as the title and resolved jointly with it — the entry resolves as a unit, most-specific-first. (Adds to the Phase-1 persistence.)
 
 ## Impact
 

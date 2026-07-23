@@ -6,8 +6,8 @@
 
 - [ ] 2.1 Write failing tests: an `action` object round-trips inside a button's per-scope entry; a title-only entry loads with no action (back-compat); saving an action leaves theme, shortcuts, and titles untouched
 - [ ] 2.2 Extend the custom-button entry model and store read/write to carry an optional `action` object alongside the title
-- [ ] 2.3 Write failing tests for action resolution: most-specific-first (device → type → global) and independent of title resolution
-- [ ] 2.4 Add action resolution to the custom-button resolver, resolving the action separately from the title
+- [ ] 2.3 Write failing tests for action resolution: the entry resolves as a unit, most-specific-first (device → type → global), so title and action always come from the same scope
+- [ ] 2.4 Add action resolution to the custom-button resolver, resolving the entry as a unit so the action comes from the same scope as the title
 
 ## 3. Action catalog and Action Type list modal
 

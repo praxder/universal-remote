@@ -9,7 +9,7 @@ Phase 2 attaches behavior to those buttons: an extensible action catalog whose f
 ## Goals / Non-Goals
 
 **Goals:**
-- Assign an action to a custom button, persisted at the same three scopes as the Phase-1 title and resolved most-specific-first.
+- Assign an action to a custom button, persisted at the same three scopes as the Phase-1 title and resolved jointly with it — the entry resolves as a unit, most-specific-first.
 - Ship one action, Run Custom Script, behind a catalog that accepts more action types later without reworking the surface or the config modals.
 - Run a configured button's action on click without freezing the TUI; leave inert (no-action) buttons opening config.
 - Let the user choose whether a run surfaces its output (a result modal) or stays quiet unless it fails (an error toast).
@@ -59,7 +59,7 @@ Scripts run in a Textual worker via an asyncio subprocess so the event loop neve
 The feature runs arbitrary shell the same user authored, on their own machine, under their own privileges. There is **no sandbox and no content vetting**; `REMOTE_IP` is the only value the app injects; the timeout is a reliability guard, not a security control. This trust boundary is stated so it is a deliberate, documented choice rather than an oversight.
 - **Why**: The advisor flagged that arbitrary-shell execution must name its trust model explicitly. It is legitimate for personal automation but should never be silent.
 
-### Decision: Persist the action in the existing entry, same scopes and precedence
+### Decision: Persist the action in the existing entry, resolved jointly with the title
 The Phase-1 custom-button entry gains an optional `"action"` object, e.g.:
 ```json
 "custom_buttons": {
@@ -70,9 +70,9 @@ The Phase-1 custom-button entry gains an optional `"action"` object, e.g.:
   } } }
 }
 ```
-The action resolves most-specific-first exactly like the title (device → type → global). Title and action resolve independently, so a button MAY inherit a global title but a device-specific action (or vice versa).
-- **Why**: Reuses the Phase-1 store, resolver, and precedence; no migration. Independent resolution avoids forcing title and action to share a scope.
-- **Alternative considered**: resolving the whole entry as a unit — rejected; it would prevent mixing a shared title with a device-specific script.
+The action resolves from the same scope as the title: the entry resolves as a single unit, most-specific-first (device → type → global), so a button's title and action always come from the same stored entry and are never split across scopes. The scope chosen in the Button Config modal governs both.
+- **Why**: Reuses the Phase-1 store, resolver, and precedence; no migration. A single scope choice in the modal governs the whole button, matching the user's mental model.
+- **Alternative considered**: resolving the title and action independently, each from its own most-specific scope — rejected; it would let a button mix a title from one scope with an action from another, splitting one scope choice in two and surprising the user.
 
 ## Risks / Trade-offs
 
