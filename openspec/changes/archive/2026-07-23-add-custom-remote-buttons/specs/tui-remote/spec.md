@@ -20,7 +20,9 @@ The Use Remote mode SHALL present a remote resembling a physical remote with a m
 - **WHEN** the terminal is too short to show the full remote
 - **THEN** the remote scrolls so every button remains reachable rather than being clipped
 
-### Requirement: Text-entry focus behavior
+## ADDED Requirements
+
+### Requirement: Text entry via a modal
 The remote's Text action SHALL open a text-entry modal rather than focusing a docked field. While the modal's input is focused, typed characters fill a buffer and Enter sends the buffered text as a single text action and closes the modal; Escape closes the modal without sending the buffered text and without sending the device's Back key. When text is unsupported by the active adapter, activating the Text action SHALL surface a clear message that text is not supported on this device and SHALL NOT open an editable input.
 
 #### Scenario: Compose then send
@@ -34,8 +36,6 @@ The remote's Text action SHALL open a text-entry modal rather than focusing a do
 #### Scenario: Text unsupported surfaces a message
 - **WHEN** the active adapter reports text as unsupported and the user activates the Text action
 - **THEN** a message explains text is not supported on this device and no editable text input is opened
-
-## ADDED Requirements
 
 ### Requirement: Custom buttons on the remote
 The remote SHALL present exactly five custom buttons in a dedicated row. Each button SHALL show its configured title resolved for the active device, or its default title `Custom N` (where `N` is the button's 1-based position) when no title is configured for that device. Each custom button MUST be clickable with the mouse. Each custom button MAY also be activated by an assigned keyboard shortcut (see the keyboard-shortcuts catalog), which SHALL behave identically to clicking that button. In this phase a custom button carries a title but no runnable action; activating a custom button (by click or shortcut) SHALL open its configuration modal.
@@ -90,3 +90,9 @@ Clicking a custom button SHALL open a Button Config modal whose heading is the s
 #### Scenario: Action Type is a disabled placeholder
 - **WHEN** the Button Config modal is open
 - **THEN** the Action Type control is shown disabled and cannot be activated
+
+## REMOVED Requirements
+
+### Requirement: Text-entry focus behavior
+**Reason**: The always-visible docked text field is gone; text entry is now reached on demand through a modal opened by the Text action. This requirement is replaced by the ADDED "Text entry via a modal".
+**Migration**: None. Composing and sending text is unchanged (type, then Enter to send); it now happens in a pop-up rather than a field parked at the bottom of the remote.

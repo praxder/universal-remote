@@ -9,16 +9,18 @@ The application SHALL define a catalog of actions that drives both the screen ke
 
 - **Home** — active only on the entry menu: Manage Devices (`d`), Use Remote (`r`), Settings (`s`), Quit (`q`), all rebindable.
 - **Global** — active on every screen except the root menu: Go Back (`escape`), rebindable.
-- **Remote** — active only on the remote surface: twenty-six rebindable device actions — OK, Back, Home, Volume Up, Volume Down, Mute, Menu, Channel Up, Channel Down, Play, Pause, Play/Pause, Rewind, Fast-forward, Stop, the number keys 0–9, and Text entry (`t`) — plus four **reserved** D-pad directional actions (Up, Down, Left, Right).
+- **Remote** — active only on the remote surface: thirty-one rebindable actions — the twenty-six device actions (OK, Back, Home, Volume Up, Volume Down, Mute, Menu, Channel Up, Channel Down, Play, Pause, Play/Pause, Rewind, Fast-forward, Stop, the number keys 0–9, and Text entry (`t`)) and five custom-button activation actions (Activate Custom Button 1 through 5) — plus four **reserved** D-pad directional actions (Up, Down, Left, Right).
 
 The four D-pad directional actions SHALL be reserved: each is fixed to its arrow key with the matching Vim key (`h`/`j`/`k`/`l`) as a fixed alias, and neither key may be reassigned. OK SHALL default to `enter`, Back to `backspace`, Home to `space`, and the number keys to `0`–`9`. The twelve formerly mouse-only keys (Volume Up, Volume Down, Mute, Menu, Channel Up, Channel Down, Play, Pause, Play/Pause, Rewind, Fast-forward, Stop) SHALL default to no shortcut.
+
+The five custom-button activation actions SHALL default to no shortcut. Each activation action, when triggered on the remote, SHALL behave exactly like clicking the matching custom button — it activates the button rather than sending a device key, and it is not tied to any particular device.
 
 The catalog SHALL also include reserved entries for framework keys that are not device actions — Activate Control (`enter`), Command Palette (`ctrl+p`), and focus navigation Tab (`tab`) and Shift+Tab (`shift+tab`) — so the user can see those keys are in use.
 
 #### Scenario: Every rebindable action is catalogued
 
 - **WHEN** the application enumerates its rebindable actions
-- **THEN** the catalog contains the four Home actions, the Global Go Back action, and the twenty-six rebindable Remote actions, each with an id, label, surface, and default key
+- **THEN** the catalog contains the four Home actions, the Global Go Back action, and the thirty-one rebindable Remote actions (the twenty-six device actions and the five custom-button activation actions), each with an id, label, surface, and default key
 
 #### Scenario: Reserved entries are catalogued and marked fixed
 
@@ -28,7 +30,12 @@ The catalog SHALL also include reserved entries for framework keys that are not 
 #### Scenario: Some actions start with no shortcut
 
 - **WHEN** the catalog is read before any customization
-- **THEN** the twelve formerly mouse-only remote keys have no default key while every other rebindable action has one
+- **THEN** the twelve formerly mouse-only remote keys and the five custom-button activation actions have no default key, while every other rebindable action has one
+
+#### Scenario: A custom-button activation action mirrors a click
+
+- **WHEN** the user assigns a shortcut to a custom-button activation action and presses it on the remote
+- **THEN** the matching custom button is activated exactly as if it had been clicked
 
 ### Requirement: Keyboard Shortcuts screen lists actions and shortcuts
 
@@ -152,3 +159,4 @@ The application's command palette SHALL offer a single "Keyboard Shortcuts" comm
 
 - **WHEN** the read-only shortcuts modal is shown
 - **THEN** no row can be activated to change a shortcut and the modal offers no assign or clear affordance
+
