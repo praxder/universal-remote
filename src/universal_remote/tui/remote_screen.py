@@ -20,11 +20,19 @@ from textual.widgets import (
 
 from ..errors import TextUnsupportedError, UnsupportedKeyError
 from ..keys import Key
+from .actions import (
+    ActionTypeListModal,
+    action_type,
+    present_result,
+    run_action,
+)
 from .custom_buttons import (
     ButtonScope,
     default_title,
+    resolve_action,
     resolve_scope,
     resolve_title,
+    set_action,
     set_title,
 )
 from .shortcuts import Scope, rebuild_shortcuts
@@ -99,11 +107,12 @@ class TextEntryModal(ModalScreen[None]):
 
 
 class ButtonConfigModal(ModalScreen[bool]):
-    """Names and scopes a custom button; OK saves the title, Cancel discards.
+    """Names, scopes, and assigns an action to a custom button; OK saves both.
 
-    Dismisses with True when a title was saved (so the remote re-resolves that
-    button's label) or False on Cancel/Escape. The Action Type control is a disabled
-    placeholder for the Phase-2 action wiring.
+    Dismisses with True when the button was saved (so the remote re-resolves that
+    button's label) or False on Cancel/Escape. The Action Type control opens the
+    action catalog; the entered title and any assigned action are saved together at
+    the selected scope, so the whole button lives in one place.
     """
 
     # Scope options in display order; the radio's pressed index maps into this tuple.
@@ -132,8 +141,14 @@ class ButtonConfigModal(ModalScreen[bool]):
         super().__init__()
         self._index = index
         self._device = device
+        # The action assigned to the button, carried so OK writes it alongside the
+        # title at the chosen scope even when the user only edits the title. Set from
+        # the button's current action in compose (when the app is reachable) and
+        # replaced when the user configures a new one.
+        self._action: dict | None = None
 
     def compose(self) -> ComposeResult:
+        self._action = self._current_action()
         selected = self._selected_scope_index()
         with Vertical(id="button-config"):
             yield Label("Configure Custom Button", id="button-config-title")
@@ -147,14 +162,24 @@ class ButtonConfigModal(ModalScreen[bool]):
                 yield RadioButton("This Device", value=selected == 0, id="scope-device")
                 yield RadioButton("Device Type", value=selected == 1, id="scope-type")
                 yield RadioButton("Global", value=selected == 2, id="scope-global")
-            yield Button(
-                "Action Type — coming in a later version",
-                id="button-config-action-type",
-                disabled=True,
-            )
+            yield Button(self._action_type_label(), id="button-config-action-type")
             with Horizontal(id="button-config-buttons"):
                 yield Button("OK", id="button-config-ok", variant="primary")
                 yield Button("Cancel", id="button-config-cancel")
+
+    def _current_action(self) -> dict | None:
+        """The button's currently assigned action, resolved for the active device."""
+        return resolve_action(
+            self.app.custom_buttons,
+            self._index,
+            device_id=self._device.id,
+            platform=self._device.platform,
+        )
+
+    def _action_type_label(self) -> str:
+        """The Action Type control's label, naming the assigned action or none."""
+        entry = action_type(self._action.get("type")) if self._action else None
+        return f"Action Type: {entry.label}" if entry else "Action Type: (none)"
 
     def _current_title(self) -> str:
         """The button's current resolved title, prefilled so it can be edited."""
@@ -184,14 +209,33 @@ class ButtonConfigModal(ModalScreen[bool]):
             self._save()
         elif event.button.id == "button-config-cancel":
             self.dismiss(False)
+        elif event.button.id == "button-config-action-type":
+            self.app.push_screen(ActionTypeListModal(), self._action_chosen)
+
+    def _action_chosen(self, action: dict | None) -> None:
+        """Assign the action the catalog flow returned; None means the user cancelled."""
+        if action is not None:
+            self._action = action
+            self.query_one(
+                "#button-config-action-type", Button
+            ).label = self._action_type_label()
 
     def _save(self) -> None:
         title = self.query_one("#button-config-title-input", Input).value
+        scope = self._selected_scope()
         set_title(
             self.app.custom_buttons,
             self._index,
             title,
-            self._selected_scope(),
+            scope,
+            device_id=self._device.id,
+            platform=self._device.platform,
+        )
+        set_action(
+            self.app.custom_buttons,
+            self._index,
+            self._action,
+            scope,
             device_id=self._device.id,
             platform=self._device.platform,
         )
@@ -280,6 +324,9 @@ class RemoteScreen(Screen[None]):
         self._session = session
         self._capabilities = capabilities
         self._device = device
+        # When armed by the edit-mode key, the next custom-button activation opens its
+        # config instead of running its action, then clears. See `action_edit_mode`.
+        self._edit_mode = False
 
     def compose(self) -> ComposeResult:
         # The device name lives in the header (see on_mount), not a separate row,
@@ -381,13 +428,41 @@ class RemoteScreen(Screen[None]):
             self._activate_custom(int(button_id.removeprefix("custom-")))
 
     def _activate_custom(self, index: int) -> None:
-        # One dispatch shared by a click and the keyboard shortcut. Phase 1: a custom
-        # button carries a title but no action, so activating it opens its config
-        # modal. Phase 2 will run a resolved action here, keeping the two identical.
-        self._configure_custom(index)
+        # One dispatch shared by a click and the keyboard shortcut, so both behave
+        # identically. Edit-mode armed → configure and disarm; otherwise run the
+        # button's resolved action, or configure it when it has none.
+        if self._edit_mode:
+            self._edit_mode = False
+            self._configure_custom(index)
+            return
+        action = resolve_action(
+            self.app.custom_buttons,
+            index,
+            device_id=self._device.id,
+            platform=self._device.platform,
+        )
+        if action:
+            self._run_action(action)
+        else:
+            self._configure_custom(index)
 
     def action_activate_custom(self, index: int) -> None:
         self._activate_custom(index)
+
+    def action_edit_mode(self) -> None:
+        # Arm edit-mode: the next custom-button activation opens its config instead of
+        # running it. A toast is the only cue, since the gesture is otherwise silent.
+        self._edit_mode = True
+        self.app.notify("Edit mode: activate a custom button to configure it.")
+
+    def _run_action(self, action: dict) -> None:
+        # Run in a worker so a slow script never blocks the remote; the outcome is
+        # surfaced per the action's Results choice when it finishes.
+        self.run_worker(self._execute(action))
+
+    async def _execute(self, action: dict) -> None:
+        result = await run_action(action, self._device.ip)
+        present_result(self.app, result, show_results=bool(action.get("show_results")))
 
     def _configure_custom(self, index: int) -> None:
         def _relabel(saved: bool | None) -> None:

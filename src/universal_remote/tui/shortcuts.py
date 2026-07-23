@@ -119,6 +119,19 @@ CATALOG: list[Action] = [
     Action("remote.text", "Text", Scope.REMOTE, "t", "text_mode"),
     # Remote — activate a custom button (same effect as clicking it); no default key.
     *(_custom_activation(index) for index in range(1, 6)),
+    # Remote — arm edit-mode: the next custom-button activation opens its config
+    # instead of running its action. Reserved so `e` can't be reassigned to another
+    # action, and hidden from the footer (a ninth hint clips the 80-column fit); it
+    # still shows as a dimmed row in the Keyboard Shortcuts table for discovery.
+    Action(
+        "remote.edit_mode",
+        "Configure Custom Button",
+        Scope.REMOTE,
+        "e",
+        "edit_mode",
+        editable=False,
+        show=False,
+    ),
     # Remote — reserved D-pad directions (arrow + Vim alias, both fixed). Labels are
     # short so the footer keeps its eight-hint fit; the "UP / K" shortcut makes the
     # direction unambiguous in the table.

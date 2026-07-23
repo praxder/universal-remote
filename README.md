@@ -142,8 +142,27 @@ field parked at the bottom of the remote. A row of **five custom buttons** sits
 there instead — click one to open its config pop-up and give it a title, saved
 just for this device, for every device of its type, or globally. Reopen the
 pop-up and it shows the scope the title is actually stored at, so you can see and
-change where it applies. (Wiring those buttons to actions comes in a later
-version.)
+change where it applies.
+
+**Give a button an action.** In that same config pop-up, open **Action Type** and
+pick **Run Custom Script** to attach a shell script to the button. Choose **Script
+File** to point at a script on disk, or **Inline Script** to type the script right
+there. A **Results** toggle decides what a run shows: **Don't Show** stays quiet on
+success and only raises an error notification if the script fails, while **Show**
+always opens a scrollable window with the exit code and the full output. A button's
+title and action are stored together at the same scope. Once a button has an action,
+**clicking it runs the script** instead of opening the config; to reconfigure it,
+press **`e`** to arm edit-mode and then activate the button (by clicking it or
+pressing its shortcut) — that opens the config once, after which edit-mode clears.
+Scripts run in the background so the remote never freezes, bounded by a fixed
+30-second timeout that kills a hung script. `REMOTE_IP` is set in the script's
+environment to the connected device's IP address.
+
+> **Trust model.** Run Custom Script executes shell **you** wrote, on **your own**
+> machine, under your own account — there is **no sandbox** and no vetting of what a
+> script does. `REMOTE_IP` is the only value the app injects into the environment,
+> and the 30-second timeout is a reliability guard against a hung script, not a
+> security control. Only attach scripts you understand and trust.
 
 Every key above is a **default you can change**, and the on-screen-only buttons
 (menu, channel, volume, mute, and the media-transport keys) can be **given** a
@@ -167,8 +186,9 @@ returns to the menu:
   Esc included**; the mouse-only **Delete** and **Cancel** buttons clear it or back
   out. Every shortcut is unique app-wide: a key already taken by another action, or
   a reserved key, is refused with a toast and nothing changes. Reserved keys — the
-  D-pad, Enter, `Ctrl+P`, and `Tab`/`Shift+Tab` — show as dimmed rows so you can
-  see they're in use but fixed. Changes apply immediately and are **remembered
+  D-pad, Enter, `Ctrl+P`, `Tab`/`Shift+Tab`, and `E` (the remote's edit-mode key
+  for reconfiguring a custom button that has an action) — show as dimmed rows so you
+  can see they're in use but fixed. Changes apply immediately and are **remembered
   across runs**.
 - **Third-party licenses** — opens the generated
   [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) on GitHub in your browser.
@@ -209,8 +229,8 @@ The Keyboard Shortcuts screen itself:
 - **Secrets stay local.** Devices and pairing credentials live in
   `~/.config/universal-remote/devices.json` (or `$XDG_CONFIG_HOME`), written
   owner-only (`0600`) since the file holds credentials. App preferences (the
-  saved theme and any custom keyboard shortcuts) live beside it in
-  `settings.json`, created on first change.
+  saved theme, custom keyboard shortcuts, and custom-button titles and actions)
+  live beside it in `settings.json`, created on first change.
 
 ## Known limitations & future work
 

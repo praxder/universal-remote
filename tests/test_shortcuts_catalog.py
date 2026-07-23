@@ -144,11 +144,23 @@ class TestReservedCatalog:
         assert focus_prev.default_key == "shift+tab"
         assert focus_prev.target is None
 
+    def test_given_the_edit_mode_entry_when_read_then_it_is_reserved_on_e(self):
+        edit_mode = _by_id()["remote.edit_mode"]
+
+        assert edit_mode.scope is Scope.REMOTE
+        assert edit_mode.editable is False  # reserved so `e` can't be reassigned
+        assert edit_mode.default_key == "e"
+        assert edit_mode.target == "edit_mode"
+        assert edit_mode.show is False  # kept out of the footer's eight-hint fit
+
+    def test_given_the_edit_mode_key_when_checked_then_it_is_reserved(self):
+        assert is_reserved("e") is True
+
     def test_given_the_remote_device_actions_when_read_then_each_maps_to_a_real_key(
         self,
     ):
-        # Text entry and the custom-button activations are not device keys.
-        non_key = {"remote.text", *_FIVE_CUSTOM}
+        # Text entry, the custom-button activations, and edit-mode are not device keys.
+        non_key = {"remote.text", "remote.edit_mode", *_FIVE_CUSTOM}
         for action in CATALOG:
             if action.scope is Scope.REMOTE and action.id not in non_key:
                 name = action.id.rsplit(".", 1)[-1].upper()

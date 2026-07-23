@@ -58,9 +58,10 @@ class TestButtonConfigModal:
                     app.screen.query_one("#button-config-scope", RadioSet).pressed_index
                     == 0
                 )
-                # The Action Type placeholder is present but cannot be activated.
+                # The Action Type control is active and reports no action assigned yet.
                 action_type = app.screen.query_one("#button-config-action-type", Button)
-                assert action_type.disabled is True
+                assert action_type.disabled is False
+                assert "none" in str(action_type.label).lower()
 
         asyncio.run(scenario())
 

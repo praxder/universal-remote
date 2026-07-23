@@ -2,10 +2,15 @@ from universal_remote.tui.custom_buttons import (
     ButtonScope,
     default_title,
     forget_device,
+    resolve_action,
     resolve_scope,
     resolve_title,
+    set_action,
     set_title,
 )
+
+_ACTION = {"type": "run_script", "source": "inline", "script": "echo hi"}
+_OTHER_ACTION = {"type": "run_script", "source": "file", "script": "/bin/true"}
 
 
 class TestDefaultTitle:
@@ -195,3 +200,169 @@ class TestForgetDevice:
         forget_device(custom_buttons, "dev-1")  # must not raise
 
         assert custom_buttons == {"global": {"1": {"title": "Reboot"}}}
+
+
+class TestSetAction:
+    def test_given_an_action_when_set_then_it_round_trips_from_the_same_scope(self):
+        custom_buttons: dict = {}
+
+        set_action(
+            custom_buttons,
+            1,
+            _ACTION,
+            ButtonScope.DEVICE,
+            device_id="dev-1",
+            platform="roku",
+        )
+
+        assert (
+            resolve_action(custom_buttons, 1, device_id="dev-1", platform="roku")
+            == _ACTION
+        )
+
+    def test_given_an_existing_title_when_an_action_is_set_then_the_title_is_kept(self):
+        # Arrange: a title already lives in the device entry.
+        custom_buttons: dict = {}
+        set_title(
+            custom_buttons,
+            1,
+            "Reboot",
+            ButtonScope.DEVICE,
+            device_id="dev-1",
+            platform="roku",
+        )
+
+        # Act: setting an action must merge into the same entry, not replace it.
+        set_action(
+            custom_buttons,
+            1,
+            _ACTION,
+            ButtonScope.DEVICE,
+            device_id="dev-1",
+            platform="roku",
+        )
+
+        # Assert: title and action coexist in the one entry.
+        entry = custom_buttons["device"]["dev-1"]["1"]
+        assert entry["title"] == "Reboot"
+        assert entry["action"] == _ACTION
+
+    def test_given_an_existing_action_when_a_title_is_set_then_the_action_is_kept(self):
+        # The symmetric guarantee: saving a title never drops an assigned action.
+        custom_buttons: dict = {}
+        set_action(
+            custom_buttons,
+            1,
+            _ACTION,
+            ButtonScope.DEVICE,
+            device_id="dev-1",
+            platform="roku",
+        )
+
+        set_title(
+            custom_buttons,
+            1,
+            "Reboot",
+            ButtonScope.DEVICE,
+            device_id="dev-1",
+            platform="roku",
+        )
+
+        entry = custom_buttons["device"]["dev-1"]["1"]
+        assert entry["action"] == _ACTION
+        assert entry["title"] == "Reboot"
+
+    def test_given_a_none_action_when_set_then_the_action_key_is_cleared(self):
+        custom_buttons: dict = {}
+        set_action(
+            custom_buttons,
+            1,
+            _ACTION,
+            ButtonScope.DEVICE,
+            device_id="dev-1",
+            platform="roku",
+        )
+
+        set_action(
+            custom_buttons,
+            1,
+            None,
+            ButtonScope.DEVICE,
+            device_id="dev-1",
+            platform="roku",
+        )
+
+        assert "action" not in custom_buttons["device"]["dev-1"]["1"]
+
+
+class TestResolveAction:
+    def test_given_no_saved_action_when_resolved_then_it_is_none(self):
+        assert resolve_action({}, 1, device_id="dev-1", platform="roku") is None
+
+    def test_given_a_title_only_entry_when_resolved_then_there_is_no_action(self):
+        # Back-compat: a pre-actions entry holds only a title and loads inert.
+        custom_buttons = {"device": {"dev-1": {"1": {"title": "Netflix"}}}}
+
+        assert (
+            resolve_action(custom_buttons, 1, device_id="dev-1", platform="roku")
+            is None
+        )
+
+    def test_given_actions_at_two_scopes_when_resolved_then_the_device_action_wins(
+        self,
+    ):
+        custom_buttons = {
+            "device": {"dev-1": {"1": {"title": "A", "action": _ACTION}}},
+            "type": {"roku": {"1": {"title": "B", "action": _OTHER_ACTION}}},
+        }
+
+        assert (
+            resolve_action(custom_buttons, 1, device_id="dev-1", platform="roku")
+            == _ACTION
+        )
+
+    def test_given_a_device_entry_when_resolved_then_title_and_action_share_its_scope(
+        self,
+    ):
+        # The entry resolves as a unit: the device entry carries both a title and an
+        # action, while only a title is saved globally. Both must come from the
+        # device entry — the global title is never mixed in.
+        custom_buttons = {
+            "device": {"dev-1": {"1": {"title": "Device", "action": _ACTION}}},
+            "global": {"1": {"title": "Global"}},
+        }
+
+        assert (
+            resolve_title(custom_buttons, 1, device_id="dev-1", platform="roku")
+            == "Device"
+        )
+        assert (
+            resolve_action(custom_buttons, 1, device_id="dev-1", platform="roku")
+            == _ACTION
+        )
+
+    def test_given_an_action_only_device_entry_when_resolved_then_it_wins_as_a_unit(
+        self,
+    ):
+        # The discriminating case: the device entry has an action but no title, while
+        # the device type has only a title. Resolving as a unit, the most-specific
+        # meaningful entry (device) wins whole — so its action runs and its (absent)
+        # title falls back to the default, rather than splitting the type's title
+        # onto the device's action.
+        custom_buttons = {
+            "device": {"dev-1": {"1": {"action": _ACTION}}},
+            "type": {"roku": {"1": {"title": "Kids"}}},
+        }
+
+        assert (
+            resolve_action(custom_buttons, 1, device_id="dev-1", platform="roku")
+            == _ACTION
+        )
+        assert (
+            resolve_title(custom_buttons, 1, device_id="dev-1", platform="roku")
+            == "Custom 1"
+        )
+        assert (
+            resolve_scope(custom_buttons, 1, device_id="dev-1", platform="roku")
+            is ButtonScope.DEVICE
+        )
