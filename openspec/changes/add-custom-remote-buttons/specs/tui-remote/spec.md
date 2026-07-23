@@ -38,7 +38,7 @@ The remote's Text action SHALL open a text-entry modal rather than focusing a do
 ## ADDED Requirements
 
 ### Requirement: Custom buttons on the remote
-The remote SHALL present exactly five custom buttons in a dedicated row. Each button SHALL show its configured title resolved for the active device, or its default title `Custom N` (where `N` is the button's 1-based position) when no title is configured for that device. Each custom button MUST be clickable with the mouse. In this phase a custom button carries a title but no runnable action; clicking a custom button SHALL open its configuration modal.
+The remote SHALL present exactly five custom buttons in a dedicated row. Each button SHALL show its configured title resolved for the active device, or its default title `Custom N` (where `N` is the button's 1-based position) when no title is configured for that device. Each custom button MUST be clickable with the mouse. Each custom button MAY also be activated by an assigned keyboard shortcut (see the keyboard-shortcuts catalog), which SHALL behave identically to clicking that button. In this phase a custom button carries a title but no runnable action; activating a custom button (by click or shortcut) SHALL open its configuration modal.
 
 #### Scenario: Custom buttons show defaults when unconfigured
 - **WHEN** the user opens Use Remote for a device with no custom-button titles saved
@@ -52,12 +52,28 @@ The remote SHALL present exactly five custom buttons in a dedicated row. Each bu
 - **WHEN** the user clicks a custom button
 - **THEN** the Button Config modal for that button opens
 
+#### Scenario: A keyboard shortcut activates a custom button
+- **WHEN** the user has assigned a shortcut to a custom button and presses it on the remote
+- **THEN** the same thing happens as clicking that button — in this phase, its configuration modal opens
+
 ### Requirement: Custom button configuration modal
-Clicking a custom button SHALL open a Button Config modal containing a button-title text input, a three-way scope selector offering This Device, Device Type, and Global, a disabled Action Type control presented as a placeholder for a later version, and OK and Cancel controls. Selecting OK SHALL save the entered title for the button at the selected scope, persist it, and update the button on the remote to show the newly resolved title. Selecting Cancel SHALL close the modal without changing any saved title. The scope selector SHALL default to This Device.
+Clicking a custom button SHALL open a Button Config modal whose heading is the static text "Configure Custom Button". The modal SHALL contain a button-title text input, a three-way scope selector offering This Device, Device Type, and Global, a disabled Action Type control presented as a placeholder for a later version, and OK and Cancel controls. Selecting OK SHALL save the entered title for the button at the selected scope, persist it, and update the button on the remote to show the newly resolved title and resize to fit it immediately, without requiring the remote to be reopened. Selecting Cancel SHALL close the modal without changing any saved title. When opened, the scope selector SHALL preselect the scope the button's shown title resolves from — the specific device, then device type, then global — so reopening the modal reflects where the title is actually stored; when no title is configured at any scope it SHALL default to This Device.
 
 #### Scenario: Save a title for this device
 - **WHEN** the user opens a custom button's config modal, enters a title, leaves the scope on This Device, and selects OK
 - **THEN** the modal closes and that button on the remote shows the entered title for the current device
+
+#### Scenario: Saved title resizes the button immediately
+- **WHEN** the user saves a title that is longer or shorter than the current one
+- **THEN** the button on the remote shows the new title and its width adjusts to fit immediately, without reopening the remote
+
+#### Scenario: Scope selector reflects where the title is stored
+- **WHEN** a button's title was saved at the Global scope and the user reopens its config modal
+- **THEN** the scope selector shows Global selected rather than This Device
+
+#### Scenario: Heading is static text
+- **WHEN** the user opens any custom button's config modal
+- **THEN** the heading reads "Configure Custom Button" regardless of which button was opened
 
 #### Scenario: Save a title for the device type
 - **WHEN** the user enters a title, sets the scope to Device Type, and selects OK

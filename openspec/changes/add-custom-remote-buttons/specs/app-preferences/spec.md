@@ -5,6 +5,8 @@ The application SHALL persist custom-button titles in the same preferences file 
 
 The title shown for a given button on a given device SHALL be resolved most-specific-first: the entry for that specific device if present, otherwise the entry for that device's type if present, otherwise the global entry if present, otherwise the built-in default `Custom N`. An absent or blank title at one scope SHALL fall through to the next less-specific scope.
 
+When a saved device is deleted, the application SHALL remove that device's device-scoped custom-button entries from the preferences, leaving the device-type and global entries for those buttons intact. Removing them MUST follow the same fault-tolerant, best-effort persistence behavior as the rest of the preferences file.
+
 #### Scenario: Saved title applied at startup
 - **WHEN** a custom-button title was previously saved and the application restarts
 - **THEN** the application shows that title on the matching custom button
@@ -32,3 +34,7 @@ The title shown for a given button on a given device SHALL be resolved most-spec
 #### Scenario: Missing custom buttons use defaults
 - **WHEN** the application starts and no custom-button titles are saved
 - **THEN** every custom button shows its `Custom N` default and the application does not error
+
+#### Scenario: Deleting a device removes its device-scoped titles
+- **WHEN** a button has a title saved for a specific device and that device is deleted
+- **THEN** that device-scoped entry is removed while any device-type and global titles for that button remain
