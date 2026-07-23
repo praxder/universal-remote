@@ -26,11 +26,15 @@ The Settings screen SHALL present a Theme row that, when activated, opens the sa
 - **THEN** the application's theme changes immediately
 
 ### Requirement: Key Bindings placeholder row
-The Settings screen SHALL present a Key Bindings row as a placeholder for a future key-rebinding feature. In this version the row SHALL NOT open a working rebind page; it SHALL make clear that the feature is not yet available (for example, disabled or labeled as coming later).
+The Settings screen SHALL present a Keyboard Shortcuts row that, when activated, opens the Keyboard Shortcuts screen (see the keyboard-shortcuts capability). The row MUST be reachable by keyboard and by mouse, consistent with the other Settings rows, and SHALL no longer be disabled or labeled as unavailable.
 
-#### Scenario: Key Bindings row is a placeholder
+#### Scenario: Keyboard Shortcuts row opens the screen
+- **WHEN** the user activates the Keyboard Shortcuts row
+- **THEN** the application opens the Keyboard Shortcuts screen
+
+#### Scenario: Keyboard Shortcuts row is enabled
 - **WHEN** the user views the Settings screen
-- **THEN** a Key Bindings row is shown that indicates the rebinding feature is not yet available
+- **THEN** the Keyboard Shortcuts row is shown as an enabled, activatable row
 
 ### Requirement: Third-party licenses link
 The Settings screen SHALL present a Third-party licenses row that, when activated, opens the project's generated `THIRD_PARTY_LICENSES.md` on GitHub (the `main` branch) in the user's default web browser.
