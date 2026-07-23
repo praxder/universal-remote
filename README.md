@@ -3,7 +3,8 @@
 A local, terminal-based universal TV remote — pretty, mouse-clickable, and fully
 keyboard-drivable. It discovers TVs on your network, handles each platform's
 pairing, and gives you a complete on-screen remote (d-pad, media transport,
-number pad, volume, channel, and text entry) for **Samsung Tizen, LG WebOS,
+number pad, volume, channel, on-demand text entry, and relabel-able custom
+buttons) for **Samsung Tizen, LG WebOS,
 Apple TV, Roku, Fire TV, and Android TV / Google TV** — all from one app.
 Everything runs on your LAN; nothing leaves your network. The architecture is
 platform-agnostic, so supporting a new TV platform is one new adapter module.
@@ -125,7 +126,7 @@ Then the remote appears. Drive it by mouse or keyboard:
 | Backspace | Back (sent to the TV) |
 | Space | Home |
 | `0`–`9` | Number-pad digits |
-| `t` | Enter the text field (type, Enter sends, Esc leaves) |
+| `t` | Open the text-entry pop-up (type, Enter sends, Esc closes) |
 | Esc | Go Back — leaves the remote (the app-wide back key) |
 
 ![The remote](docs/screenshots/remote.png)
@@ -135,6 +136,12 @@ play/pause, rewind, fast-forward, stop), the number pad, and power are on-screen
 buttons. Buttons the connected TV doesn't support are shown disabled — Apple TV
 has no mute, Roku has no discrete play/pause/stop or number pad, Fire TV has no
 channel keys, and so on.
+
+Text entry is reached on demand: `t` opens a pop-up to type into rather than a
+field parked at the bottom of the remote. A row of **five custom buttons** sits
+there instead — click one to open its config pop-up and give it a title, saved
+just for this device, for every device of its type, or globally. (Wiring those
+buttons to actions comes in a later version.)
 
 Every key above is a **default you can change**, and the on-screen-only buttons
 (menu, channel, volume, mute, and the media-transport keys) can be **given** a

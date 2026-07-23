@@ -297,11 +297,11 @@ class TestAdbTextFallbackStatus:
                 app.screen._session.adb_text_unavailable = True
                 await pilot.press("t")
                 await pilot.pause()
-                field = app.screen.query_one("#text", Input)
+                field = app.screen.query_one("#text-entry-input", Input)
                 field.value = "hello"
                 await pilot.press("enter")
                 await pilot.pause()
-                status = str(app.screen.query_one("#text-status", Label).render())
-                assert "adb" in status.lower()
+                messages = [str(n.message).lower() for n in app._notifications]
+                assert any("adb" in message for message in messages)
 
         asyncio.run(scenario())
