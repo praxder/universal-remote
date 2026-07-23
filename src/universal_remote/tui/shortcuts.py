@@ -56,6 +56,22 @@ def _remote_key(name: str, label: str, key: str, *, show: bool = True) -> Action
     )
 
 
+def _custom_activation(index: int) -> Action:
+    """A rebindable Remote action that activates custom button `index` like a click.
+
+    Starts with no shortcut and stays out of the footer; it is not a device key, so
+    firing it runs the button's own activation (Phase 1: opens the config modal).
+    """
+    return Action(
+        id=f"remote.custom_{index}",
+        label=f"Activate Custom Button {index}",
+        scope=Scope.REMOTE,
+        default_key="",
+        target=f"activate_custom({index})",
+        show=False,
+    )
+
+
 def _reserved_dpad(name: str, label: str, arrow: str, alias: str) -> Action:
     """A fixed D-pad direction: its arrow key plus a Vim alias, both unchangeable."""
     return Action(
@@ -101,6 +117,8 @@ CATALOG: list[Action] = [
     ),
     # Remote — text entry.
     Action("remote.text", "Text", Scope.REMOTE, "t", "text_mode"),
+    # Remote — activate a custom button (same effect as clicking it); no default key.
+    *(_custom_activation(index) for index in range(1, 6)),
     # Remote — reserved D-pad directions (arrow + Vim alias, both fixed). Labels are
     # short so the footer keeps its eight-hint fit; the "UP / K" shortcut makes the
     # direction unambiguous in the table.

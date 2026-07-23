@@ -24,6 +24,10 @@ _TWELVE_CLICK_ONLY = {
     "remote.stop",
 }
 
+# The five custom-button activation actions: rebindable Remote actions that mirror a
+# click, not device keys, and start with no shortcut.
+_FIVE_CUSTOM = {f"remote.custom_{index}" for index in range(1, 6)}
+
 
 def _by_id():
     return {action.id: action for action in CATALOG}
@@ -53,14 +57,15 @@ class TestRebindableCatalog:
         assert go_back.default_key == "escape"
         assert go_back.editable
 
-    def test_given_the_catalog_when_read_then_there_are_26_rebindable_remote_actions(
+    def test_given_the_catalog_when_read_then_there_are_31_rebindable_remote_actions(
         self,
     ):
         rebindable_remote = [
             a for a in CATALOG if a.scope is Scope.REMOTE and a.editable
         ]
 
-        assert len(rebindable_remote) == 26
+        # 26 device actions + 5 custom-button activation actions.
+        assert len(rebindable_remote) == 31
 
     def test_given_the_catalog_when_read_then_each_entry_has_id_label_scope_and_default(
         self,
@@ -78,9 +83,23 @@ class TestRebindableCatalog:
             assert by_id[action_id].default_key == ""
 
     def test_given_the_other_rebindable_actions_when_read_then_each_has_a_default(self):
+        no_default = _TWELVE_CLICK_ONLY | _FIVE_CUSTOM
         for action in CATALOG:
-            if action.editable and action.id not in _TWELVE_CLICK_ONLY:
+            if action.editable and action.id not in no_default:
                 assert action.default_key != ""
+
+    def test_given_the_five_custom_activation_actions_when_read_then_they_are_catalogued(
+        self,
+    ):
+        by_id = _by_id()
+
+        for index in range(1, 6):
+            action = by_id[f"remote.custom_{index}"]
+            assert action.scope is Scope.REMOTE
+            assert action.editable is True
+            assert action.default_key == ""  # no shortcut until the user assigns one
+            assert action.target == f"activate_custom({index})"
+            assert action.show is False  # kept out of the footer's eight-hint fit
 
 
 class TestReservedCatalog:
@@ -128,8 +147,10 @@ class TestReservedCatalog:
     def test_given_the_remote_device_actions_when_read_then_each_maps_to_a_real_key(
         self,
     ):
+        # Text entry and the custom-button activations are not device keys.
+        non_key = {"remote.text", *_FIVE_CUSTOM}
         for action in CATALOG:
-            if action.scope is Scope.REMOTE and action.id != "remote.text":
+            if action.scope is Scope.REMOTE and action.id not in non_key:
                 name = action.id.rsplit(".", 1)[-1].upper()
                 assert Key[name]  # raises KeyError if not a real member
 

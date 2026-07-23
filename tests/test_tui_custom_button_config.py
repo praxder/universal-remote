@@ -1,6 +1,6 @@
 import asyncio
 
-from textual.widgets import Button, Input, RadioSet
+from textual.widgets import Button, Input, Label, RadioSet
 
 from tests.fakes import FakeAdapter
 from universal_remote.devices.models import Device
@@ -84,6 +84,29 @@ class TestButtonConfigModal:
 
         asyncio.run(scenario())
 
+    def test_given_a_longer_title_when_saved_then_the_button_widens_immediately(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                before = app.screen.query_one("#custom-1", Button).outer_size.width
+                await _open_config(app, pilot, 1)
+                app.screen.query_one(
+                    "#button-config-title-input", Input
+                ).value = "A Very Long Custom Title"
+                await pilot.click("#button-config-ok")
+                await pilot.pause()
+                # The button resizes to fit the new title without reopening the remote.
+                after = app.screen.query_one("#custom-1", Button).outer_size.width
+                assert after > before
+
+        asyncio.run(scenario())
+
     def test_given_type_scope_when_ok_then_saved_for_the_device_type(self, tmp_path):
         store = _store_with_device(tmp_path)
         adapter = FakeAdapter(platform="fake-tv")
@@ -157,6 +180,50 @@ class TestButtonConfigModal:
 
         asyncio.run(scenario())
 
+    def test_given_any_button_when_config_opens_then_the_heading_is_static(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_config(app, pilot, 3)
+                heading = app.screen.query_one("#button-config-title", Label)
+                assert str(heading.render()) == "Configure Custom Button"
+
+        asyncio.run(scenario())
+
+    def test_given_a_global_title_when_config_reopens_then_global_scope_is_preselected(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                # The button's title lives at the Global scope, not This Device.
+                set_title(
+                    app.custom_buttons,
+                    1,
+                    "Reboot",
+                    ButtonScope.GLOBAL,
+                    device_id=store.list()[0].id,
+                    platform="fake-tv",
+                )
+                await _goto_remote(app, pilot)
+                await _open_config(app, pilot, 1)
+                # Global is the third option, so the radio preselects index 2.
+                assert (
+                    app.screen.query_one("#button-config-scope", RadioSet).pressed_index
+                    == 2
+                )
+
+        asyncio.run(scenario())
+
     def test_given_a_configured_button_when_config_opens_then_the_input_prefills_its_title(
         self, tmp_path
     ):
@@ -179,6 +246,34 @@ class TestButtonConfigModal:
                 await _open_config(app, pilot, 1)
                 title_input = app.screen.query_one("#button-config-title-input", Input)
                 assert title_input.value == "Netflix"
+
+        asyncio.run(scenario())
+
+
+class TestCustomButtonShortcut:
+    def test_given_a_shortcut_when_pressed_on_the_remote_then_the_button_activates(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                # Assign a free key to "Activate Custom Button 2" and apply it live.
+                app.shortcut_overrides["remote.custom_2"] = "f2"
+                app.apply_shortcuts()
+                await pilot.pause()
+                await pilot.press("f2")
+                await pilot.pause()
+                # Pressing the shortcut does the same as clicking button 2: its config
+                # modal opens for that button.
+                assert isinstance(app.screen, ButtonConfigModal)
+                app.screen.query_one("#button-config-title-input", Input).value = "Hit"
+                await pilot.click("#button-config-ok")
+                await pilot.pause()
+                assert str(app.screen.query_one("#custom-2", Button).label) == "Hit"
 
         asyncio.run(scenario())
 

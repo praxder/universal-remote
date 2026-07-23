@@ -20,7 +20,13 @@ from textual.widgets import (
 
 from ..errors import TextUnsupportedError, UnsupportedKeyError
 from ..keys import Key
-from .custom_buttons import ButtonScope, default_title, resolve_title, set_title
+from .custom_buttons import (
+    ButtonScope,
+    default_title,
+    resolve_scope,
+    resolve_title,
+    set_title,
+)
 from .shortcuts import Scope, rebuild_shortcuts
 
 if TYPE_CHECKING:
@@ -128,8 +134,9 @@ class ButtonConfigModal(ModalScreen[bool]):
         self._device = device
 
     def compose(self) -> ComposeResult:
+        selected = self._selected_scope_index()
         with Vertical(id="button-config"):
-            yield Label(f"Configure Custom {self._index}", id="button-config-title")
+            yield Label("Configure Custom Button", id="button-config-title")
             yield Input(
                 value=self._current_title(),
                 placeholder="Button title",
@@ -137,9 +144,9 @@ class ButtonConfigModal(ModalScreen[bool]):
             )
             yield Label("Scope", id="button-config-scope-label")
             with RadioSet(id="button-config-scope"):
-                yield RadioButton("This Device", value=True, id="scope-device")
-                yield RadioButton("Device Type", id="scope-type")
-                yield RadioButton("Global", id="scope-global")
+                yield RadioButton("This Device", value=selected == 0, id="scope-device")
+                yield RadioButton("Device Type", value=selected == 1, id="scope-type")
+                yield RadioButton("Global", value=selected == 2, id="scope-global")
             yield Button(
                 "Action Type — coming in a later version",
                 id="button-config-action-type",
@@ -157,6 +164,20 @@ class ButtonConfigModal(ModalScreen[bool]):
             device_id=self._device.id,
             platform=self._device.platform,
         )
+
+    def _selected_scope_index(self) -> int:
+        """The radio index to preselect: the scope the shown title resolves from.
+
+        Reopening the modal reflects where the title is actually stored; with no
+        title configured at any scope it falls back to This Device (index 0).
+        """
+        scope = resolve_scope(
+            self.app.custom_buttons,
+            self._index,
+            device_id=self._device.id,
+            platform=self._device.platform,
+        )
+        return self._SCOPES.index(scope) if scope is not None else 0
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "button-config-ok":
@@ -340,21 +361,33 @@ class RemoteScreen(Screen[None]):
 
     def _label_custom(self, index: int) -> None:
         """Set button `index`'s label to its title resolved for the active device."""
-        self.query_one(f"#custom-{index}", Button).label = resolve_title(
+        button = self.query_one(f"#custom-{index}", Button)
+        button.label = resolve_title(
             self.app.custom_buttons,
             index,
             device_id=self._device.id,
             platform=self._device.platform,
         )
+        # The `label` reactive repaints text but is `layout=False`, so the button's
+        # auto width stays stale (it keeps its mount-time size until the remote is
+        # reopened). Force a layout pass so a longer/shorter title resizes it now.
+        button.refresh(layout=True)
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         button_id = event.button.id or ""
         if button_id.startswith("key-"):
             await self._send(Key[button_id.removeprefix("key-").upper()])
         elif button_id.startswith("custom-"):
-            # Phase 1: a custom button carries a title but no action, so a click has
-            # nothing to run — it opens the config modal for that button.
-            self._configure_custom(int(button_id.removeprefix("custom-")))
+            self._activate_custom(int(button_id.removeprefix("custom-")))
+
+    def _activate_custom(self, index: int) -> None:
+        # One dispatch shared by a click and the keyboard shortcut. Phase 1: a custom
+        # button carries a title but no action, so activating it opens its config
+        # modal. Phase 2 will run a resolved action here, keeping the two identical.
+        self._configure_custom(index)
+
+    def action_activate_custom(self, index: int) -> None:
+        self._activate_custom(index)
 
     def _configure_custom(self, index: int) -> None:
         def _relabel(saved: bool | None) -> None:

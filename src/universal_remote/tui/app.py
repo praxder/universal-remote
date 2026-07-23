@@ -14,6 +14,7 @@ from ..errors import UniversalRemoteError
 from ..preferences.store import Preferences, PreferencesStore
 from ..registry import AdapterRegistry
 from ..registry import registry as default_registry
+from .custom_buttons import forget_device
 from .menu import MenuScreen
 from .quotes import Quote, random_quote
 from .shortcuts_screen import ShortcutsCommandProvider
@@ -181,6 +182,18 @@ class UniversalRemoteApp(App[None]):
         saved here without touching framework internals. The current shortcuts ride
         along so saving the theme never drops them.
         """
+        self.persist_preferences()
+
+    def delete_device(self, device_id: str) -> None:
+        """Remove a saved device and the custom-button titles scoped only to it.
+
+        Deletes from the device store and purges that device's device-scoped
+        `custom_buttons` entries (device-type and global titles stand), then persists
+        the preferences — the two stores are kept in step here so both delete sites
+        do it the same way.
+        """
+        self.store.delete(device_id)
+        forget_device(self.custom_buttons, device_id)
         self.persist_preferences()
 
     def persist_preferences(self) -> None:

@@ -1,6 +1,8 @@
 from universal_remote.tui.custom_buttons import (
     ButtonScope,
     default_title,
+    forget_device,
+    resolve_scope,
     resolve_title,
     set_title,
 )
@@ -113,3 +115,83 @@ class TestSetTitle:
             resolve_title(custom_buttons, 1, device_id="other", platform="samsung")
             == "Reboot"
         )
+
+
+class TestResolveScope:
+    def test_given_no_saved_titles_when_resolved_then_the_scope_is_none(self):
+        assert resolve_scope({}, 1, device_id="dev-1", platform="roku") is None
+
+    def test_given_a_device_title_when_resolved_then_the_scope_is_device(self):
+        # Arrange: a title at all three scopes; the most-specific one is what shows.
+        custom_buttons = {
+            "device": {"dev-1": {"1": {"title": "Netflix"}}},
+            "type": {"roku": {"1": {"title": "Kids"}}},
+            "global": {"1": {"title": "Reboot"}},
+        }
+
+        scope = resolve_scope(custom_buttons, 1, device_id="dev-1", platform="roku")
+
+        assert scope is ButtonScope.DEVICE
+
+    def test_given_only_a_type_title_when_resolved_then_the_scope_is_type(self):
+        custom_buttons = {"type": {"roku": {"1": {"title": "Kids"}}}}
+
+        scope = resolve_scope(custom_buttons, 1, device_id="dev-1", platform="roku")
+
+        assert scope is ButtonScope.TYPE
+
+    def test_given_only_a_global_title_when_resolved_then_the_scope_is_global(self):
+        custom_buttons = {"global": {"2": {"title": "Reboot"}}}
+
+        scope = resolve_scope(custom_buttons, 2, device_id="dev-1", platform="roku")
+
+        assert scope is ButtonScope.GLOBAL
+
+    def test_given_a_blank_device_title_when_resolved_then_it_falls_through_to_type(
+        self,
+    ):
+        # A blank entry is skipped exactly as resolve_title skips it, so the reported
+        # scope always matches the title actually shown.
+        custom_buttons = {
+            "device": {"dev-1": {"1": {"title": "   "}}},
+            "type": {"roku": {"1": {"title": "Kids"}}},
+        }
+
+        scope = resolve_scope(custom_buttons, 1, device_id="dev-1", platform="roku")
+
+        assert scope is ButtonScope.TYPE
+
+
+class TestForgetDevice:
+    def test_given_a_device_scoped_title_when_forgotten_then_it_is_removed(self):
+        # Arrange: the same button has a device title and a global title.
+        custom_buttons = {
+            "device": {"dev-1": {"1": {"title": "Netflix"}}},
+            "global": {"1": {"title": "Reboot"}},
+        }
+
+        # Act
+        forget_device(custom_buttons, "dev-1")
+
+        # Assert: the device entry is gone; the global entry stands.
+        assert "dev-1" not in custom_buttons["device"]
+        assert custom_buttons["global"]["1"]["title"] == "Reboot"
+
+    def test_given_type_and_global_titles_when_forgotten_then_they_are_kept(self):
+        custom_buttons = {
+            "device": {"dev-1": {"1": {"title": "Netflix"}}},
+            "type": {"roku": {"1": {"title": "Kids"}}},
+            "global": {"2": {"title": "Reboot"}},
+        }
+
+        forget_device(custom_buttons, "dev-1")
+
+        assert custom_buttons["type"]["roku"]["1"]["title"] == "Kids"
+        assert custom_buttons["global"]["2"]["title"] == "Reboot"
+
+    def test_given_no_entry_for_the_device_when_forgotten_then_it_is_a_no_op(self):
+        custom_buttons = {"global": {"1": {"title": "Reboot"}}}
+
+        forget_device(custom_buttons, "dev-1")  # must not raise
+
+        assert custom_buttons == {"global": {"1": {"title": "Reboot"}}}

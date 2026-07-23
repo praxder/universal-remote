@@ -140,14 +140,17 @@ channel keys, and so on.
 Text entry is reached on demand: `t` opens a pop-up to type into rather than a
 field parked at the bottom of the remote. A row of **five custom buttons** sits
 there instead — click one to open its config pop-up and give it a title, saved
-just for this device, for every device of its type, or globally. (Wiring those
-buttons to actions comes in a later version.)
+just for this device, for every device of its type, or globally. Reopen the
+pop-up and it shows the scope the title is actually stored at, so you can see and
+change where it applies. (Wiring those buttons to actions comes in a later
+version.)
 
 Every key above is a **default you can change**, and the on-screen-only buttons
 (menu, channel, volume, mute, and the media-transport keys) can be **given** a
-keyboard shortcut — see [Keyboard Shortcuts](#settings) in Settings. The D-pad
-directions (arrows and `h` `j` `k` `l`) are reserved for navigation and stay
-fixed.
+keyboard shortcut — see [Keyboard Shortcuts](#settings) in Settings. The five
+custom buttons can be given shortcuts too (**Activate Custom Button 1**–**5**),
+each firing the matching button exactly as a click would. The D-pad directions
+(arrows and `h` `j` `k` `l`) are reserved for navigation and stay fixed.
 
 ### Settings
 

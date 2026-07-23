@@ -44,6 +44,24 @@ def resolve_title(
     return default_title(index)
 
 
+def resolve_scope(
+    custom_buttons: dict, index: int, *, device_id: str, platform: str
+) -> ButtonScope | None:
+    """The scope button `index`'s shown title resolves from, or None when unset.
+
+    Mirrors `resolve_title`'s device → type → global order and its non-blank rule so
+    the config modal preselects exactly the scope whose title is displayed.
+    """
+    for scope, key in (
+        (ButtonScope.DEVICE, device_id),
+        (ButtonScope.TYPE, platform),
+        (ButtonScope.GLOBAL, None),
+    ):
+        if _stored_title(custom_buttons, scope, key, index):
+            return scope
+    return None
+
+
 def set_title(
     custom_buttons: dict,
     index: int,
@@ -56,6 +74,14 @@ def set_title(
     """Write `title` for button `index` at `scope`, creating slots as needed."""
     slot = _scope_slot(custom_buttons, scope, device_id, platform)
     slot[str(index)] = {"title": title}
+
+
+def forget_device(custom_buttons: dict, device_id: str) -> None:
+    """Drop every device-scoped custom-button entry for `device_id`.
+
+    Device-type and global entries are left intact; a no-op when the device has none.
+    """
+    custom_buttons.get(ButtonScope.DEVICE.value, {}).pop(device_id, None)
 
 
 def _scope_key(scope: ButtonScope, device_id: str, platform: str) -> str | None:
