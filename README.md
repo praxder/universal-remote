@@ -146,6 +146,8 @@ change where it applies — moving a button to a broader scope takes effect at
 once. A **Reset** button clears the button back to its default title with no
 action.
 
+![Configure a custom button](docs/screenshots/configure-custom-button.png)
+
 **Give a button an action.** In that same config pop-up, open **Action Type** and
 pick **Run Custom Script** to attach a shell script to the button. Choose **Script
 File** to point at a script on disk (it runs through the shell, so it needs no
@@ -164,6 +166,8 @@ Results settings filled in, so you pick up where you left off.
 Scripts run in the background so the remote never freezes, bounded by a fixed
 30-second timeout that kills a hung script. `REMOTE_IP` is set in the script's
 environment to the connected device's IP address.
+
+![Configure a Run Custom Script action](docs/screenshots/run-custom-script.png)
 
 > **Trust model.** Run Custom Script executes shell **you** wrote, on **your own**
 > machine, under your own account — there is **no sandbox** and no vetting of what a
