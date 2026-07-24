@@ -1,7 +1,7 @@
 # tui-remote Specification
 
 ## Purpose
-TBD - created by archiving change scaffold-samsung-remote. Update Purpose after archive.
+The Textual terminal UI: the entry menu, device management, network discovery, and the on-screen remote, covering device selection, pairing, connection, reachability indicators, text entry, and custom buttons.
 ## Requirements
 ### Requirement: Menu-driven entry with two modes
 The application SHALL launch into a menu offering two modes: Manage Devices and Use Remote. Both modes MUST be reachable by keyboard and by mouse. The menu SHALL also present a Settings entry point — a "Settings" button docked in the bottom-left corner of the screen, plus an `s` key binding — that opens the Settings screen. The Settings entry point MUST be reachable by keyboard (the `s` key) and by mouse (clicking the button). Adding the Settings entry point SHALL NOT change the centered layout of the existing menu content (title, mode buttons, and movie quote). The menu's key bindings — Manage Devices (`d`), Use Remote (`r`), Settings (`s`), and Quit (`q`) — SHALL be the default shortcuts of rebindable Home actions that the user MAY change via the keyboard-shortcuts capability; the docked Settings button and the mode buttons remain operable by mouse regardless of the current key bindings.
@@ -370,11 +370,11 @@ The Manage Devices add entry SHALL open a device discovery screen that lists dev
 - **THEN** the application returns to the saved-device list without error
 
 ### Requirement: Command palette contents
-The application's command palette (opened with Ctrl+P) SHALL expose exactly the Theme, Quit, and Keys commands inherited from Textual, and SHALL NOT expose the Maximize command or the Screenshot command. Because nothing in the application maximizes a widget, the Minimize command — shown by Textual only while a widget is maximized — SHALL likewise never appear.
+The application's command palette (opened with Ctrl+P) SHALL expose the Theme, Quit, and Keys commands inherited from Textual plus the application's own "Keyboard Shortcuts" command (a read-only shortcuts view; see the keyboard-shortcuts capability), and SHALL NOT expose the Maximize command or the Screenshot command. Because nothing in the application maximizes a widget, the Minimize command — shown by Textual only while a widget is maximized — SHALL likewise never appear.
 
-#### Scenario: Palette lists only the retained commands
+#### Scenario: Palette lists the retained commands
 - **WHEN** the user opens the command palette
-- **THEN** its commands are exactly Theme, Quit, and Keys
+- **THEN** its commands are Theme, Quit, Keys, and Keyboard Shortcuts
 
 #### Scenario: Maximize is excluded
 - **WHEN** the user opens the command palette

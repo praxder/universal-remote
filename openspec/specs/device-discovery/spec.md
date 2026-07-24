@@ -1,7 +1,7 @@
 # device-discovery Specification
 
 ## Purpose
-TBD - created by syncing change add-device-discovery. Update Purpose after archive.
+Discover controllable devices on the local network across every supported platform, concurrently and best-effort, resolving cross-protocol collisions by platform priority and excluding already-saved devices.
 ## Requirements
 ### Requirement: Discover devices across supported platforms
 The system SHALL discover devices on the local network for every supported platform that can be discovered, reporting each discovered device with a name, a platform identifier resolvable by the adapter registry, and an IP address. Each platform's scan SHALL run concurrently, and discovery SHALL complete within a bounded time window. When a discovered device announces no usable friendly name, the reported name SHALL fall back to its IP address.

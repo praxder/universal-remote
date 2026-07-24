@@ -1,7 +1,7 @@
 # keyboard-shortcuts Specification
 
 ## Purpose
-TBD - created by syncing change add-custom-keyboard-shortcuts. Update Purpose after archive.
+Define a rebindable action catalog and let the user view and reassign keyboard shortcuts — enforcing global conflict and reserved-key rules, applying changes immediately, and persisting them across runs.
 ## Requirements
 ### Requirement: Rebindable action catalog
 
@@ -56,7 +56,7 @@ The application SHALL provide a Keyboard Shortcuts screen, reached from the Sett
 #### Scenario: Reserved entries are shown disabled
 
 - **WHEN** the table is displayed
-- **THEN** the reserved entries (the D-pad directions, Activate Control, and Command Palette) appear as disabled rows that cannot be activated for capture
+- **THEN** the reserved entries (the D-pad directions, the Configure Custom Button edit-mode key, Activate Control, the Command Palette, and focus-navigation Tab and Shift+Tab) appear as disabled rows that cannot be activated for capture
 
 #### Scenario: Actions without a shortcut show as blank
 
@@ -84,16 +84,16 @@ Every shortcut shown in the table SHALL be rendered as an uppercase label rather
 
 ### Requirement: Assign, clear, or cancel from the capture modal
 
-Activating a rebindable row (Enter or click) SHALL open a capture modal prompting the user to press a key. The next key the user presses — including Escape — SHALL be normalized to its canonical long form and, subject to the conflict and reserved-key rules, assigned as that action's shortcut, after which the modal closes and the row updates. The modal SHALL provide two mouse-only buttons that do not take keyboard focus: a **Cancel** button that closes the modal without changing the shortcut, and a **DEL** button that clears the action's shortcut (leaving it with none) and closes the modal. Because the buttons never hold focus, there SHALL be no keyboard-only way to cancel or clear — every key press is captured as a candidate shortcut.
+Activating a rebindable row (Enter or click) SHALL open a capture modal prompting the user to press a key. The next key the user presses — including Escape — SHALL be normalized to its canonical long form and, subject to the conflict and reserved-key rules, assigned as that action's shortcut, after which the modal closes and the row updates. The modal SHALL provide two mouse-only buttons that do not take keyboard focus: a **Cancel** button that closes the modal without changing the shortcut, and a **Delete** button that clears the action's shortcut (leaving it with none) and closes the modal. Because the buttons never hold focus, there SHALL be no keyboard-only way to cancel or clear — every key press is captured as a candidate shortcut.
 
 #### Scenario: Capture assigns a new shortcut
 
 - **WHEN** the user activates a row and presses an available key
 - **THEN** that key becomes the action's shortcut, the modal closes, and the row shows the new shortcut
 
-#### Scenario: The DEL button clears a shortcut
+#### Scenario: The Delete button clears a shortcut
 
-- **WHEN** the user activates a row and clicks the DEL button in the capture modal
+- **WHEN** the user activates a row and clicks the Delete button in the capture modal
 - **THEN** the action's shortcut is cleared, the modal closes, and the row shows an empty shortcut cell
 
 #### Scenario: The Cancel button leaves the shortcut unchanged

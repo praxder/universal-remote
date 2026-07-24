@@ -1,7 +1,7 @@
 # app-preferences Specification
 
 ## Purpose
-TBD - created by syncing change add-settings-page. Update Purpose after archive.
+Persist app-level user preferences — the selected theme, custom keyboard shortcuts, and custom-button titles and actions — across runs in an XDG-aware settings file, falling back to defaults when it is missing or unreadable.
 ## Requirements
 ### Requirement: Preferences persisted across runs
 The application SHALL persist app-level user preferences to an XDG-aware JSON file at `$XDG_CONFIG_HOME/universal-remote/settings.json`, falling back to `~/.config/universal-remote/settings.json` when `XDG_CONFIG_HOME` is unset, mirroring the existing device store's location convention. The file SHALL be created on first write and MUST NOT disturb the existing `devices.json` or `error.log`. When the file is absent or unreadable, the application SHALL fall back to built-in defaults rather than failing to start.
@@ -64,7 +64,7 @@ The application SHALL persist the user's custom keyboard shortcuts in the same p
 ### Requirement: Custom button titles persisted across runs
 The application SHALL persist custom-button titles in the same preferences file as the theme and shortcuts, under a layered structure keyed by scope: a specific device (by device id), a device type (by platform identifier), and global. Each button is identified by its 1-based position (1 through 5), and each stored entry SHALL be an object holding at least a title, so later versions MAY extend an entry without changing the file's shape. On startup the application SHALL load the saved titles; reading or writing them MUST follow the same fault-tolerant behavior as the rest of the preferences file — a missing or unreadable file SHALL fall back to defaults rather than failing to start, and an unwritable file SHALL be ignored rather than raised. Persisting custom-button titles MUST NOT disturb the saved theme or the saved shortcuts.
 
-The title shown for a given button on a given device SHALL be resolved most-specific-first: the entry for that specific device if present, otherwise the entry for that device's type if present, otherwise the global entry if present, otherwise the built-in default `Custom N`. An absent or blank title at one scope SHALL fall through to the next less-specific scope.
+The title shown for a given button on a given device SHALL be resolved from the button's stored entry, chosen most-specific-first: the entry for that specific device, otherwise the entry for that device's type, otherwise the global entry, otherwise none. A scope whose entry holds nothing for the button — neither a title nor an action — is skipped in favour of the next less-specific scope. The shown title is the chosen entry's title, or the built-in default `Custom N` when the chosen entry has no title. Because a button's title and action resolve together from one scope as a single unit (see the "Custom button actions persisted across runs" requirement), a blank title on the chosen entry SHALL show `Custom N` rather than borrowing a less-specific scope's title.
 
 When a saved device is deleted, the application SHALL remove that device's device-scoped custom-button entries from the preferences, leaving the device-type and global entries for those buttons intact. Removing them MUST follow the same fault-tolerant, best-effort persistence behavior as the rest of the preferences file.
 

@@ -1,7 +1,7 @@
 # firetv-adapter Specification
 
 ## Purpose
-TBD - created by syncing change add-firetv-adapter. Update Purpose after archive.
+Control Amazon Fire TV devices — pairing through the device-side authorization popup and preferring a low-latency input path with a standard fallback — behind the generic remote-control seam.
 ## Requirements
 ### Requirement: Fire TV adapter registration
 The system SHALL provide an adapter for the Amazon Fire TV platform, registered under a stable platform identifier so devices of that platform resolve to it.

@@ -1,7 +1,7 @@
 # homebrew-distribution Specification
 
 ## Purpose
-TBD - created by syncing change add-homebrew-distribution. Update Purpose after archive.
+Package the app as a standalone macOS arm64 binary installable via the praxder/homebrew-tap formula, with non-interactive `--version`/`--help` and a short `ur` alias.
 ## Requirements
 ### Requirement: Non-interactive version and help flags
 

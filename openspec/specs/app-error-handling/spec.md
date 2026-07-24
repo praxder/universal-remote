@@ -1,7 +1,7 @@
 # app-error-handling Specification
 
 ## Purpose
-TBD - created by syncing change add-global-error-handling. Update Purpose after archive.
+Keep the running app open when unexpected errors occur by catching them at a global net that toasts and logs, while leaving expected domain errors to their local seams and letting interrupts pass through.
 ## Requirements
 ### Requirement: Unexpected errors keep the app open with an error toast
 

@@ -1,7 +1,7 @@
 # custom-button-actions Specification
 
 ## Purpose
-TBD - created by syncing change add-custom-button-actions. Update Purpose after archive.
+Let a custom remote button be assigned an action from an extensible catalog — currently Run Custom Script — that is configured, run without blocking the UI, and reports its outcome per the user's choice.
 ## Requirements
 ### Requirement: Assignable action catalog
 A custom button MAY be assigned an action drawn from an action catalog. The catalog SHALL be extensible: adding a new action type SHALL NOT require reworking the remote surface or the Button Config modal. In this phase the catalog SHALL contain exactly one action type, Run Custom Script, whose display label is "Run Custom Script". The Action Type list SHALL present the catalog's action types for selection.
