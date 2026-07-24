@@ -33,8 +33,10 @@ class UniversalRemoteApp(App[None]):
     #menu { width: 100%; height: auto; }
     #menu Button { width: 28; margin: 1 0; }
     /* Settings entry: a bottom-left button docked above the Footer (which docks
-       last, so it stays below this). Left-aligned; the centered #menu is untouched. */
-    #settings-bar { dock: bottom; height: auto; width: 100%; align-horizontal: left; }
+       last, so it stays below this). Width hugs the button (not 100%) so the bar
+       does not overlay the centered #menu content and swallow its mouse clicks on a
+       short terminal where the menu buttons reach the docked rows. */
+    #settings-bar { dock: bottom; height: auto; width: auto; }
     #settings-bar Button { width: auto; margin: 0 0 2 2; }
     /* focus: accent text on a slightly lighter fill instead of reversing fg/bg;
        keep the default `tall` top/bottom border so the height never changes */
