@@ -1,6 +1,6 @@
 import asyncio
 
-from textual.widgets import Button, Input, Label
+from textual.widgets import Button, Input
 
 from tests.fakes import FakeAdapter
 from universal_remote.capabilities import Capabilities
@@ -9,7 +9,7 @@ from universal_remote.devices.store import DeviceStore
 from universal_remote.keys import Key
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
-from universal_remote.tui.remote_screen import RemoteScreen, TextField
+from universal_remote.tui.remote_screen import RemoteScreen, TextEntryModal
 
 
 def _app(store, adapter):
@@ -103,27 +103,33 @@ class TestCapabilityDisabling:
 
         asyncio.run(scenario())
 
-    def test_given_text_unsupported_when_the_remote_shows_then_the_field_is_disabled_with_a_message(
+    def test_given_text_unsupported_when_text_activated_then_a_message_shows_and_no_input_opens(
         self, tmp_path
     ):
         caps = Capabilities(keys=frozenset(Key), text=False)
         adapter = FakeAdapter(platform="fake-tv", capabilities=caps)
+        captured: dict = {}
 
         async def scenario():
             app = _app(_store(tmp_path), adapter)
             async with app.run_test() as pilot:
                 await _goto_remote(app, pilot)
-                assert app.screen.query_one("#text", Input).disabled is True
-                message = str(
-                    app.screen.query_one("#text-status", Label).content
-                ).lower()
-                assert "not supported" in message
+                await pilot.press("t")
+                await pilot.pause()
+                captured["screen"] = type(app.screen).__name__
+                captured["messages"] = [
+                    str(n.message).lower() for n in app._notifications
+                ]
 
         asyncio.run(scenario())
 
+        # No editable input opened (still on the remote), and a message explains it.
+        assert captured["screen"] == "RemoteScreen"
+        assert any("not supported" in message for message in captured["messages"])
 
-class TestTextEntryFocus:
-    def test_given_the_text_field_when_composed_and_entered_then_the_buffer_is_sent(
+
+class TestTextEntryModal:
+    def test_given_text_activated_when_composed_and_entered_then_the_buffer_is_sent(
         self, tmp_path
     ):
         caps = Capabilities(keys=frozenset(Key), text=True)
@@ -135,17 +141,20 @@ class TestTextEntryFocus:
                 await _goto_remote(app, pilot)
                 await pilot.press("t")
                 await pilot.pause()
-                assert app.focused is app.screen.query_one("#text", TextField)
+                assert isinstance(app.screen, TextEntryModal)
+                assert app.focused is app.screen.query_one("#text-entry-input", Input)
                 await pilot.press("h", "i")
                 await pilot.pause()
                 await pilot.press("enter")
                 await pilot.pause()
+                # Submitting sends once and returns to the remote.
+                assert isinstance(app.screen, RemoteScreen)
 
         asyncio.run(scenario())
 
         assert adapter.sessions[0].sent_text == ["hi"]
 
-    def test_given_the_text_field_focused_when_escape_pressed_then_it_exits_without_back(
+    def test_given_the_text_modal_when_escape_pressed_then_it_dismisses_without_back_or_close(
         self, tmp_path
     ):
         caps = Capabilities(keys=frozenset(Key), text=True)
@@ -161,8 +170,7 @@ class TestTextEntryFocus:
                 await pilot.pause()
                 await pilot.press("escape")
                 await pilot.pause()
-                assert app.focused is None
-                # Escape exits only the field; the remote page stays open.
+                # Escape closes the modal only; the live remote stays open.
                 assert isinstance(app.screen, RemoteScreen)
 
         asyncio.run(scenario())
@@ -170,3 +178,4 @@ class TestTextEntryFocus:
         session = adapter.sessions[0]
         assert Key.BACK not in session.sent_keys
         assert session.sent_text == []
+        assert session.closed is False  # the remote session was not torn down

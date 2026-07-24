@@ -7,6 +7,7 @@ from universal_remote.tui.shortcuts import (
     effective_key,
     is_bare_modifier,
     is_reserved,
+    without_reserved,
 )
 
 _TWELVE_CLICK_ONLY = {
@@ -23,6 +24,10 @@ _TWELVE_CLICK_ONLY = {
     "remote.fast_forward",
     "remote.stop",
 }
+
+# The five custom-button activation actions: rebindable Remote actions that mirror a
+# click, not device keys, and start with no shortcut.
+_FIVE_CUSTOM = {f"remote.custom_{index}" for index in range(1, 6)}
 
 
 def _by_id():
@@ -53,14 +58,15 @@ class TestRebindableCatalog:
         assert go_back.default_key == "escape"
         assert go_back.editable
 
-    def test_given_the_catalog_when_read_then_there_are_26_rebindable_remote_actions(
+    def test_given_the_catalog_when_read_then_there_are_31_rebindable_remote_actions(
         self,
     ):
         rebindable_remote = [
             a for a in CATALOG if a.scope is Scope.REMOTE and a.editable
         ]
 
-        assert len(rebindable_remote) == 26
+        # 26 device actions + 5 custom-button activation actions.
+        assert len(rebindable_remote) == 31
 
     def test_given_the_catalog_when_read_then_each_entry_has_id_label_scope_and_default(
         self,
@@ -78,9 +84,23 @@ class TestRebindableCatalog:
             assert by_id[action_id].default_key == ""
 
     def test_given_the_other_rebindable_actions_when_read_then_each_has_a_default(self):
+        no_default = _TWELVE_CLICK_ONLY | _FIVE_CUSTOM
         for action in CATALOG:
-            if action.editable and action.id not in _TWELVE_CLICK_ONLY:
+            if action.editable and action.id not in no_default:
                 assert action.default_key != ""
+
+    def test_given_the_five_custom_activation_actions_when_read_then_they_are_catalogued(
+        self,
+    ):
+        by_id = _by_id()
+
+        for index in range(1, 6):
+            action = by_id[f"remote.custom_{index}"]
+            assert action.scope is Scope.REMOTE
+            assert action.editable is True
+            assert action.default_key == ""  # no shortcut until the user assigns one
+            assert action.target == f"activate_custom({index})"
+            assert action.show is False  # kept out of the footer's eight-hint fit
 
 
 class TestReservedCatalog:
@@ -100,6 +120,9 @@ class TestReservedCatalog:
             assert action.editable is False
             assert action.default_key == arrow
             assert alias in action.aliases
+            assert (
+                action.show is False
+            )  # arrows are self-labeled by the on-screen D-pad
 
     def test_given_the_catalog_when_read_then_the_framework_keys_are_reserved(self):
         by_id = _by_id()
@@ -125,11 +148,26 @@ class TestReservedCatalog:
         assert focus_prev.default_key == "shift+tab"
         assert focus_prev.target is None
 
+    def test_given_the_edit_mode_entry_when_read_then_it_is_reserved_on_e(self):
+        edit_mode = _by_id()["remote.edit_mode"]
+
+        assert edit_mode.scope is Scope.REMOTE
+        assert edit_mode.editable is False  # reserved so `e` can't be reassigned
+        assert edit_mode.default_key == "e"
+        assert edit_mode.target == "edit_mode"
+        assert edit_mode.show is True  # shown in the footer for discoverability
+        assert edit_mode.footer_label == "Edit"  # short footer text, long table label
+
+    def test_given_the_edit_mode_key_when_checked_then_it_is_reserved(self):
+        assert is_reserved("e") is True
+
     def test_given_the_remote_device_actions_when_read_then_each_maps_to_a_real_key(
         self,
     ):
+        # Text entry, the custom-button activations, and edit-mode are not device keys.
+        non_key = {"remote.text", "remote.edit_mode", *_FIVE_CUSTOM}
         for action in CATALOG:
-            if action.scope is Scope.REMOTE and action.id != "remote.text":
+            if action.scope is Scope.REMOTE and action.id not in non_key:
                 name = action.id.rsplit(".", 1)[-1].upper()
                 assert Key[name]  # raises KeyError if not a real member
 
@@ -185,6 +223,32 @@ class TestConflictsAndReserved:
     def test_given_an_actions_own_default_when_checked_then_it_is_exempt(self):
         # OK legitimately defaults to `enter`, itself a reserved key.
         assert conflicts("remote.ok", "enter", {}) is False
+
+
+class TestWithoutReserved:
+    def test_given_an_override_on_a_now_reserved_key_when_pruned_then_it_is_dropped(
+        self,
+    ):
+        # `e` was assignable to Stop before it became reserved for edit-mode; a saved
+        # override on it would shadow the reserved binding, so it must be dropped.
+        overrides = {"remote.stop": "e", "remote.play_pause": "p"}
+
+        pruned = without_reserved(overrides)
+
+        assert "remote.stop" not in pruned
+        assert pruned["remote.play_pause"] == "p"
+
+    def test_given_only_free_key_overrides_when_pruned_then_they_are_kept(self):
+        overrides = {"remote.mute": "m", "remote.menu": "o"}
+
+        assert without_reserved(overrides) == overrides
+
+    def test_given_overrides_when_pruned_then_the_original_map_is_unchanged(self):
+        overrides = {"remote.stop": "e"}
+
+        without_reserved(overrides)
+
+        assert overrides == {"remote.stop": "e"}
 
 
 class TestDisplayLabel:

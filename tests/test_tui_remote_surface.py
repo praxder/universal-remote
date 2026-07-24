@@ -1,6 +1,6 @@
 import asyncio
 
-from textual.widgets import Button, Input, Label
+from textual.widgets import Button, Footer, Input
 
 from tests.fakes import FakeAdapter
 from universal_remote.capabilities import Capabilities
@@ -9,7 +9,8 @@ from universal_remote.devices.store import DeviceStore
 from universal_remote.keys import Key
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
-from universal_remote.tui.remote_screen import RemoteScreen, TextField
+from universal_remote.tui.custom_buttons import ButtonScope, set_title
+from universal_remote.tui.remote_screen import RemoteScreen
 
 # The bordered remote is taller than a minimal 80×24 terminal; this is the
 # supported baseline the full button set fits without scrolling.
@@ -166,6 +167,21 @@ class TestRemoteSurface:
 
         asyncio.run(scenario())
 
+    def test_given_the_remote_when_shown_then_no_docked_text_field(self, tmp_path):
+        # The spec is explicit that text entry moved to a modal: no always-visible
+        # field or status label is docked on the remote.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                assert not app.screen.query("#text")
+                assert not app.screen.query("#text-status")
+
+        asyncio.run(scenario())
+
     def test_given_the_remote_when_shown_then_the_header_names_the_device_type_and_ip(
         self, tmp_path
     ):
@@ -305,7 +321,7 @@ class TestRemoteSurface:
         # Escape leaves the remote page; it does not send Back to the device.
         assert Key.BACK not in adapter.sessions[0].sent_keys
 
-    def test_given_the_text_field_focused_when_backspace_pressed_then_it_edits_not_sends_back(
+    def test_given_the_text_modal_when_backspace_pressed_then_it_edits_not_sends_back(
         self, tmp_path
     ):
         store = _store_with_device(tmp_path)
@@ -315,11 +331,11 @@ class TestRemoteSurface:
             app = _app(store, adapter)
             async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
-                await pilot.press("t")  # enter the text field
+                await pilot.press("t")  # open the text modal
                 await pilot.pause()
                 await pilot.press("a", "b", "backspace")
                 await pilot.pause()
-                assert app.screen.query_one("#text", TextField).value == "a"
+                assert app.screen.query_one("#text-entry-input", Input).value == "a"
 
         asyncio.run(scenario())
 
@@ -365,7 +381,7 @@ class TestRemoteSurface:
 
         assert adapter.sessions[0].sent_keys == [Key.HOME]
 
-    def test_given_the_text_field_focused_when_vim_keys_and_space_typed_then_they_fill_not_navigate(
+    def test_given_the_text_modal_when_vim_keys_and_space_typed_then_they_fill_not_navigate(
         self, tmp_path
     ):
         store = _store_with_device(tmp_path)
@@ -375,11 +391,11 @@ class TestRemoteSurface:
             app = _app(store, adapter)
             async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
-                await pilot.press("t")  # enter the text field
+                await pilot.press("t")  # open the text modal
                 await pilot.pause()
                 await pilot.press("h", "j", "k", "l", "space")
                 await pilot.pause()
-                assert app.screen.query_one("#text", TextField).value == "hjkl "
+                assert app.screen.query_one("#text-entry-input", Input).value == "hjkl "
 
         asyncio.run(scenario())
 
@@ -420,7 +436,7 @@ class TestRemoteSurface:
 
         assert adapter.sessions[0].sent_keys == [Key[f"NUM_{d}"] for d in range(10)]
 
-    def test_given_the_text_field_focused_when_digits_typed_then_they_fill_not_send(
+    def test_given_the_text_modal_when_digits_typed_then_they_fill_not_send(
         self, tmp_path
     ):
         store = _store_with_device(tmp_path)
@@ -430,11 +446,11 @@ class TestRemoteSurface:
             app = _app(store, adapter)
             async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
-                await pilot.press("t")  # enter the text field
+                await pilot.press("t")  # open the text modal
                 await pilot.pause()
                 await pilot.press("1", "2", "3")
                 await pilot.pause()
-                assert app.screen.query_one("#text", TextField).value == "123"
+                assert app.screen.query_one("#text-entry-input", Input).value == "123"
 
         asyncio.run(scenario())
 
@@ -444,12 +460,13 @@ class TestRemoteSurface:
         self, tmp_path
     ):
         # An adapter without number keys (like Apple TV): the digit hotkey behaves
-        # like the disabled button — nothing sent, no error message.
+        # like the disabled button — nothing sent, no message surfaced.
         store = _store_with_device(tmp_path)
         caps = Capabilities(
             keys=frozenset(Key) - {Key[f"NUM_{d}"] for d in range(10)}, text=True
         )
         adapter = FakeAdapter(platform="fake-tv", capabilities=caps)
+        captured: dict = {}
 
         async def scenario():
             app = _app(store, adapter)
@@ -457,11 +474,11 @@ class TestRemoteSurface:
                 await _goto_remote(app, pilot)
                 await pilot.press("5")
                 await pilot.pause()
-                status = str(app.screen.query_one("#text-status", Label).content)
-                assert status == ""
+                captured["notifications"] = list(app._notifications)
 
         asyncio.run(scenario())
 
+        assert captured["notifications"] == []  # nothing surfaced
         assert adapter.sessions[0].sent_keys == []
 
     def test_given_an_override_for_a_formerly_unbound_key_when_pressed_then_it_sends(
@@ -490,6 +507,7 @@ class TestRemoteSurface:
         # Arrange: a live remote whose device will fail the next key dispatch.
         store = _store_with_device(tmp_path)
         adapter = FakeAdapter(platform="fake-tv")
+        captured: dict = {}
 
         async def scenario():
             app = _app(store, adapter)
@@ -501,12 +519,13 @@ class TestRemoteSurface:
                 await pilot.press("up")
                 await pilot.pause()
 
-                # Assert: the remote is still up and reports the failure.
+                # Assert: the remote is still up and reports the failure via a toast.
                 assert isinstance(app.screen, RemoteScreen)
-                status = app.screen.query_one("#text-status", Label)
-                assert "UP" in str(status.content)
+                captured["messages"] = [str(n.message) for n in app._notifications]
 
         asyncio.run(scenario())
+
+        assert any("UP" in message for message in captured["messages"])
 
     def test_given_a_text_send_fails_when_submitted_then_the_remote_survives(
         self, tmp_path
@@ -522,23 +541,94 @@ class TestRemoteSurface:
                 await _goto_remote(app, pilot)
                 adapter.sessions[0].text_dispatch_error = RuntimeError("device dropped")
 
-                # Act: enter text mode, type, and submit — the send raises.
+                # Act: open the text modal, type, and submit — the send raises.
                 await pilot.press("t")
                 await pilot.pause()
-                app.screen.query_one("#text", Input).value = "hello"
+                app.screen.query_one("#text-entry-input", Input).value = "hello"
                 await pilot.press("enter")
                 await pilot.pause()
 
                 captured["screen"] = type(app.screen).__name__
-                captured["status"] = str(
-                    app.screen.query_one("#text-status", Label).content
-                )
                 captured["severities"] = [n.severity for n in app._notifications]
+                captured["messages"] = [str(n.message) for n in app._notifications]
 
         asyncio.run(scenario())
 
-        # The seam handled it locally: remote still up, a status shown, and the
-        # global error net was never engaged (no error toast).
+        # The seam handled it locally: the modal closed back to the remote, a warning
+        # toast was shown, and the app-wide error net (its generic message) never fired.
         assert captured["screen"] == "RemoteScreen"
-        assert captured["status"].strip() != ""
-        assert "error" not in captured["severities"]
+        assert "warning" in captured["severities"]
+        assert not any("went wrong" in message for message in captured["messages"])
+
+
+class TestCustomButtons:
+    def test_given_no_saved_titles_when_shown_then_five_buttons_read_their_defaults(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                labels = [
+                    str(app.screen.query_one(f"#custom-{i}", Button).label)
+                    for i in range(1, 6)
+                ]
+                assert labels == [f"Custom {i}" for i in range(1, 6)]
+
+        asyncio.run(scenario())
+
+    def test_given_a_saved_title_for_the_active_device_when_shown_then_the_button_shows_it(
+        self, tmp_path
+    ):
+        # A title saved for the device's type resolves for the active device; the
+        # other buttons keep their defaults.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                set_title(
+                    app.custom_buttons,
+                    2,
+                    "Netflix",
+                    ButtonScope.TYPE,
+                    device_id="unused",
+                    platform="fake-tv",
+                )
+                await _goto_remote(app, pilot)
+                assert str(app.screen.query_one("#custom-2", Button).label) == "Netflix"
+                assert (
+                    str(app.screen.query_one("#custom-1", Button).label) == "Custom 1"
+                )
+
+        asyncio.run(scenario())
+
+
+class TestFooterFit:
+    def test_given_the_remote_footer_at_the_baseline_width_then_its_hints_fit(
+        self, tmp_path
+    ):
+        # The footer must show the edit-mode hint yet stay within the supported
+        # 80-column width; the self-labeled D-pad arrows are dropped to make room.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+
+                footer = app.screen.query_one(Footer)
+                keys = list(footer.query("FooterKey"))
+                total = sum(key.size.width for key in keys)
+                descriptions = {key.description for key in keys}
+
+                assert total <= footer.size.width
+                assert "Edit" in descriptions
+                assert descriptions.isdisjoint({"Up", "Down", "Left", "Right"})
+
+        asyncio.run(scenario())

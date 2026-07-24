@@ -66,3 +66,38 @@ class TestPreferencesStorePersistence:
 
         assert loaded.theme == "nord"
         assert loaded.shortcuts == {}
+
+    def test_given_custom_buttons_when_reloaded_then_they_round_trip(self, tmp_path):
+        path = tmp_path / "settings.json"
+        custom_buttons = {"device": {"abc": {"1": {"title": "Netflix"}}}}
+        preferences = Preferences(custom_buttons=custom_buttons)
+
+        PreferencesStore(path=path).save(preferences)
+
+        assert PreferencesStore(path=path).load() == preferences
+
+    def test_given_an_old_file_without_custom_buttons_when_loaded_then_they_are_empty(
+        self, tmp_path
+    ):
+        path = tmp_path / "settings.json"
+        path.write_text('{"theme": "nord"}')
+
+        loaded = PreferencesStore(path=path).load()
+
+        assert loaded.custom_buttons == {}
+
+    def test_given_theme_shortcuts_and_custom_buttons_when_reloaded_then_all_round_trip(
+        self, tmp_path
+    ):
+        # Saving one preference must not overwrite the others: theme, shortcuts, and
+        # custom-button titles coexist in the one settings file.
+        path = tmp_path / "settings.json"
+        preferences = Preferences(
+            theme="gruvbox",
+            shortcuts={"remote.vol_up": "="},
+            custom_buttons={"global": {"1": {"title": "Reboot"}}},
+        )
+
+        PreferencesStore(path=path).save(preferences)
+
+        assert PreferencesStore(path=path).load() == preferences

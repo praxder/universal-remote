@@ -116,7 +116,7 @@ class DeviceListScreen(Screen[None]):
 
         def _on_confirm(confirmed: bool | None) -> None:
             if confirmed:
-                self.app.store.delete(device.id)
+                self.app.delete_device(device.id)
                 self._reload()
 
         self.app.push_screen(ConfirmDeleteScreen(device.name), _on_confirm)
@@ -348,7 +348,7 @@ class AddDeviceScreen(Screen[None]):
     def _delete(self) -> None:
         def _on_confirm(confirmed: bool | None) -> None:
             if confirmed:
-                self.app.store.delete(self._existing.id)
+                self.app.delete_device(self._existing.id)
                 self.app.pop_screen()
 
         self.app.push_screen(ConfirmDeleteScreen(self._existing.name), _on_confirm)

@@ -7,6 +7,7 @@ from universal_remote.devices.models import Device
 from universal_remote.devices.store import DeviceStore
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
+from universal_remote.tui.custom_buttons import ButtonScope, set_title
 from universal_remote.tui.devices_screen import (
     ADD_TITLE_ART,
     EDIT_TITLE_ART,
@@ -669,6 +670,52 @@ class TestEditAndDelete:
 
         assert [d.name for d in store.list()] == ["Keep"]
 
+    def test_given_a_deleted_device_when_confirmed_then_its_custom_buttons_are_purged(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        drop = store.add(Device(name="Drop", platform="fake-tv", ip="2.2.2.2"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                # A device-scoped title for the doomed device, plus a global title
+                # that must survive the delete.
+                set_title(
+                    app.custom_buttons,
+                    1,
+                    "DropOnly",
+                    ButtonScope.DEVICE,
+                    device_id=drop.id,
+                    platform="fake-tv",
+                )
+                set_title(
+                    app.custom_buttons,
+                    2,
+                    "Everywhere",
+                    ButtonScope.GLOBAL,
+                    device_id=drop.id,
+                    platform="fake-tv",
+                )
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, drop.id)
+                await pilot.pause()
+                await pilot.press("backspace")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                await pilot.click("#confirm")
+                await pilot.pause()
+                # The device-scoped entry is gone, in memory and on disk; the global
+                # title stands.
+                assert drop.id not in app.custom_buttons.get("device", {})
+                assert app.custom_buttons["global"]["2"]["title"] == "Everywhere"
+                persisted = app.preferences.load().custom_buttons
+                assert drop.id not in persisted.get("device", {})
+
+        asyncio.run(scenario())
+
     def test_given_a_device_when_delete_is_cancelled_then_it_is_kept(self, tmp_path):
         store = DeviceStore(path=tmp_path / "d.json")
         keep = store.add(Device(name="Keep", platform="fake-tv", ip="1.1.1.1"))
@@ -799,6 +846,39 @@ class TestEditScreenDelete:
         asyncio.run(scenario())
 
         assert store.list() == []
+
+    def test_given_the_edit_delete_when_confirmed_then_its_custom_buttons_are_purged(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        device = store.add(
+            Device(name="Living Room", platform="fake-tv", ip="10.0.0.5")
+        )
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                set_title(
+                    app.custom_buttons,
+                    1,
+                    "DeviceOnly",
+                    ButtonScope.DEVICE,
+                    device_id=device.id,
+                    platform="fake-tv",
+                )
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                await pilot.click("#delete")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                await pilot.click("#confirm")
+                await pilot.pause()
+                # The edit-screen delete path purges the same way the list path does.
+                assert device.id not in app.custom_buttons.get("device", {})
+
+        asyncio.run(scenario())
 
     def test_given_the_edit_delete_when_cancelled_then_kept_and_stays_on_edit(
         self, tmp_path

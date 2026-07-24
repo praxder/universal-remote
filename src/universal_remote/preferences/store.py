@@ -17,11 +17,14 @@ def default_settings_path() -> Path:
 
 @dataclass(frozen=True)
 class Preferences:
-    """App-level user preferences: the selected theme and custom keyboard shortcuts."""
+    """App-level user preferences: theme, custom shortcuts, and custom-button titles."""
 
     theme: str | None = None
     # Action id -> key; only shortcuts that differ from a catalog default are stored.
     shortcuts: dict[str, str] = field(default_factory=dict)
+    # Layered custom-button titles keyed by scope (device / type / global); empty when
+    # the user has configured none. Resolution lives in `tui.custom_buttons`.
+    custom_buttons: dict = field(default_factory=dict)
 
 
 class PreferencesStore:
@@ -41,7 +44,14 @@ class PreferencesStore:
         shortcuts = raw.get("shortcuts")
         if not isinstance(shortcuts, dict):
             shortcuts = {}
-        return Preferences(theme=raw.get("theme"), shortcuts=shortcuts)
+        custom_buttons = raw.get("custom_buttons")
+        if not isinstance(custom_buttons, dict):
+            custom_buttons = {}
+        return Preferences(
+            theme=raw.get("theme"),
+            shortcuts=shortcuts,
+            custom_buttons=custom_buttons,
+        )
 
     def save(self, preferences: Preferences) -> None:
         """Best-effort write; an unwritable config dir is ignored, not raised.
@@ -54,7 +64,11 @@ class PreferencesStore:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             self._path.write_text(
                 json.dumps(
-                    {"theme": preferences.theme, "shortcuts": preferences.shortcuts},
+                    {
+                        "theme": preferences.theme,
+                        "shortcuts": preferences.shortcuts,
+                        "custom_buttons": preferences.custom_buttons,
+                    },
                     indent=2,
                 )
             )

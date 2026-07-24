@@ -14,6 +14,7 @@ from ..errors import UniversalRemoteError
 from ..preferences.store import Preferences, PreferencesStore
 from ..registry import AdapterRegistry
 from ..registry import registry as default_registry
+from .custom_buttons import forget_device
 from .menu import MenuScreen
 from .quotes import Quote, random_quote
 from .shortcuts_screen import ShortcutsCommandProvider
@@ -157,6 +158,10 @@ class UniversalRemoteApp(App[None]):
         # saved preferences on mount (see `on_mount`) and edited live from the
         # Keyboard Shortcuts screen. Screens read this to build their bindings.
         self.shortcut_overrides: dict[str, str] = {}
+        # Layered custom-button titles keyed by scope; populated from saved preferences
+        # on mount and read by the remote to label its custom buttons. Resolution lives
+        # in `tui.custom_buttons`.
+        self.custom_buttons: dict = {}
         # Set true only once our own mount handler has run, so the safety net can
         # tell a post-mount error (stay open) from a startup/compose/mount failure
         # (fall through). See `_handle_exception`.
@@ -179,10 +184,26 @@ class UniversalRemoteApp(App[None]):
         """
         self.persist_preferences()
 
+    def delete_device(self, device_id: str) -> None:
+        """Remove a saved device and the custom-button titles scoped only to it.
+
+        Deletes from the device store and purges that device's device-scoped
+        `custom_buttons` entries (device-type and global titles stand), then persists
+        the preferences — the two stores are kept in step here so both delete sites
+        do it the same way.
+        """
+        self.store.delete(device_id)
+        forget_device(self.custom_buttons, device_id)
+        self.persist_preferences()
+
     def persist_preferences(self) -> None:
-        """Write the current theme and shortcuts together, best-effort."""
+        """Write the current theme, shortcuts, and custom buttons together, best-effort."""
         self.preferences.save(
-            Preferences(theme=self.theme, shortcuts=dict(self.shortcut_overrides))
+            Preferences(
+                theme=self.theme,
+                shortcuts=dict(self.shortcut_overrides),
+                custom_buttons=self.custom_buttons,
+            )
         )
 
     def apply_shortcuts(self) -> None:
@@ -200,15 +221,26 @@ class UniversalRemoteApp(App[None]):
                 rebuild_shortcuts(screen, self.shortcut_overrides, scopes, hide=hide)
 
     def on_mount(self) -> None:
+        from .shortcuts import without_reserved
+
         preferences = self.preferences.load()
         # Load saved shortcuts into the override map before the menu is pushed, so
-        # its bindings (and every later screen's) build from them. `update` keeps any
-        # overrides set directly on the app (e.g. in tests) when none are saved.
-        self.shortcut_overrides.update(preferences.shortcuts)
+        # its bindings (and every later screen's) build from them. Drop any override
+        # whose key has since become reserved (e.g. `e` bound to a device action before
+        # it was reserved for edit-mode): left in place it would shadow the reserved
+        # binding, so the action reverts to its default. `update` keeps any overrides
+        # set directly on the app (e.g. in tests) when none are saved.
+        kept = without_reserved(preferences.shortcuts)
+        self.shortcut_overrides.update(kept)
+        # Load saved custom-button titles the same way, before any remote is opened.
+        self.custom_buttons.update(preferences.custom_buttons)
         # Ignore a saved theme that is no longer registered (e.g. removed by a
         # Textual upgrade) so `_validate_theme` cannot raise; the default stands.
         if preferences.theme in self.available_themes:
             self.theme = preferences.theme
+        # Persist the cleaned overrides so a pruned stale binding stays gone next run.
+        if kept != preferences.shortcuts:
+            self.persist_preferences()
         self.push_screen(MenuScreen())
         self._mount_succeeded = True
 

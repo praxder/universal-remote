@@ -31,7 +31,9 @@ class Action:
     screen action string the binding fires, or None for framework entries that are
     catalogued only for visibility. `aliases` are extra fixed keys a reserved entry
     also answers to (the D-pad's Vim keys). `show` is the default footer visibility
-    of the primary key.
+    of the primary key. `footer_label`, when set, is a shorter label the footer shows
+    in place of `label` (which stays the full Keyboard Shortcuts table text) so a
+    long action name does not overflow the narrow footer.
     """
 
     id: str
@@ -42,6 +44,7 @@ class Action:
     editable: bool = True
     aliases: tuple[str, ...] = ()
     show: bool = True
+    footer_label: str | None = None
 
 
 def _remote_key(name: str, label: str, key: str, *, show: bool = True) -> Action:
@@ -56,8 +59,29 @@ def _remote_key(name: str, label: str, key: str, *, show: bool = True) -> Action
     )
 
 
+def _custom_activation(index: int) -> Action:
+    """A rebindable Remote action that activates custom button `index` like a click.
+
+    Starts with no shortcut and stays out of the footer; it is not a device key, so
+    firing it runs the button's own activation (Phase 1: opens the config modal).
+    """
+    return Action(
+        id=f"remote.custom_{index}",
+        label=f"Activate Custom Button {index}",
+        scope=Scope.REMOTE,
+        default_key="",
+        target=f"activate_custom({index})",
+        show=False,
+    )
+
+
 def _reserved_dpad(name: str, label: str, arrow: str, alias: str) -> Action:
-    """A fixed D-pad direction: its arrow key plus a Vim alias, both unchangeable."""
+    """A fixed D-pad direction: its arrow key plus a Vim alias, both unchangeable.
+
+    Kept out of the footer — the on-screen D-pad already labels the directions with
+    ▲▼◀▶ glyphs, so dropping their hints frees room for the edit-mode hint within the
+    80-column footer fit; the table still lists them for discovery.
+    """
     return Action(
         id=f"remote.{name}",
         label=label,
@@ -66,6 +90,7 @@ def _reserved_dpad(name: str, label: str, arrow: str, alias: str) -> Action:
         target=f"send('{name.upper()}')",
         editable=False,
         aliases=(alias,),
+        show=False,
     )
 
 
@@ -101,9 +126,24 @@ CATALOG: list[Action] = [
     ),
     # Remote — text entry.
     Action("remote.text", "Text", Scope.REMOTE, "t", "text_mode"),
-    # Remote — reserved D-pad directions (arrow + Vim alias, both fixed). Labels are
-    # short so the footer keeps its eight-hint fit; the "UP / K" shortcut makes the
-    # direction unambiguous in the table.
+    # Remote — activate a custom button (same effect as clicking it); no default key.
+    *(_custom_activation(index) for index in range(1, 6)),
+    # Remote — toggle edit-mode: press `e` to arm it (the next custom-button
+    # activation opens its config instead of running its action) and `e` again to
+    # disarm it. Reserved so `e` can't be reassigned. Shown in the footer as the short
+    # "Edit" hint (the full "Configure Custom Button" label stays in the table); the
+    # D-pad arrow hints are dropped to keep room within the 80-column footer fit.
+    Action(
+        "remote.edit_mode",
+        "Configure Custom Button",
+        Scope.REMOTE,
+        "e",
+        "edit_mode",
+        editable=False,
+        footer_label="Edit",
+    ),
+    # Remote — reserved D-pad directions (arrow + Vim alias, both fixed), kept out of
+    # the footer; the "UP / K" shortcut makes the direction unambiguous in the table.
     _reserved_dpad("up", "Up", "up", "k"),
     _reserved_dpad("down", "Down", "down", "j"),
     _reserved_dpad("left", "Left", "left", "h"),
@@ -179,6 +219,17 @@ def is_reserved(key: str) -> bool:
     return key in RESERVED_KEYS
 
 
+def without_reserved(overrides: dict[str, str]) -> dict[str, str]:
+    """`overrides` with any entry whose key is now reserved dropped.
+
+    A key can become reserved after a user already bound it — for example `e` was
+    assignable to a device action before it was reserved for edit-mode. Such a stale
+    override would shadow the reserved binding, so it is dropped on load and the action
+    reverts to its default. Returns a new map; the original is untouched.
+    """
+    return {aid: key for aid, key in overrides.items() if not is_reserved(key)}
+
+
 # A lone modifier press (Shift, Ctrl, …) is never a valid shortcut. Most terminals
 # never deliver one, but the Kitty keyboard protocol can, so reject it defensively.
 _MODIFIER_ONLY: frozenset[str] = frozenset(
@@ -228,8 +279,10 @@ _CATALOG_IDS = frozenset(action.id for action in CATALOG)
 
 
 def _bind(bindings, key: str, action: Action, show: bool) -> None:
+    # The footer shows `footer_label` when set (a short hint), else the full label.
+    description = action.footer_label or action.label
     bindings.key_to_bindings.setdefault(key, []).append(
-        Binding(key, action.target, description=action.label, show=show, id=action.id)
+        Binding(key, action.target, description=description, show=show, id=action.id)
     )
 
 
