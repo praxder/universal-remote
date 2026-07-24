@@ -155,9 +155,12 @@ success and only raises an error notification if the script fails, while **Show*
 always opens a scrollable window with the exit code and the full output. A button's
 title and action are stored together at the same scope. Once a button has an action,
 **clicking it runs the script** instead of opening the config; to reconfigure it,
-press **`e`** to arm edit-mode and then activate the button (by clicking it or
-pressing its shortcut) — that opens the config once, after which edit-mode clears.
-While edit-mode is armed the custom buttons highlight so you can tell it is on.
+press **`e`** (shown as **Edit** in the bottom bar) to arm edit-mode and then activate
+the button (by clicking it or pressing its shortcut) — that opens the config once,
+after which edit-mode clears. Press **`e`** again to leave edit-mode without changing
+anything. While edit-mode is armed the custom buttons highlight so you can tell it is
+on. Reopening a configured button's action shows its saved source, script, and
+Results settings filled in, so you pick up where you left off.
 Scripts run in the background so the remote never freezes, bounded by a fixed
 30-second timeout that kills a hung script. `REMOTE_IP` is set in the script's
 environment to the connected device's IP address.

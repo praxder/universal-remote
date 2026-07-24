@@ -217,7 +217,9 @@ class ButtonConfigModal(ModalScreen[bool]):
         elif event.button.id == "button-config-reset":
             self._reset()
         elif event.button.id == "button-config-action-type":
-            self.app.push_screen(ActionTypeListModal(), self._action_chosen)
+            # Pass the button's current action so re-editing it prefills the action's
+            # config instead of opening blank.
+            self.app.push_screen(ActionTypeListModal(self._action), self._action_chosen)
 
     def _action_chosen(self, action: dict | None) -> None:
         """Assign the action the catalog flow returned; None means the user cancelled."""
@@ -481,8 +483,13 @@ class RemoteScreen(Screen[None]):
         self._activate_custom(index)
 
     def action_edit_mode(self) -> None:
-        # Arm edit-mode: the next custom-button activation opens its config instead of
-        # running it. The custom buttons pick up a visual cue, and a toast names it.
+        # Toggle edit-mode: `e` arms it, `e` again disarms it. While armed, the next
+        # custom-button activation opens its config instead of running it, and the
+        # custom buttons carry a visual cue. A toast names the new state.
+        if self._edit_mode:
+            self._set_edit_mode(False)
+            self.app.notify("Edit mode off.")
+            return
         self._set_edit_mode(True)
         self.app.notify("Edit mode: activate a custom button to configure it.")
 

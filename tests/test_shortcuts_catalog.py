@@ -120,6 +120,9 @@ class TestReservedCatalog:
             assert action.editable is False
             assert action.default_key == arrow
             assert alias in action.aliases
+            assert (
+                action.show is False
+            )  # arrows are self-labeled by the on-screen D-pad
 
     def test_given_the_catalog_when_read_then_the_framework_keys_are_reserved(self):
         by_id = _by_id()
@@ -152,7 +155,8 @@ class TestReservedCatalog:
         assert edit_mode.editable is False  # reserved so `e` can't be reassigned
         assert edit_mode.default_key == "e"
         assert edit_mode.target == "edit_mode"
-        assert edit_mode.show is False  # kept out of the footer's eight-hint fit
+        assert edit_mode.show is True  # shown in the footer for discoverability
+        assert edit_mode.footer_label == "Edit"  # short footer text, long table label
 
     def test_given_the_edit_mode_key_when_checked_then_it_is_reserved(self):
         assert is_reserved("e") is True

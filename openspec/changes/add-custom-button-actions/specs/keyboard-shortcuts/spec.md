@@ -12,7 +12,7 @@ The four D-pad directional actions SHALL be reserved: each is fixed to its arrow
 
 The five custom-button activation actions SHALL default to no shortcut. Each activation action, when triggered on the remote, SHALL behave exactly like clicking the matching custom button — it activates the button rather than sending a device key, and it is not tied to any particular device.
 
-The Configure Custom Button action SHALL be reserved and fixed to `e`: it arms custom-button edit-mode (see the remote surface's edit gesture) and its key MUST NOT be reassigned. It SHALL be catalogued so it appears as a fixed row in the Keyboard Shortcuts table.
+The Configure Custom Button action SHALL be reserved and fixed to `e`: it toggles custom-button edit-mode — arming it, or disarming it when already armed (see the remote surface's edit gesture) — and its key MUST NOT be reassigned. It SHALL be catalogued so it appears as a fixed row in the Keyboard Shortcuts table.
 
 The catalog SHALL also include reserved entries for framework keys that are not device actions — Activate Control (`enter`), Command Palette (`ctrl+p`), and focus navigation Tab (`tab`) and Shift+Tab (`shift+tab`) — so the user can see those keys are in use.
 

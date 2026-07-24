@@ -12,7 +12,7 @@ A custom button MAY be assigned an action drawn from an action catalog. The cata
 - **THEN** the Run Script configuration modal opens
 
 ### Requirement: Run Custom Script configuration
-The Run Script configuration modal SHALL offer a source toggle between Script File and Inline Script. When Script File is selected it SHALL present a single-line input for a path to a shell script; when Inline Script is selected it SHALL present a multi-line editor for shell script text. The modal SHALL offer a Results toggle between Don't Show and Show. The modal SHALL display a helpline stating that `REMOTE_IP` is set in the script's environment to the connected device's IP address. The modal SHALL provide OK and Cancel controls. Selecting OK SHALL store the configured action (source kind, script or path, and results-visibility choice) on the button at the scope chosen in the Button Config modal; Cancel SHALL close the modal without storing an action.
+The Run Script configuration modal SHALL offer a source toggle between Script File and Inline Script. When Script File is selected it SHALL present a single-line input for a path to a shell script; when Inline Script is selected it SHALL present a multi-line editor for shell script text. The modal SHALL offer a Results toggle between Don't Show and Show. The modal SHALL display a helpline stating that `REMOTE_IP` is set in the script's environment to the connected device's IP address. The modal SHALL provide OK and Cancel controls. Selecting OK SHALL store the configured action (source kind, script or path, and results-visibility choice) on the button at the scope chosen in the Button Config modal; Cancel SHALL close the modal without storing an action. When the modal is opened for a button that already has a Run Custom Script action, it SHALL prefill its controls from the stored action — the source toggle, the script text or file path, and the Results choice — so re-editing continues from the saved values rather than an empty form.
 
 #### Scenario: Configure an inline script
 - **WHEN** the user selects Inline Script, enters script text, chooses a Results option, and selects OK
@@ -29,6 +29,10 @@ The Run Script configuration modal SHALL offer a source toggle between Script Fi
 #### Scenario: Cancel stores nothing
 - **WHEN** the user opens the Run Script configuration modal and selects Cancel
 - **THEN** no action is stored and the button is unchanged
+
+#### Scenario: Re-editing prefills the stored action
+- **WHEN** the user reopens the Run Script configuration for a button that already has a Run Custom Script action
+- **THEN** the source toggle, the script text or file path, and the Results choice are prefilled from the stored action rather than opening blank
 
 ### Requirement: Non-blocking script execution with REMOTE_IP
 Running a custom button's Run Custom Script action SHALL execute the configured shell script without blocking the user interface, in a background worker using an asynchronous subprocess. Both source kinds SHALL run through the shell: an inline script SHALL run as shell text, and a script file SHALL be run by passing its path to the shell rather than executing the file directly, so a file needs neither an execute bit nor a shebang line. A file path SHALL have a leading `~` expanded to the user's home directory. The script's environment SHALL include `REMOTE_IP` set to the connected device's IP address; `REMOTE_IP` SHALL be the only value the application injects. Execution SHALL be bounded by a fixed 30-second timeout, not user-configurable, that terminates a script still running when it elapses, and a terminated script SHALL be treated as a failure. A script that cannot be started — a script-file path that is not an existing file, or any other spawn failure — SHALL be reported as a failure rather than crashing the remote.

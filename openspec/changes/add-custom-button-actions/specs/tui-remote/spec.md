@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Custom buttons on the remote
-The remote SHALL present exactly five custom buttons in a dedicated row. Each button SHALL show its configured title resolved for the active device, or its default title `Custom N` (where `N` is the button's 1-based position) when no title is configured for that device. Each custom button MUST be clickable with the mouse. Clicking a custom button SHALL run its assigned action when one is resolved for the active device, and SHALL open the button's configuration modal when no action is assigned. A custom button MAY also be activated by an assigned keyboard shortcut (see the keyboard-shortcuts catalog), which SHALL behave identically to clicking that button — running its resolved action, or opening its configuration when none is assigned. To re-edit a button that has an assigned action, the user SHALL use a distinct edit gesture: pressing an edit-mode key SHALL arm edit-mode, and the next activation of a custom button — whether by clicking it or by pressing its keyboard shortcut — SHALL open that button's configuration modal instead of running its action, after which edit-mode SHALL clear. While edit-mode is armed, the custom buttons SHALL show a visual indicator distinguishing the armed edit state from their normal run appearance, and that indicator SHALL clear together with edit-mode.
+The remote SHALL present exactly five custom buttons in a dedicated row. Each button SHALL show its configured title resolved for the active device, or its default title `Custom N` (where `N` is the button's 1-based position) when no title is configured for that device. Each custom button MUST be clickable with the mouse. Clicking a custom button SHALL run its assigned action when one is resolved for the active device, and SHALL open the button's configuration modal when no action is assigned. A custom button MAY also be activated by an assigned keyboard shortcut (see the keyboard-shortcuts catalog), which SHALL behave identically to clicking that button — running its resolved action, or opening its configuration when none is assigned. To re-edit a button that has an assigned action, the user SHALL use a distinct edit gesture: pressing an edit-mode key SHALL arm edit-mode, and the next activation of a custom button — whether by clicking it or by pressing its keyboard shortcut — SHALL open that button's configuration modal instead of running its action, after which edit-mode SHALL clear. The edit-mode key SHALL toggle: pressing it while edit-mode is already armed SHALL disarm edit-mode without opening any configuration. While edit-mode is armed, the custom buttons SHALL show a visual indicator distinguishing the armed edit state from their normal run appearance, and that indicator SHALL clear together with edit-mode.
 
 #### Scenario: Custom buttons show defaults when unconfigured
 - **WHEN** the user opens Use Remote for a device with no custom-button titles saved
@@ -26,6 +26,10 @@ The remote SHALL present exactly five custom buttons in a dedicated row. Each bu
 #### Scenario: Edit-mode shows a visual indicator
 - **WHEN** the user presses the edit-mode key to arm edit-mode
 - **THEN** the custom buttons show an armed indicator that distinguishes edit-mode from their normal appearance, and the indicator clears once a custom button is activated and edit-mode ends
+
+#### Scenario: Pressing the edit-mode key again disarms edit-mode
+- **WHEN** the user presses the edit-mode key while edit-mode is already armed
+- **THEN** edit-mode disarms without opening any configuration and the armed indicator clears
 
 #### Scenario: A keyboard shortcut activates a custom button
 - **WHEN** the user has assigned a shortcut to a custom button and presses it on the remote

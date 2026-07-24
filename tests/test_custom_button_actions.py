@@ -1,6 +1,6 @@
 import asyncio
 
-from textual.widgets import Button, TextArea
+from textual.widgets import Button, RadioSet, TextArea
 
 from tests.fakes import FakeAdapter
 from universal_remote.devices.models import Device
@@ -162,6 +162,33 @@ class TestEditGesture:
 
         asyncio.run(scenario())
 
+    def test_given_edit_mode_armed_when_the_edit_key_is_pressed_again_then_it_disarms(
+        self, tmp_path
+    ):
+        # The edit-mode key toggles: `e` arms it, `e` again disarms it without opening
+        # any configuration, and the armed indicator clears with it.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                button = app.screen.query_one("#custom-1", Button)
+
+                await pilot.press("e")  # arm
+                await pilot.pause()
+                assert app.screen._edit_mode is True
+                assert button.has_class("edit-armed") is True
+
+                await pilot.press("e")  # press again disarms
+                await pilot.pause()
+                assert isinstance(app.screen, RemoteScreen)
+                assert app.screen._edit_mode is False
+                assert button.has_class("edit-armed") is False
+
+        asyncio.run(scenario())
+
     def test_given_a_stale_reserved_override_on_e_when_pressed_then_edit_mode_arms(
         self, tmp_path
     ):
@@ -272,5 +299,48 @@ class TestActionTypeControl:
                 entry = app.preferences.load().custom_buttons["device"][device.id]["1"]
                 assert entry["action"]["source"] == "inline"
                 assert entry["action"]["script"] == "echo hi"
+
+        asyncio.run(scenario())
+
+    def test_given_a_configured_action_when_reopened_then_the_config_prefills(
+        self, tmp_path
+    ):
+        # Re-editing a button that already has an action must reopen its Run Script
+        # config with the stored source, script, and results choice filled in — not
+        # blank. _SHOW_OK_ACTION is an inline "exit 0" with results shown.
+        store = _store_with_device(tmp_path)
+        device = store.list()[0]
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                set_action(
+                    app.custom_buttons,
+                    1,
+                    _SHOW_OK_ACTION,
+                    ButtonScope.DEVICE,
+                    device_id=device.id,
+                    platform="fake-tv",
+                )
+                await _goto_remote(app, pilot)
+                await pilot.press("e")  # edit gesture, so the click opens config
+                await pilot.pause()
+                await pilot.click("#custom-1")
+                await _wait_for(app, pilot, ButtonConfigModal)
+                await pilot.click("#button-config-action-type")
+                await _wait_for(app, pilot, ActionTypeListModal)
+                await pilot.press("enter")  # choose Run Custom Script
+                await _wait_for(app, pilot, RunScriptConfigModal)
+
+                screen = app.screen
+                assert screen.query_one("#run-script-inline", TextArea).text == "exit 0"
+                # Inline source (index 1) and Show results (index 1) are preselected.
+                assert (
+                    screen.query_one("#run-script-source", RadioSet).pressed_index == 1
+                )
+                assert (
+                    screen.query_one("#run-script-results", RadioSet).pressed_index == 1
+                )
 
         asyncio.run(scenario())

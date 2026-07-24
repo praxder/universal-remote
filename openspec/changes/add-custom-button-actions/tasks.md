@@ -51,3 +51,9 @@
 - [x] 8.4 Edit-mode visual indicator: the custom buttons show a warning-colored bold border while edit-mode is armed, clearing when it ends — with a test and the `tui-remote` scope
 - [x] 8.5 Run Script file source: run a script file through the shell (`/bin/sh <path>`, `~` expanded) so it needs no exec bit or shebang, and report a non-existent path as a clean start failure — fixes "Exec format error" — with tests and the `custom-button-actions` scope
 - [x] 8.6 Result modal: center the Close button (presentation only; no spec change) — with a geometry test
+
+## 9. Second-pass review refinements
+
+- [x] 9.1 Edit-mode key toggles: pressing `e` while edit-mode is armed disarms it (no config opens) and clears the indicator, so `e` is a toggle rather than a one-way arm — with a test and updates to the `tui-remote` and `keyboard-shortcuts` scopes ("arms" → "toggles" plus a disarm scenario)
+- [x] 9.2 Edit-mode key in the footer: show `e` as a short "Edit" hint via a new `footer_label` field on the catalog `Action` (full "Configure Custom Button" label stays in the table); drop the four self-labeled D-pad arrow hints from the footer to keep the 80-column fit — with a footer-width regression test and catalog assertions (design note only; footer visibility is not spec-governed)
+- [x] 9.3 Re-editing prefills the action: thread the button's current action from the Button Config modal through the Action Type list into the Run Script config modal (forwarded only on a type match), so reopening a configured button's action config prefills source, script/path, and Results instead of opening blank — with an end-to-end prefill test and the `custom-button-actions` scope

@@ -1,6 +1,6 @@
 import asyncio
 
-from textual.widgets import Button, Input
+from textual.widgets import Button, Footer, Input
 
 from tests.fakes import FakeAdapter
 from universal_remote.capabilities import Capabilities
@@ -604,5 +604,31 @@ class TestCustomButtons:
                 assert (
                     str(app.screen.query_one("#custom-1", Button).label) == "Custom 1"
                 )
+
+        asyncio.run(scenario())
+
+
+class TestFooterFit:
+    def test_given_the_remote_footer_at_the_baseline_width_then_its_hints_fit(
+        self, tmp_path
+    ):
+        # The footer must show the edit-mode hint yet stay within the supported
+        # 80-column width; the self-labeled D-pad arrows are dropped to make room.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+
+                footer = app.screen.query_one(Footer)
+                keys = list(footer.query("FooterKey"))
+                total = sum(key.size.width for key in keys)
+                descriptions = {key.description for key in keys}
+
+                assert total <= footer.size.width
+                assert "Edit" in descriptions
+                assert descriptions.isdisjoint({"Up", "Down", "Left", "Right"})
 
         asyncio.run(scenario())

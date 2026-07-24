@@ -180,3 +180,34 @@ class TestPrefill:
                 )
 
         asyncio.run(scenario())
+
+    def test_given_an_existing_file_action_when_reopened_then_its_values_prefill(self):
+        action = {
+            "type": "run_script",
+            "source": "file",
+            "script": "~/scripts/wake.sh",
+            "show_results": False,
+        }
+
+        async def scenario():
+            app = _Host(action)
+            async with app.run_test(size=(90, 40)) as pilot:
+                await pilot.pause()
+                # The path input holds the stored path and is the visible source field.
+                path = app.screen.query_one("#run-script-path", Input)
+                assert path.value == "~/scripts/wake.sh"
+                assert path.display is True
+                assert app.screen.query_one("#run-script-inline", TextArea).display is (
+                    False
+                )
+                # File is preselected (index 0) and Don't Show is preselected (index 0).
+                assert (
+                    app.screen.query_one("#run-script-source", RadioSet).pressed_index
+                    == 0
+                )
+                assert (
+                    app.screen.query_one("#run-script-results", RadioSet).pressed_index
+                    == 0
+                )
+
+        asyncio.run(scenario())

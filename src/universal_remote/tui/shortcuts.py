@@ -31,7 +31,9 @@ class Action:
     screen action string the binding fires, or None for framework entries that are
     catalogued only for visibility. `aliases` are extra fixed keys a reserved entry
     also answers to (the D-pad's Vim keys). `show` is the default footer visibility
-    of the primary key.
+    of the primary key. `footer_label`, when set, is a shorter label the footer shows
+    in place of `label` (which stays the full Keyboard Shortcuts table text) so a
+    long action name does not overflow the narrow footer.
     """
 
     id: str
@@ -42,6 +44,7 @@ class Action:
     editable: bool = True
     aliases: tuple[str, ...] = ()
     show: bool = True
+    footer_label: str | None = None
 
 
 def _remote_key(name: str, label: str, key: str, *, show: bool = True) -> Action:
@@ -73,7 +76,12 @@ def _custom_activation(index: int) -> Action:
 
 
 def _reserved_dpad(name: str, label: str, arrow: str, alias: str) -> Action:
-    """A fixed D-pad direction: its arrow key plus a Vim alias, both unchangeable."""
+    """A fixed D-pad direction: its arrow key plus a Vim alias, both unchangeable.
+
+    Kept out of the footer — the on-screen D-pad already labels the directions with
+    ▲▼◀▶ glyphs, so dropping their hints frees room for the edit-mode hint within the
+    80-column footer fit; the table still lists them for discovery.
+    """
     return Action(
         id=f"remote.{name}",
         label=label,
@@ -82,6 +90,7 @@ def _reserved_dpad(name: str, label: str, arrow: str, alias: str) -> Action:
         target=f"send('{name.upper()}')",
         editable=False,
         aliases=(alias,),
+        show=False,
     )
 
 
@@ -119,10 +128,11 @@ CATALOG: list[Action] = [
     Action("remote.text", "Text", Scope.REMOTE, "t", "text_mode"),
     # Remote — activate a custom button (same effect as clicking it); no default key.
     *(_custom_activation(index) for index in range(1, 6)),
-    # Remote — arm edit-mode: the next custom-button activation opens its config
-    # instead of running its action. Reserved so `e` can't be reassigned to another
-    # action, and hidden from the footer (a ninth hint clips the 80-column fit); it
-    # still shows as a dimmed row in the Keyboard Shortcuts table for discovery.
+    # Remote — toggle edit-mode: press `e` to arm it (the next custom-button
+    # activation opens its config instead of running its action) and `e` again to
+    # disarm it. Reserved so `e` can't be reassigned. Shown in the footer as the short
+    # "Edit" hint (the full "Configure Custom Button" label stays in the table); the
+    # D-pad arrow hints are dropped to keep room within the 80-column footer fit.
     Action(
         "remote.edit_mode",
         "Configure Custom Button",
@@ -130,11 +140,10 @@ CATALOG: list[Action] = [
         "e",
         "edit_mode",
         editable=False,
-        show=False,
+        footer_label="Edit",
     ),
-    # Remote — reserved D-pad directions (arrow + Vim alias, both fixed). Labels are
-    # short so the footer keeps its eight-hint fit; the "UP / K" shortcut makes the
-    # direction unambiguous in the table.
+    # Remote — reserved D-pad directions (arrow + Vim alias, both fixed), kept out of
+    # the footer; the "UP / K" shortcut makes the direction unambiguous in the table.
     _reserved_dpad("up", "Up", "up", "k"),
     _reserved_dpad("down", "Down", "down", "j"),
     _reserved_dpad("left", "Left", "left", "h"),
@@ -270,8 +279,10 @@ _CATALOG_IDS = frozenset(action.id for action in CATALOG)
 
 
 def _bind(bindings, key: str, action: Action, show: bool) -> None:
+    # The footer shows `footer_label` when set (a short hint), else the full label.
+    description = action.footer_label or action.label
     bindings.key_to_bindings.setdefault(key, []).append(
-        Binding(key, action.target, description=action.label, show=show, id=action.id)
+        Binding(key, action.target, description=description, show=show, id=action.id)
     )
 
 

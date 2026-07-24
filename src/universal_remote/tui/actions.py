@@ -337,6 +337,13 @@ class ActionTypeListModal(ModalScreen[dict | None]):
     #action-type-options { width: 100%; height: auto; }
     """
 
+    def __init__(self, current: dict | None = None) -> None:
+        super().__init__()
+        # The button's currently-assigned action, forwarded to a chosen type's config
+        # modal so re-editing prefills its fields. Only forwarded when its type matches
+        # the chosen one, so it stays correct as the catalog grows.
+        self._current = current
+
     def compose(self) -> ComposeResult:
         with Vertical(id="action-type-list"):
             yield Label("Choose an Action Type", id="action-type-title")
@@ -351,7 +358,12 @@ class ActionTypeListModal(ModalScreen[dict | None]):
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         entry = action_type(event.option.id)
         if entry is not None:
-            self.app.push_screen(entry.config_modal(), self._configured)
+            existing = (
+                self._current
+                if self._current and self._current.get("type") == entry.id
+                else None
+            )
+            self.app.push_screen(entry.config_modal(existing), self._configured)
 
     def _configured(self, action: dict | None) -> None:
         self.dismiss(action)
