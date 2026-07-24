@@ -129,6 +129,39 @@ class TestDeviceList:
         asyncio.run(scenario())
 
 
+class TestStalePlatformSelection:
+    def test_given_a_stale_platform_device_when_selected_then_a_tailored_toast_and_no_edit(
+        self, tmp_path
+    ):
+        # A saved device may name a platform whose adapter is no longer registered.
+        # Opening it for edit must be refused at the seam with a tailored message,
+        # not raise into the global error net while composing the edit form.
+        store = DeviceStore(path=tmp_path / "d.json")
+        device = store.add(Device(name="Old TV", platform="gone", ip="9.9.9.9"))
+
+        async def scenario():
+            app = _app(store, registry=_registry("fake-tv"))  # "gone" not registered
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, device.id)
+                await pilot.pause()
+                await pilot.press("enter")
+                await pilot.pause()
+                # Stayed on the list; no edit form was opened.
+                assert isinstance(app.screen, DeviceListScreen)
+                # Handled locally: the error net was not invoked...
+                assert app._exception is None
+                # ...and a tailored error toast named the device.
+                errors = [
+                    n.message for n in app._notifications if n.severity == "error"
+                ]
+                assert any("Old TV" in message for message in errors)
+
+        asyncio.run(scenario())
+
+
 class TestSelection:
     def test_given_the_add_row_when_selected_by_enter_then_discovery_opens(
         self, tmp_path

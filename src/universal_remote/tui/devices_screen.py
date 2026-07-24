@@ -95,7 +95,20 @@ class DeviceListScreen(Screen[None]):
             (d for d in self.app.store.list() if d.id == event.option.id), None
         )
         if device is not None:
-            self.app.push_screen(AddDeviceScreen(existing=device))
+            self._open_for_edit(device)
+
+    def _open_for_edit(self, device: Device) -> None:
+        # A saved device may name a platform whose adapter is no longer registered;
+        # refuse the edit at the seam with a tailored message rather than letting the
+        # edit form's platform lookup raise into the global error net.
+        if not self.app.registry.is_supported(device.platform):
+            self.notify(
+                f"Can't open {device.name}: its platform is no longer supported.",
+                title="Unsupported device",
+                severity="error",
+            )
+            return
+        self.app.push_screen(AddDeviceScreen(existing=device))
 
     def action_add(self) -> None:
         # The add entry opens discovery first; manual entry is its last row. Imported
@@ -107,7 +120,7 @@ class DeviceListScreen(Screen[None]):
     def action_edit(self) -> None:
         device = self._selected()
         if device is not None:
-            self.app.push_screen(AddDeviceScreen(existing=device))
+            self._open_for_edit(device)
 
     def action_delete(self) -> None:
         device = self._selected()

@@ -20,7 +20,11 @@ from textual.widgets import (
 from textual.widgets.option_list import Option
 
 from ..devices.models import Device
-from ..errors import ConnectionFailedError, PairingCancelledError
+from ..errors import (
+    ConnectionFailedError,
+    PairingCancelledError,
+    UnsupportedPlatformError,
+)
 from ..reachability import Reachability, probe
 from ..session import Session
 from .device_option_list import DeviceOptionList
@@ -179,7 +183,13 @@ class UseRemoteScreen(Screen[None]):
         for index, device in enumerate(self._devices):
             if device.id in self._inflight:
                 continue
-            adapter = self.app.registry.resolve(device.platform)
+            try:
+                adapter = self.app.registry.resolve(device.platform)
+            except UnsupportedPlatformError:
+                # A saved device whose adapter is no longer registered: reachability
+                # is best-effort, so skip this row (it stays unknown) and keep
+                # probing the rest rather than letting the error reach the net.
+                continue
             port = getattr(adapter, "reachability_port", None)
             if port is None:
                 continue  # no port declared: the row stays yellow (unknown)
@@ -206,6 +216,16 @@ class UseRemoteScreen(Screen[None]):
             (d for d in self.app.store.list() if d.id == event.option.id), None
         )
         if device is None:
+            return
+        # A saved device may name a platform whose adapter is no longer registered.
+        # Handle it here at the seam with a tailored message rather than letting the
+        # deeper resolve raise into the global error net.
+        if not self.app.registry.is_supported(device.platform):
+            self.notify(
+                f"Can't use {device.name}: its platform is no longer supported.",
+                title="Unsupported device",
+                severity="error",
+            )
             return
         # An adapter may declare it needs no pairing (e.g. Roku's unauthenticated
         # ECP); such a device connects directly even without a stored credential.

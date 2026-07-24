@@ -39,7 +39,9 @@ from textual.widgets.option_list import Option
 # security boundary. Overridable only as a test seam.
 DEFAULT_TIMEOUT = 30.0
 
-_HELPLINE = "REMOTE_IP is set in the environment to the connected device's IP address."
+_HELPLINE = (
+    "REMOTE_IP is set in the script's environment to the connected device's IP address."
+)
 
 
 @dataclass(frozen=True)
