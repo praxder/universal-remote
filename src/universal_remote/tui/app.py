@@ -221,16 +221,17 @@ class UniversalRemoteApp(App[None]):
                 rebuild_shortcuts(screen, self.shortcut_overrides, scopes, hide=hide)
 
     def on_mount(self) -> None:
-        from .shortcuts import without_reserved
+        from .shortcuts import without_bare_modifiers, without_reserved
 
         preferences = self.preferences.load()
         # Load saved shortcuts into the override map before the menu is pushed, so
         # its bindings (and every later screen's) build from them. Drop any override
         # whose key has since become reserved (e.g. `e` bound to a device action before
-        # it was reserved for edit-mode): left in place it would shadow the reserved
-        # binding, so the action reverts to its default. `update` keeps any overrides
-        # set directly on the app (e.g. in tests) when none are saved.
-        kept = without_reserved(preferences.shortcuts)
+        # it was reserved for edit-mode) or is a lone modifier (assignable before the
+        # `is_bare_modifier` guard was fixed): left in place either would bind a fixed
+        # or modifier-only key, so the action reverts to its default. `update` keeps
+        # any overrides set directly on the app (e.g. in tests) when none are saved.
+        kept = without_bare_modifiers(without_reserved(preferences.shortcuts))
         self.shortcut_overrides.update(kept)
         # Load saved custom-button titles the same way, before any remote is opened.
         self.custom_buttons.update(preferences.custom_buttons)

@@ -6,7 +6,7 @@ The spec has **no requirement** covering this behavior at all — the guard was 
 
 ## What Changes
 
-- A **lone modifier press** (left/right Shift, Control, Alt, Super/Command, Hyper, Meta, plus ISO level-3/level-5 shift) is refused in the capture modal with an error toast; the action keeps its existing shortcut.
+- A **lone modifier press** (left/right Shift, Control, Alt, Super/Command, Hyper, Meta, plus ISO level-3/level-5 shift) is **silently ignored** in the capture modal — no shortcut assigned, modal stays open, no error. The terminal reports key presses only (never releases), so a modifier that starts a combo (Alt, then A) arrives as its own event first; toasting on it would spuriously reject a valid `Alt+A`, so the modal swallows the modifier and waits for the base key.
 - A **modifier combined with a base key** (for example `ctrl+b`) stays a normal candidate shortcut, assignable subject to the conflict and reserved-key rules. This half already works — no code change — the spec just records it.
 - Fix `is_bare_modifier`: `_MODIFIER_ONLY` becomes the key names the keyboard protocol actually delivers for a modifier pressed on its own, with a comment citing `textual._keyboard_protocol.MODIFIER_FUNCTIONAL_KEYS` (hardcoded, no private-module import).
 - On load, **drop any persisted override whose key is a lone modifier**, mirroring the existing reserved-key pruning (`without_reserved`): the action reverts to its default and the cleaned set is persisted. This self-heals anyone who already saved a bare-modifier binding while the guard was broken.
@@ -22,6 +22,6 @@ The spec has **no requirement** covering this behavior at all — the guard was 
 
 - `src/universal_remote/tui/shortcuts.py` — correct `_MODIFIER_ONLY` to the modifier key names the protocol delivers; add a load-time pruning helper for lone-modifier overrides mirroring `without_reserved`.
 - `src/universal_remote/tui/app.py` — apply lone-modifier pruning alongside `without_reserved` in `on_mount`, persisting the cleaned overrides when anything is dropped.
-- `src/universal_remote/tui/shortcuts_screen.py` — no logic change; the capture modal already calls `is_bare_modifier`, so correcting the set makes that call effective.
+- `src/universal_remote/tui/shortcuts_screen.py` — the capture modal's `on_key` swallows a bare-modifier press (using the corrected `is_bare_modifier`) instead of assigning; the now-dead bare-modifier toast branch is removed from `_assign`.
 - `tests/test_shortcuts_catalog.py` — fix the false-green bare-modifier test; add a modifier-plus-key-allowed assertion and a lone-modifier pruning test.
 - No new dependencies; no device-adapter or `Key` vocabulary changes; no user-visible change to combos, which already worked.

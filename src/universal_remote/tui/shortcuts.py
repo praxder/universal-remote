@@ -230,10 +230,40 @@ def without_reserved(overrides: dict[str, str]) -> dict[str, str]:
     return {aid: key for aid, key in overrides.items() if not is_reserved(key)}
 
 
-# A lone modifier press (Shift, Ctrl, …) is never a valid shortcut. Most terminals
-# never deliver one, but the Kitty keyboard protocol can, so reject it defensively.
+def without_bare_modifiers(overrides: dict[str, str]) -> dict[str, str]:
+    """`overrides` with any entry whose key is a lone modifier dropped.
+
+    A broken guard once let a bare modifier be assigned and saved — its key names never
+    matched what the terminal delivers, so `is_bare_modifier` always returned False.
+    Such an override binds an action to a modifier press, so it is dropped on load and
+    the action reverts to its default. Returns a new map; the original is untouched.
+    """
+    return {aid: key for aid, key in overrides.items() if not is_bare_modifier(key)}
+
+
+# A lone modifier press is never a valid shortcut. Under the Kitty keyboard protocol
+# (Ghostty, Kitty, WezTerm, modern iTerm) a modifier pressed on its own arrives as its
+# own functional-key name — `left_alt`, `left_shift`, … — not the short `alt`/`shift`,
+# so the capture modal receives these strings verbatim. Kept in sync with
+# `textual._keyboard_protocol.MODIFIER_FUNCTIONAL_KEYS` (hardcoded to avoid importing a
+# private module).
 _MODIFIER_ONLY: frozenset[str] = frozenset(
-    {"shift", "ctrl", "alt", "super", "meta", "hyper"}
+    {
+        "left_shift",
+        "left_control",
+        "left_alt",
+        "left_super",
+        "left_hyper",
+        "left_meta",
+        "right_shift",
+        "right_control",
+        "right_alt",
+        "right_super",
+        "right_hyper",
+        "right_meta",
+        "iso_level3_shift",
+        "iso_level5_shift",
+    }
 )
 
 

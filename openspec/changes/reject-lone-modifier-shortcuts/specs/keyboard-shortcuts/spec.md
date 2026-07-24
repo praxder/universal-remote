@@ -2,12 +2,12 @@
 
 ### Requirement: Lone modifier keys cannot be assigned
 
-A shortcut MUST combine any modifier with a base key; a lone modifier press SHALL NOT be assignable. When the capture modal receives a bare modifier key — a left or right Shift, Control, Alt, Super, Hyper, or Meta press, or an ISO level-3 / level-5 shift — the assignment SHALL be refused with an error toast and the action's existing shortcut SHALL be left unchanged. A modifier combined with a base key (for example `ctrl+b`) is a normal candidate shortcut and SHALL be assignable subject to the conflict and reserved-key rules. The set of lone-modifier keys SHALL match the key names the terminal keyboard protocol delivers when a modifier is pressed on its own, so the check matches what the modal actually receives rather than a shorthand the terminal never sends.
+A shortcut MUST combine any modifier with a base key; a lone modifier press SHALL NOT be assignable. When the capture modal receives a bare modifier key — a left or right Shift, Control, Alt, Super, Hyper, or Meta press, or an ISO level-3 / level-5 shift — the modal SHALL silently ignore it: no shortcut is assigned, the action's existing shortcut is left unchanged, the modal stays open awaiting a real key, and no error is shown. This is because the terminal reports key presses only, never releases: a modifier pressed as the start of a combination (Alt, then A) arrives as its own press event before the combination, so treating it as an error would spuriously reject a valid combo. A modifier combined with a base key (for example `ctrl+b`) is a normal candidate shortcut and SHALL be assignable subject to the conflict and reserved-key rules. The set of lone-modifier keys SHALL match the key names the terminal keyboard protocol delivers when a modifier is pressed on its own, so the check matches what the modal actually receives rather than a shorthand the terminal never sends.
 
-#### Scenario: A lone modifier press is refused
+#### Scenario: A lone modifier press is ignored
 
 - **WHEN** the user activates a row and presses only a modifier key (such as Alt or Shift) in the capture modal
-- **THEN** the assignment is refused, the action keeps its previous shortcut, and a toast explains the key cannot be assigned on its own
+- **THEN** no shortcut is assigned, the action keeps its previous shortcut, the capture modal stays open, and no error is shown
 
 #### Scenario: A modifier combined with a base key is accepted
 
@@ -17,7 +17,7 @@ A shortcut MUST combine any modifier with a base key; a lone modifier press SHAL
 #### Scenario: The check matches the protocol's delivered names
 
 - **WHEN** the terminal reports a modifier-only press as its protocol key name (such as `left_alt` or `iso_level3_shift`)
-- **THEN** that name is recognized as a lone modifier and refused, not treated as an ordinary assignable key
+- **THEN** that name is recognized as a lone modifier and ignored, not treated as an ordinary assignable key
 
 ### Requirement: Stale lone-modifier overrides are dropped on load
 

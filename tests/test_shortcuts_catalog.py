@@ -7,6 +7,7 @@ from universal_remote.tui.shortcuts import (
     effective_key,
     is_bare_modifier,
     is_reserved,
+    without_bare_modifiers,
     without_reserved,
 )
 
@@ -215,10 +216,18 @@ class TestConflictsAndReserved:
         assert is_reserved("v") is False
 
     def test_given_a_bare_modifier_when_checked_then_it_is_unassignable(self):
-        assert is_bare_modifier("shift") is True
-        assert is_bare_modifier("ctrl") is True
+        # A modifier pressed alone arrives under the keyboard protocol's own name
+        # (`left_alt`, `iso_level3_shift`, …), never the short `alt`; the check must
+        # match what the capture modal actually receives.
+        assert is_bare_modifier("left_alt") is True
+        assert is_bare_modifier("left_shift") is True
+        assert is_bare_modifier("iso_level3_shift") is True
+
+    def test_given_a_base_key_or_modifier_combo_when_checked_then_it_is_assignable(
+        self,
+    ):
         assert is_bare_modifier("d") is False
-        assert is_bare_modifier("ctrl+p") is False
+        assert is_bare_modifier("ctrl+b") is False
 
     def test_given_an_actions_own_default_when_checked_then_it_is_exempt(self):
         # OK legitimately defaults to `enter`, itself a reserved key.
@@ -249,6 +258,30 @@ class TestWithoutReserved:
         without_reserved(overrides)
 
         assert overrides == {"remote.stop": "e"}
+
+
+class TestWithoutBareModifiers:
+    def test_given_a_lone_modifier_override_when_pruned_then_it_is_dropped(self):
+        # A broken guard once let a bare modifier be assigned and saved; such an
+        # override binds an action to a modifier press and must be dropped.
+        overrides = {"remote.vol_up": "left_alt", "remote.mute": "="}
+
+        pruned = without_bare_modifiers(overrides)
+
+        assert "remote.vol_up" not in pruned
+        assert pruned["remote.mute"] == "="
+
+    def test_given_ordinary_and_combo_overrides_when_pruned_then_they_are_kept(self):
+        overrides = {"remote.vol_up": "=", "remote.mute": "ctrl+b"}
+
+        assert without_bare_modifiers(overrides) == overrides
+
+    def test_given_overrides_when_pruned_then_the_original_map_is_unchanged(self):
+        overrides = {"remote.vol_up": "left_alt"}
+
+        without_bare_modifiers(overrides)
+
+        assert overrides == {"remote.vol_up": "left_alt"}
 
 
 class TestDisplayLabel:
