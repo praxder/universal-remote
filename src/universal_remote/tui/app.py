@@ -11,10 +11,13 @@ from typing import Callable, Iterable
 from ..devices.store import DeviceStore
 from ..error_log import log_exception
 from ..errors import UniversalRemoteError
+from ..preferences.store import Preferences, PreferencesStore
 from ..registry import AdapterRegistry
 from ..registry import registry as default_registry
+from .custom_buttons import forget_device
 from .menu import MenuScreen
 from .quotes import Quote, random_quote
+from .shortcuts_screen import ShortcutsCommandProvider
 
 
 class UniversalRemoteApp(App[None]):
@@ -22,10 +25,17 @@ class UniversalRemoteApp(App[None]):
 
     TITLE = "Universal Remote"
 
+    # Add the read-only "Keyboard Shortcuts" entry to the default command palette.
+    COMMANDS = App.COMMANDS | {ShortcutsCommandProvider}
+
     CSS = """
     Screen { align: center middle; }
     #menu { width: 100%; height: auto; }
     #menu Button { width: 28; margin: 1 0; }
+    /* Settings entry: a bottom-left button docked above the Footer (which docks
+       last, so it stays below this). Left-aligned; the centered #menu is untouched. */
+    #settings-bar { dock: bottom; height: auto; width: 100%; align-horizontal: left; }
+    #settings-bar Button { width: auto; margin: 0 0 2 2; }
     /* focus: accent text on a slightly lighter fill instead of reversing fg/bg;
        keep the default `tall` top/bottom border so the height never changes */
     Button:focus {
@@ -46,6 +56,12 @@ class UniversalRemoteApp(App[None]):
     #use-remote-title { width: 58; text-align: left; margin: 1 0 1 0; color: $accent; }
     /* wide enough for the "Discover" banner; padded like the Devices banner */
     #discover-title { width: 40; text-align: left; margin: 1 0 1 0; color: $accent; }
+    /* wide enough for the "Settings" banner; padded like the other banners */
+    #settings-title { width: 40; text-align: left; margin: 1 0 1 0; color: $accent; }
+    /* Settings rows: each wrapped in Center; the version is a muted, non-interactive label */
+    #settings { width: 100%; height: auto; }
+    #settings Button { width: 40; margin-bottom: 1; }
+    #settings #version { width: auto; margin-top: 1; color: $text-muted; }
     /* the "searching" indicator: an animated spinner + bold text, hidden once done */
     #discover-status { height: 1; margin-top: 1; }
     #discover-status LoadingIndicator { width: 8; height: 1; color: $accent; }
@@ -131,11 +147,21 @@ class UniversalRemoteApp(App[None]):
         store: DeviceStore | None = None,
         registry: AdapterRegistry | None = None,
         quote_provider: Callable[[], Quote | None] | None = None,
+        preferences: PreferencesStore | None = None,
     ) -> None:
         super().__init__()
         self.store = store or DeviceStore()
         self.registry = registry or default_registry
         self.quote_provider = quote_provider or random_quote
+        self.preferences = preferences or PreferencesStore()
+        # Action id -> key overrides for the catalogued shortcuts; populated from the
+        # saved preferences on mount (see `on_mount`) and edited live from the
+        # Keyboard Shortcuts screen. Screens read this to build their bindings.
+        self.shortcut_overrides: dict[str, str] = {}
+        # Layered custom-button titles keyed by scope; populated from saved preferences
+        # on mount and read by the remote to label its custom buttons. Resolution lives
+        # in `tui.custom_buttons`.
+        self.custom_buttons: dict = {}
         # Set true only once our own mount handler has run, so the safety net can
         # tell a post-mount error (stay open) from a startup/compose/mount failure
         # (fall through). See `_handle_exception`.
@@ -148,7 +174,73 @@ class UniversalRemoteApp(App[None]):
                 continue
             yield command
 
+    def watch_theme(self, theme_name: str) -> None:
+        """Persist every theme change, wherever it originates.
+
+        Textual dispatches both its own private `_watch_theme` and this public
+        watcher, so a change from the Settings picker or the command palette is
+        saved here without touching framework internals. The current shortcuts ride
+        along so saving the theme never drops them.
+        """
+        self.persist_preferences()
+
+    def delete_device(self, device_id: str) -> None:
+        """Remove a saved device and the custom-button titles scoped only to it.
+
+        Deletes from the device store and purges that device's device-scoped
+        `custom_buttons` entries (device-type and global titles stand), then persists
+        the preferences — the two stores are kept in step here so both delete sites
+        do it the same way.
+        """
+        self.store.delete(device_id)
+        forget_device(self.custom_buttons, device_id)
+        self.persist_preferences()
+
+    def persist_preferences(self) -> None:
+        """Write the current theme, shortcuts, and custom buttons together, best-effort."""
+        self.preferences.save(
+            Preferences(
+                theme=self.theme,
+                shortcuts=dict(self.shortcut_overrides),
+                custom_buttons=self.custom_buttons,
+            )
+        )
+
+    def apply_shortcuts(self) -> None:
+        """Rebuild the catalogued bindings of every mounted screen from the overrides.
+
+        Called after a shortcut is assigned or cleared so the change takes effect
+        without a restart across the whole screen stack.
+        """
+        from .shortcuts import rebuild_shortcuts
+
+        for screen in self.screen_stack:
+            scopes = getattr(screen, "SHORTCUT_SCOPES", None)
+            if scopes:
+                hide = getattr(screen, "SHORTCUT_HIDE", ())
+                rebuild_shortcuts(screen, self.shortcut_overrides, scopes, hide=hide)
+
     def on_mount(self) -> None:
+        from .shortcuts import without_reserved
+
+        preferences = self.preferences.load()
+        # Load saved shortcuts into the override map before the menu is pushed, so
+        # its bindings (and every later screen's) build from them. Drop any override
+        # whose key has since become reserved (e.g. `e` bound to a device action before
+        # it was reserved for edit-mode): left in place it would shadow the reserved
+        # binding, so the action reverts to its default. `update` keeps any overrides
+        # set directly on the app (e.g. in tests) when none are saved.
+        kept = without_reserved(preferences.shortcuts)
+        self.shortcut_overrides.update(kept)
+        # Load saved custom-button titles the same way, before any remote is opened.
+        self.custom_buttons.update(preferences.custom_buttons)
+        # Ignore a saved theme that is no longer registered (e.g. removed by a
+        # Textual upgrade) so `_validate_theme` cannot raise; the default stands.
+        if preferences.theme in self.available_themes:
+            self.theme = preferences.theme
+        # Persist the cleaned overrides so a pruned stale binding stays gone next run.
+        if kept != preferences.shortcuts:
+            self.persist_preferences()
         self.push_screen(MenuScreen())
         self._mount_succeeded = True
 

@@ -21,6 +21,7 @@ from textual.widgets.option_list import Option
 
 from ..devices.models import Device
 from .device_option_list import DeviceOptionList
+from .shortcuts import Scope, rebuild_shortcuts
 
 ADD_ID = "__add__"
 
@@ -44,11 +45,13 @@ EDIT_TITLE_ART = r""" _____    _ _ _     ____             _
 
 
 class DeviceListScreen(Screen[None]):
+    # Go Back (Escape by default) is the catalogued Global action, built on mount.
+    SHORTCUT_SCOPES = frozenset({Scope.GLOBAL})
+
     BINDINGS = [
         ("a", "add", "Add"),
         ("e", "edit", "Edit"),
         ("backspace", "delete", "Delete"),
-        ("escape", "back", "Back"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -59,6 +62,7 @@ class DeviceListScreen(Screen[None]):
         yield Footer()
 
     def on_mount(self) -> None:
+        rebuild_shortcuts(self, self.app.shortcut_overrides, self.SHORTCUT_SCOPES)
         self._reload()
 
     def on_screen_resume(self) -> None:
@@ -112,12 +116,12 @@ class DeviceListScreen(Screen[None]):
 
         def _on_confirm(confirmed: bool | None) -> None:
             if confirmed:
-                self.app.store.delete(device.id)
+                self.app.delete_device(device.id)
                 self._reload()
 
         self.app.push_screen(ConfirmDeleteScreen(device.name), _on_confirm)
 
-    def action_back(self) -> None:
+    def action_go_back(self) -> None:
         self.app.pop_screen()
 
 
@@ -344,7 +348,7 @@ class AddDeviceScreen(Screen[None]):
     def _delete(self) -> None:
         def _on_confirm(confirmed: bool | None) -> None:
             if confirmed:
-                self.app.store.delete(self._existing.id)
+                self.app.delete_device(self._existing.id)
                 self.app.pop_screen()
 
         self.app.push_screen(ConfirmDeleteScreen(self._existing.name), _on_confirm)

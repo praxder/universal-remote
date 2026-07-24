@@ -4,7 +4,7 @@
 TBD - created by archiving change scaffold-samsung-remote. Update Purpose after archive.
 ## Requirements
 ### Requirement: Menu-driven entry with two modes
-The application SHALL launch into a menu offering two modes: Manage Devices and Use Remote. Both modes MUST be reachable by keyboard and by mouse.
+The application SHALL launch into a menu offering two modes: Manage Devices and Use Remote. Both modes MUST be reachable by keyboard and by mouse. The menu SHALL also present a Settings entry point — a "Settings" button docked in the bottom-left corner of the screen, plus an `s` key binding — that opens the Settings screen. The Settings entry point MUST be reachable by keyboard (the `s` key) and by mouse (clicking the button). Adding the Settings entry point SHALL NOT change the centered layout of the existing menu content (title, mode buttons, and movie quote). The menu's key bindings — Manage Devices (`d`), Use Remote (`r`), Settings (`s`), and Quit (`q`) — SHALL be the default shortcuts of rebindable Home actions that the user MAY change via the keyboard-shortcuts capability; the docked Settings button and the mode buttons remain operable by mouse regardless of the current key bindings.
 
 #### Scenario: Menu offers both modes
 - **WHEN** the application starts
@@ -13,6 +13,18 @@ The application SHALL launch into a menu offering two modes: Manage Devices and 
 #### Scenario: Mode reachable by keyboard and mouse
 - **WHEN** the user selects a mode with the keyboard or by clicking it
 - **THEN** the application navigates to that mode
+
+#### Scenario: Settings reachable by key
+- **WHEN** the user presses the `s` key on the menu
+- **THEN** the application opens the Settings screen
+
+#### Scenario: Settings reachable by button
+- **WHEN** the user clicks the bottom-left Settings button on the menu
+- **THEN** the application opens the Settings screen
+
+#### Scenario: Home key is rebindable
+- **WHEN** the user has assigned a Home action (Manage Devices, Use Remote, Settings, or Quit) a custom key and presses it on the menu
+- **THEN** the application performs that action, and its default key no longer triggers it
 
 ### Requirement: Device management screens
 The Manage Devices mode SHALL present a "Devices" ASCII-art banner, the saved devices, and an always-present add entry as the last row of the list, backed by the device store and exposing add, edit, and delete. When one or more devices are saved, the mode SHALL list the devices first, then a separator, then the add entry; when no devices are saved, the list SHALL show only the add entry. Selecting the add entry — by Enter or by mouse click — SHALL open device discovery (see the "Add device via discovery" requirement). Selecting a device row — by Enter or by mouse click — SHALL open that device for editing. Deleting a device SHALL be triggered either by the Backspace key while a device row is highlighted on the list, or by a Delete button on the edit screen (shown only when editing a device, never when adding), and SHALL require the user to confirm before the device is removed: the system SHALL present the same confirmation prompt naming the device, remove the device only when the user confirms, and leave the store unchanged when the user cancels. When deletion is confirmed from the edit screen, the application SHALL return to the saved-device list, which SHALL no longer show the removed device. The confirmation prompt SHALL default keyboard focus to its cancel action and SHALL let the user move focus between its confirm and cancel actions with the arrow keys. Pressing Backspace while the add entry is highlighted SHALL do nothing. The add and edit screen SHALL present an ASCII-art banner titled "Add Device" when adding and "Edit Device" when editing, styled with the same top and bottom margin as the "Devices" banner. The add and edit screen SHALL order its cells as device type, then name, then IP address. When adding, the device type SHALL be a selector offering the registered platforms by their human-readable names and defaulting to the first; when editing, the device type SHALL be shown as a read-only cell while the name and IP address remain editable. When editing, the screen SHALL show a Delete button below Save, aligned to the same left edge; the add screen SHALL NOT show a Delete button. The device-type cell, the name and IP address cells, the Save button, and — when editing — the Delete button SHALL be reachable both by Tab and by the Up and Down arrow keys — Up moves focus to the previous cell and Down to the next — while the Left and Right arrows continue to move the text cursor within a focused input. Because the Up and Down arrows navigate between cells, the device-type dropdown SHALL open on Enter or Space rather than on an arrow key. The Save button's left edge SHALL be aligned with the cells above it.
@@ -174,11 +186,12 @@ Entering Use Remote SHALL let the user choose a target device, then connect to i
 - **THEN** the application returns to the entry menu
 
 ### Requirement: On-screen remote surface
-The Use Remote mode SHALL present a remote resembling a physical remote with a menu key, a D-pad (up, down, left, right), OK, Back, Home, volume up, volume down, mute, channel up and channel down, the media-transport keys play, pause, play/pause, rewind, and fast-forward and stop, a number pad for the digits 0 through 9, and a text field. Every button MUST be clickable with the mouse. The rewind and fast-forward buttons SHALL use scan-style icons. The remote's buttons SHALL be bordered and sized for comfortable reading, laid out to resemble a physical remote (centered groups, the D-pad as a cross). The remote SHALL size to its content; on a terminal too short to show the full set it SHALL scroll so every button stays reachable rather than clipping.
+The Use Remote mode SHALL present a remote resembling a physical remote with a menu key, a D-pad (up, down, left, right), OK, Back, Home, volume up, volume down, mute, channel up and channel down, the media-transport keys play, pause, play/pause, rewind, and fast-forward and stop, a number pad for the digits 0 through 9, and a row of five custom buttons. Every button MUST be clickable with the mouse. The rewind and fast-forward buttons SHALL use scan-style icons. The remote's buttons SHALL be bordered and sized for comfortable reading, laid out to resemble a physical remote (centered groups, the D-pad as a cross). The five custom buttons SHALL use the same bordered button style as the rest of the remote and SHALL sit in their own centered row. The remote SHALL NOT show an always-visible docked text field; text entry SHALL be reached on demand through a modal opened by the Text action. The remote SHALL size to its content; on a terminal too short to show the full set it SHALL scroll so every button stays reachable rather than clipping.
 
 #### Scenario: Remote renders the button set
 - **WHEN** the user opens Use Remote for a device
-- **THEN** the menu key, D-pad, OK, Back, Home, volume, mute, channel up/down, the media-transport buttons (play, pause, play/pause, rewind, fast-forward, stop), the number pad 0–9, and the text field are shown
+- **THEN** the menu key, D-pad, OK, Back, Home, volume, mute, channel up/down, the media-transport buttons (play, pause, play/pause, rewind, fast-forward, stop), the number pad 0–9, and the row of five custom buttons are shown
+- **AND** no docked text field is shown
 
 #### Scenario: Button click sends action
 - **WHEN** the user clicks an enabled remote button
@@ -193,7 +206,7 @@ The Use Remote mode SHALL present a remote resembling a physical remote with a m
 - **THEN** the remote scrolls so every button remains reachable rather than being clipped
 
 ### Requirement: Keyboard control of the remote
-The remote SHALL be fully operable from the keyboard, mapping both the arrow keys and the Vim keys `h`, `j`, `k`, and `l` to the D-pad — `h` and Left send LEFT, `j` and Down send DOWN, `k` and Up send UP, `l` and Right send RIGHT — Enter to OK, Backspace to the device's Back key, and the Space bar to the Home key. Escape SHALL leave the remote and return to the previous page rather than sending Back to the device, matching Escape's back-a-page role elsewhere in the application. The digit keys `0` through `9` SHALL send the matching number key when the active adapter supports it; on an adapter that does not support number keys, pressing a digit SHALL do nothing and SHALL NOT report an error — the hotkey behaves the same as the disabled button. Because `h` now sends the LEFT direction, the Home key SHALL no longer be bound to `h`; the on-screen Home button remains clickable with the mouse. The remaining on-screen buttons (menu, channel, and media transport) are operated by mouse only. While the text field is focused, digit keys and the D-pad letters fill the field rather than sending keys, and Backspace edits the field rather than sending the device's Back key.
+The remote SHALL be fully operable from the keyboard, mapping both the arrow keys and the Vim keys `h`, `j`, `k`, and `l` to the D-pad — `h` and Left send LEFT, `j` and Down send DOWN, `k` and Up send UP, `l` and Right send RIGHT — Enter to OK, Backspace to the device's Back key, and the Space bar to the Home key. Escape SHALL leave the remote and return to the previous page rather than sending Back to the device, matching Escape's back-a-page role elsewhere in the application; this leave-the-remote behavior SHALL be the application's Global Go Back action, whose key is customizable via the keyboard-shortcuts capability. The digit keys `0` through `9` SHALL send the matching number key when the active adapter supports it; on an adapter that does not support number keys, pressing a digit SHALL do nothing and SHALL NOT report an error — the hotkey behaves the same as the disabled button. Because `h` now sends the LEFT direction, the Home key SHALL no longer be bound to `h`; the on-screen Home button remains clickable with the mouse. The remaining on-screen buttons (menu, channel, and media transport) are operated by mouse by default and MAY be given a keyboard shortcut via the keyboard-shortcuts capability. While the text field is focused, digit keys and the D-pad letters fill the field rather than sending keys, and Backspace edits the field rather than sending the device's Back key. The rebindable remote mappings — OK, Back, Home, the digit keys, Text entry, and the twelve formerly mouse-only keys — SHALL be the default shortcuts of rebindable Remote actions that the user MAY change via the keyboard-shortcuts capability. The D-pad directional keys (the arrow keys and `h`/`j`/`k`/`l`) SHALL be reserved for navigation and SHALL NOT be rebindable, though they are listed among the shortcuts for visibility.
 
 #### Scenario: Arrow key drives D-pad
 - **WHEN** the user presses an arrow key while the remote is focused and no text field is active
@@ -231,27 +244,16 @@ The remote SHALL be fully operable from the keyboard, mapping both the arrow key
 - **WHEN** the text field is focused and the user types digit keys
 - **THEN** the digits fill the field and no number key is sent
 
+#### Scenario: Formerly mouse-only key gains a shortcut
+- **WHEN** the user assigns a shortcut to a previously unbound remote key (for example Volume Up) and presses it on the remote with a supporting adapter
+- **THEN** that device key is sent
+
 ### Requirement: Capability-driven button state
 The remote SHALL disable and visibly indicate any button whose key the active device's adapter does not declare as supported.
 
 #### Scenario: Unsupported button disabled
 - **WHEN** the active adapter does not declare support for a key
 - **THEN** that button is shown in a disabled state and does not send an action when activated
-
-### Requirement: Text-entry focus behavior
-The remote's text field SHALL define a text-entry mode: while the field is focused, typed characters fill a buffer and Enter sends the buffered text; Escape exits the field without sending Back. When text is unsupported by the active adapter, the field MUST be disabled with a clear message.
-
-#### Scenario: Compose then send
-- **WHEN** the text field is focused and the user types characters and presses Enter
-- **THEN** the buffered text is sent to the device as a single text action
-
-#### Scenario: Escape exits field, not Back
-- **WHEN** the text field is focused and the user presses Escape
-- **THEN** focus leaves the field and no Back key is sent
-
-#### Scenario: Text unsupported disables field
-- **WHEN** the active adapter reports text as unsupported
-- **THEN** the text field is disabled and a message explains text is not supported on this device
 
 ### Requirement: Landing menu shows a movie/TV quote
 The entry menu SHALL display one famous movie or TV quote with attribution beneath the two mode buttons. The attribution SHALL read `— <character>, <source>`. A quote provider selects the quote once per launch. When no quote is available, the menu MUST render without a quote row and MUST NOT fail.
@@ -443,4 +445,97 @@ While Use Remote mode is showing the on-screen remote, the top status bar SHALL 
 #### Scenario: Type uses the human-readable label
 - **WHEN** the remote is shown for a device
 - **THEN** the status bar's Type field displays the platform's human-readable label rather than the raw platform identifier
+
+### Requirement: Text entry via a modal
+The remote's Text action SHALL open a text-entry modal rather than focusing a docked field. While the modal's input is focused, typed characters fill a buffer and Enter sends the buffered text as a single text action and closes the modal; Escape closes the modal without sending the buffered text and without sending the device's Back key. When text is unsupported by the active adapter, activating the Text action SHALL surface a clear message that text is not supported on this device and SHALL NOT open an editable input.
+
+#### Scenario: Compose then send
+- **WHEN** the text-entry modal is open and the user types characters and presses Enter
+- **THEN** the buffered text is sent to the device as a single text action and the modal closes
+
+#### Scenario: Escape closes the modal, not Back
+- **WHEN** the text-entry modal is open and the user presses Escape
+- **THEN** the modal closes, no buffered text is sent, and no Back key is sent to the device
+
+#### Scenario: Text unsupported surfaces a message
+- **WHEN** the active adapter reports text as unsupported and the user activates the Text action
+- **THEN** a message explains text is not supported on this device and no editable text input is opened
+
+### Requirement: Custom buttons on the remote
+The remote SHALL present exactly five custom buttons in a dedicated row. Each button SHALL show its configured title resolved for the active device, or its default title `Custom N` (where `N` is the button's 1-based position) when no title is configured for that device. Each custom button MUST be clickable with the mouse. Clicking a custom button SHALL run its assigned action when one is resolved for the active device, and SHALL open the button's configuration modal when no action is assigned. A custom button MAY also be activated by an assigned keyboard shortcut (see the keyboard-shortcuts catalog), which SHALL behave identically to clicking that button — running its resolved action, or opening its configuration when none is assigned. To re-edit a button that has an assigned action, the user SHALL use a distinct edit gesture: pressing an edit-mode key SHALL arm edit-mode, and the next activation of a custom button — whether by clicking it or by pressing its keyboard shortcut — SHALL open that button's configuration modal instead of running its action, after which edit-mode SHALL clear. The edit-mode key SHALL toggle: pressing it while edit-mode is already armed SHALL disarm edit-mode without opening any configuration. While edit-mode is armed, the custom buttons SHALL show a visual indicator distinguishing the armed edit state from their normal run appearance, and that indicator SHALL clear together with edit-mode.
+
+#### Scenario: Custom buttons show defaults when unconfigured
+- **WHEN** the user opens Use Remote for a device with no custom-button titles saved
+- **THEN** the five custom buttons read `Custom 1`, `Custom 2`, `Custom 3`, `Custom 4`, and `Custom 5`
+
+#### Scenario: Custom button shows its resolved title
+- **WHEN** a custom button has a title configured that applies to the active device
+- **THEN** that button shows the configured title instead of its `Custom N` default
+
+#### Scenario: Clicking a button with no action opens its configuration
+- **WHEN** the user clicks a custom button that has no assigned action for the active device
+- **THEN** the Button Config modal for that button opens
+
+#### Scenario: Clicking a button with an action runs it
+- **WHEN** the user clicks a custom button that has an assigned action for the active device
+- **THEN** that action runs and the configuration modal does not open
+
+#### Scenario: Edit gesture opens configuration for a configured button
+- **WHEN** the user presses the edit-mode key and then activates a custom button that has an assigned action
+- **THEN** the Button Config modal for that button opens instead of running the action, and edit-mode clears
+
+#### Scenario: Edit-mode shows a visual indicator
+- **WHEN** the user presses the edit-mode key to arm edit-mode
+- **THEN** the custom buttons show an armed indicator that distinguishes edit-mode from their normal appearance, and the indicator clears once a custom button is activated and edit-mode ends
+
+#### Scenario: Pressing the edit-mode key again disarms edit-mode
+- **WHEN** the user presses the edit-mode key while edit-mode is already armed
+- **THEN** edit-mode disarms without opening any configuration and the armed indicator clears
+
+#### Scenario: A keyboard shortcut activates a custom button
+- **WHEN** the user has assigned a shortcut to a custom button and presses it on the remote
+- **THEN** the same thing happens as clicking that button — its resolved action runs, or its configuration opens when no action is assigned
+
+### Requirement: Custom button configuration modal
+The Button Config modal's heading SHALL be the static text "Configure Custom Button". The modal SHALL contain a button-title text input, a three-way scope selector offering This Device, Device Type, and Global, an Action Type control, and OK, Cancel, and Reset controls. The Action Type control SHALL be active: selecting it SHALL open the Action Type list, from which choosing an action type opens that action type's configuration and, on completion, assigns the action to the button at the selected scope. Selecting OK SHALL save the entered title and any assigned action for the button at the selected scope, persist them, and update the button on the remote to show the newly resolved title and resize to fit it immediately, without requiring the remote to be reopened. So the selected scope is the one that resolves, saving SHALL also drop the button's entry at any scope more specific than the selected scope for the active device and its type, leaving scopes less specific than the selected one untouched. Selecting Cancel SHALL close the modal without changing any saved title or action. Selecting Reset SHALL clear the button's title and action at every scope for the active device — the device, its device type, and global — returning it to its default title with no action, persist that, close the modal, and update the button on the remote to its default. When opened, the scope selector SHALL preselect the scope the button's shown title resolves from — the specific device, then device type, then global — so reopening the modal reflects where the title is actually stored; when no title is configured at any scope it SHALL default to This Device.
+
+#### Scenario: Save a title for this device
+- **WHEN** the user opens a custom button's config modal, enters a title, leaves the scope on This Device, and selects OK
+- **THEN** the modal closes and that button on the remote shows the entered title for the current device
+
+#### Scenario: Save a title for the device type
+- **WHEN** the user enters a title, sets the scope to Device Type, and selects OK
+- **THEN** the title is saved for the current device's type and the button shows it
+
+#### Scenario: Save a title globally
+- **WHEN** the user enters a title, sets the scope to Global, and selects OK
+- **THEN** the title is saved for the button regardless of device or device type and the button shows it
+
+#### Scenario: Switching to a broader scope takes effect
+- **WHEN** a button whose title is stored at This Device is reopened, its scope is changed to Global, and OK is selected
+- **THEN** the more-specific device entry is cleared for the active device and the button shows the Global title rather than the old device title
+
+#### Scenario: Reset returns a button to its default
+- **WHEN** the user opens a configured button's config modal and selects Reset
+- **THEN** the modal closes and the button reads its default `Custom N` title with no action, at every scope for the active device
+
+#### Scenario: Cancel discards changes
+- **WHEN** the user opens a custom button's config modal, edits the title, and selects Cancel
+- **THEN** the modal closes and the button's saved title and action are unchanged
+
+#### Scenario: Action Type opens the action list
+- **WHEN** the user selects the Action Type control in the Button Config modal
+- **THEN** the Action Type list opens for choosing an action type
+
+#### Scenario: Heading is static text
+- **WHEN** the user opens any custom button's config modal
+- **THEN** the heading reads "Configure Custom Button" regardless of which button was opened
+
+#### Scenario: Scope selector reflects where the title is stored
+- **WHEN** a button's title was saved at the Global scope and the user reopens its config modal
+- **THEN** the scope selector shows Global selected rather than This Device
+
+#### Scenario: Saved title resizes the button immediately
+- **WHEN** the user saves a title that is longer or shorter than the current one
+- **THEN** the button on the remote shows the new title and its width adjusts to fit immediately, without reopening the remote
 

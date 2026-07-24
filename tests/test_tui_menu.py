@@ -6,8 +6,10 @@ from universal_remote.devices.store import DeviceStore
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
 from universal_remote.tui.devices_screen import DeviceListScreen
+from universal_remote.tui.menu import MenuScreen
 from universal_remote.tui.quotes import Quote
 from universal_remote.tui.remote_flow import UseRemoteScreen
+from universal_remote.tui.settings_screen import SettingsScreen
 
 
 def _app(tmp_path, quote_provider=None):
@@ -106,21 +108,21 @@ class TestMenu:
 
         asyncio.run(scenario())
 
-    def test_given_focus_on_use_when_down_arrow_then_focus_cycles_to_manage(
+    def test_given_focus_on_settings_when_down_arrow_then_focus_cycles_to_manage(
         self, tmp_path
     ):
         async def scenario():
             app = _app(tmp_path)
             async with app.run_test() as pilot:
                 await pilot.pause()
-                app.screen.set_focus(app.screen.query_one("#use", Button))
+                app.screen.set_focus(app.screen.query_one("#settings", Button))
                 await pilot.press("down")
                 assert app.focused is not None
                 assert app.focused.id == "manage"
 
         asyncio.run(scenario())
 
-    def test_given_focus_on_manage_when_up_arrow_then_focus_cycles_to_use(
+    def test_given_focus_on_manage_when_up_arrow_then_focus_cycles_to_settings(
         self, tmp_path
     ):
         async def scenario():
@@ -130,7 +132,7 @@ class TestMenu:
                 app.screen.set_focus(app.screen.query_one("#manage", Button))
                 await pilot.press("up")
                 assert app.focused is not None
-                assert app.focused.id == "use"
+                assert app.focused.id == "settings"
 
         asyncio.run(scenario())
 
@@ -213,6 +215,36 @@ class TestMenu:
 
         asyncio.run(scenario())
 
+    def test_given_a_home_action_rebound_when_the_new_key_is_pressed_then_it_fires(
+        self, tmp_path
+    ):
+        app = _app(tmp_path)
+        app.shortcut_overrides["home.manage_devices"] = "x"
+
+        async def scenario():
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                await pilot.press("x")
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+
+        asyncio.run(scenario())
+
+    def test_given_a_home_action_rebound_when_the_default_key_is_pressed_then_nothing(
+        self, tmp_path
+    ):
+        app = _app(tmp_path)
+        app.shortcut_overrides["home.manage_devices"] = "x"
+
+        async def scenario():
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                await pilot.press("d")  # the former default no longer fires
+                await pilot.pause()
+                assert isinstance(app.screen, MenuScreen)
+
+        asyncio.run(scenario())
+
     def test_given_the_menu_when_q_is_pressed_then_the_app_quits(self, tmp_path):
         async def scenario():
             app = _app(tmp_path)
@@ -220,5 +252,42 @@ class TestMenu:
                 await pilot.press("q")
                 await pilot.pause()
                 assert app._exit is True
+
+        asyncio.run(scenario())
+
+
+class TestMenuSettings:
+    def test_given_the_menu_when_the_settings_key_is_pressed_then_it_navigates_there(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test() as pilot:
+                await pilot.press("s")
+                await pilot.pause()
+                assert isinstance(app.screen, SettingsScreen)
+
+        asyncio.run(scenario())
+
+    def test_given_the_menu_when_the_settings_button_is_clicked_then_it_navigates_there(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                await pilot.click("#settings")
+                await pilot.pause()
+                assert isinstance(app.screen, SettingsScreen)
+
+        asyncio.run(scenario())
+
+    def test_given_the_menu_when_shown_then_both_modes_remain_present(self, tmp_path):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                labels = {str(button.label) for button in app.screen.query(Button)}
+                assert {"Manage Devices", "Use Remote", "Settings"} <= labels
 
         asyncio.run(scenario())

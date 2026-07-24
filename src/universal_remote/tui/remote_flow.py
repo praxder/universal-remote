@@ -25,6 +25,7 @@ from ..reachability import Reachability, probe
 from ..session import Session
 from .device_option_list import DeviceOptionList
 from .remote_screen import RemoteScreen
+from .shortcuts import Scope, rebuild_shortcuts
 
 # Reachability state -> Rich-markup bubble colour.
 _BUBBLE_COLORS = {
@@ -113,7 +114,8 @@ class UseRemoteScreen(Screen[None]):
     port; the bubble is advisory and never blocks selection.
     """
 
-    BINDINGS = [("escape", "back", "Back")]
+    # Go Back (Escape by default) is the catalogued Global action, built on mount.
+    SHORTCUT_SCOPES = frozenset({Scope.GLOBAL})
 
     POLL_INTERVAL = 5.0  # seconds between reachability refreshes while open
     PROBE_TIMEOUT = 2.0  # seconds to reach a device (strictly below the interval)
@@ -134,6 +136,7 @@ class UseRemoteScreen(Screen[None]):
         yield Footer()
 
     def on_mount(self) -> None:
+        rebuild_shortcuts(self, self.app.shortcut_overrides, self.SHORTCUT_SCOPES)
         devices = self.app.store.list()
         picker = self.query_one("#device-picker", DeviceOptionList)
         if not devices:
@@ -231,7 +234,7 @@ class UseRemoteScreen(Screen[None]):
 
         self.app.push_screen(ConnectingModal(device), _on_connected)
 
-    def action_back(self) -> None:
+    def action_go_back(self) -> None:
         self.app.pop_screen()
 
 

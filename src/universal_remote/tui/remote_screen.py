@@ -7,12 +7,37 @@ from typing import TYPE_CHECKING
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Grid, Horizontal, Vertical
-from textual.message import Message
-from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Input, Label
+from textual.screen import ModalScreen, Screen
+from textual.widgets import (
+    Button,
+    Footer,
+    Header,
+    Input,
+    Label,
+    RadioButton,
+    RadioSet,
+)
 
 from ..errors import TextUnsupportedError, UnsupportedKeyError
 from ..keys import Key
+from .actions import (
+    ActionTypeListModal,
+    action_type,
+    present_result,
+    run_action,
+)
+from .custom_buttons import (
+    ButtonScope,
+    clear_entry,
+    clear_more_specific,
+    default_title,
+    resolve_action,
+    resolve_scope,
+    resolve_title,
+    set_action,
+    set_title,
+)
+from .shortcuts import Scope, rebuild_shortcuts
 
 if TYPE_CHECKING:
     from ..capabilities import Capabilities
@@ -20,16 +45,240 @@ if TYPE_CHECKING:
     from ..session import Session
 
 
-class TextField(Input):
-    """A text input whose Escape exits the field (rather than firing the Back key)."""
+class TextEntryModal(ModalScreen[None]):
+    """On-demand text entry: type then Enter sends once and dismisses; Escape cancels.
 
-    BINDINGS = [Binding("escape", "exit_field", "Exit field")]
+    Owns the send path so the remote surface no longer reserves a docked field.
+    Escape is bound here so it dismisses the modal rather than reaching the remote's
+    Go Back (which would close the session). Transient outcomes — a failed send, or
+    an ADB path that fell back — surface as app-level toasts that outlive the modal.
+    """
 
-    class ExitRequested(Message):
-        """Posted when the user presses Escape to leave the field."""
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
 
-    def action_exit_field(self) -> None:
-        self.post_message(self.ExitRequested())
+    DEFAULT_CSS = """
+    TextEntryModal { align: center middle; background: $background 60%; }
+    #text-entry {
+        width: 60%; height: auto; padding: 1 2;
+        border: thick $primary; background: $surface;
+    }
+    #text-entry-title { width: 100%; text-align: center; margin-bottom: 1; }
+    #text-entry-input { width: 100%; }
+    """
+
+    def __init__(self, session: "Session") -> None:
+        super().__init__()
+        self._session = session
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="text-entry"):
+            yield Label("Enter text to send", id="text-entry-title")
+            yield Input(
+                placeholder="Type text, then Enter to send…", id="text-entry-input"
+            )
+
+    def on_mount(self) -> None:
+        self.query_one("#text-entry-input", Input).focus()
+
+    async def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.value:
+            await self._send(event.value)
+        self.dismiss()
+
+    async def _send(self, text: str) -> None:
+        try:
+            await self._session.send_text(text)
+        except TextUnsupportedError:
+            self.app.notify(
+                "Text entry is not supported on this device", severity="warning"
+            )
+        except Exception:
+            # A failed text send (device timeout, dropped connection) must not take
+            # down the remote — report it and return, like the key-send path.
+            self.app.notify(
+                "Text entry failed — the device may be unreachable", severity="warning"
+            )
+        else:
+            # An opted-in ADB send that fell back to Remote v2 flags itself; say so
+            # rather than leaving the user wondering why setup made no change.
+            if getattr(self._session, "adb_text_unavailable", False):
+                self.app.notify("ADB text unavailable — sent over the standard path")
+
+    def action_cancel(self) -> None:
+        self.dismiss()
+
+
+class ButtonConfigModal(ModalScreen[bool]):
+    """Names, scopes, and assigns an action to a custom button; OK saves both.
+
+    Dismisses with True when the button was saved (so the remote re-resolves that
+    button's label) or False on Cancel/Escape. The Action Type control opens the
+    action catalog; the entered title and any assigned action are saved together at
+    the selected scope, so the whole button lives in one place.
+    """
+
+    # Scope options in display order; the radio's pressed index maps into this tuple.
+    _SCOPES = (ButtonScope.DEVICE, ButtonScope.TYPE, ButtonScope.GLOBAL)
+
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
+    DEFAULT_CSS = """
+    ButtonConfigModal { align: center middle; background: $background 60%; }
+    #button-config {
+        width: 70%; height: auto; padding: 1 2;
+        border: thick $primary; background: $surface;
+    }
+    #button-config-title {
+        width: 100%; text-align: center; text-style: bold; margin-bottom: 1;
+    }
+    #button-config-title-input { width: 100%; margin-bottom: 1; }
+    #button-config-scope-label { width: 100%; }
+    #button-config-scope { width: 100%; margin-bottom: 1; }
+    #button-config-action-type { width: 100%; margin-bottom: 1; }
+    #button-config-buttons { width: 100%; height: auto; align-horizontal: center; }
+    /* min-width overrides Textual's Button default (16) so three buttons fit the row
+       without the last one clipping. */
+    #button-config-buttons Button { width: 14; min-width: 0; margin: 0 1; }
+    """
+
+    def __init__(self, index: int, device: "Device") -> None:
+        super().__init__()
+        self._index = index
+        self._device = device
+        # The action assigned to the button, carried so OK writes it alongside the
+        # title at the chosen scope even when the user only edits the title. Set from
+        # the button's current action in compose (when the app is reachable) and
+        # replaced when the user configures a new one.
+        self._action: dict | None = None
+
+    def compose(self) -> ComposeResult:
+        self._action = self._current_action()
+        selected = self._selected_scope_index()
+        with Vertical(id="button-config"):
+            yield Label("Configure Custom Button", id="button-config-title")
+            yield Input(
+                value=self._current_title(),
+                placeholder="Button title",
+                id="button-config-title-input",
+            )
+            yield Label("Scope", id="button-config-scope-label")
+            with RadioSet(id="button-config-scope"):
+                yield RadioButton("This Device", value=selected == 0, id="scope-device")
+                yield RadioButton("Device Type", value=selected == 1, id="scope-type")
+                yield RadioButton("Global", value=selected == 2, id="scope-global")
+            yield Button(self._action_type_label(), id="button-config-action-type")
+            with Horizontal(id="button-config-buttons"):
+                yield Button("OK", id="button-config-ok", variant="primary")
+                yield Button("Cancel", id="button-config-cancel")
+                yield Button("Reset", id="button-config-reset")
+
+    def _current_action(self) -> dict | None:
+        """The button's currently assigned action, resolved for the active device."""
+        return resolve_action(
+            self.app.custom_buttons,
+            self._index,
+            device_id=self._device.id,
+            platform=self._device.platform,
+        )
+
+    def _action_type_label(self) -> str:
+        """The Action Type control's label, naming the assigned action or none."""
+        entry = action_type(self._action.get("type")) if self._action else None
+        return f"Action Type: {entry.label}" if entry else "Action Type: (none)"
+
+    def _current_title(self) -> str:
+        """The button's current resolved title, prefilled so it can be edited."""
+        return resolve_title(
+            self.app.custom_buttons,
+            self._index,
+            device_id=self._device.id,
+            platform=self._device.platform,
+        )
+
+    def _selected_scope_index(self) -> int:
+        """The radio index to preselect: the scope the shown title resolves from.
+
+        Reopening the modal reflects where the title is actually stored; with no
+        title configured at any scope it falls back to This Device (index 0).
+        """
+        scope = resolve_scope(
+            self.app.custom_buttons,
+            self._index,
+            device_id=self._device.id,
+            platform=self._device.platform,
+        )
+        return self._SCOPES.index(scope) if scope is not None else 0
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "button-config-ok":
+            self._save()
+        elif event.button.id == "button-config-cancel":
+            self.dismiss(False)
+        elif event.button.id == "button-config-reset":
+            self._reset()
+        elif event.button.id == "button-config-action-type":
+            # Pass the button's current action so re-editing it prefills the action's
+            # config instead of opening blank.
+            self.app.push_screen(ActionTypeListModal(self._action), self._action_chosen)
+
+    def _action_chosen(self, action: dict | None) -> None:
+        """Assign the action the catalog flow returned; None means the user cancelled."""
+        if action is not None:
+            self._action = action
+            self.query_one(
+                "#button-config-action-type", Button
+            ).label = self._action_type_label()
+
+    def _save(self) -> None:
+        title = self.query_one("#button-config-title-input", Input).value
+        scope = self._selected_scope()
+        # Keep the button in one place: drop any entry at a more-specific scope so the
+        # chosen scope is what resolves, then write the title and action there.
+        clear_more_specific(
+            self.app.custom_buttons,
+            self._index,
+            scope,
+            device_id=self._device.id,
+            platform=self._device.platform,
+        )
+        set_title(
+            self.app.custom_buttons,
+            self._index,
+            title,
+            scope,
+            device_id=self._device.id,
+            platform=self._device.platform,
+        )
+        set_action(
+            self.app.custom_buttons,
+            self._index,
+            self._action,
+            scope,
+            device_id=self._device.id,
+            platform=self._device.platform,
+        )
+        self.app.persist_preferences()
+        self.dismiss(True)
+
+    def _reset(self) -> None:
+        # Clear the button at every scope for this device, so it returns to its default
+        # title and no action, then persist and close.
+        clear_entry(
+            self.app.custom_buttons,
+            self._index,
+            device_id=self._device.id,
+            platform=self._device.platform,
+        )
+        self.app.persist_preferences()
+        self.dismiss(True)
+
+    def _selected_scope(self) -> ButtonScope:
+        return self._SCOPES[
+            self.query_one("#button-config-scope", RadioSet).pressed_index
+        ]
+
+    def action_cancel(self) -> None:
+        self.dismiss(False)
 
 
 class RemoteScreen(Screen[None]):
@@ -57,6 +306,9 @@ class RemoteScreen(Screen[None]):
         min-width: 0; padding: 0 1; margin: 0 1;
     }
     #remote Button:disabled { text-opacity: 40% !important; }
+    /* Edit-mode cue: the custom buttons switch to a warning-colored, bold border
+       while edit-mode is armed, so it reads as "editing" rather than "run". */
+    #remote Button.edit-armed { border: round $warning; text-style: bold; }
     /* Auto heights so the button set sizes to its content: if it exceeds the
        terminal the screen scrolls (a visible, testable signal) rather than the
        rows silently compressing. The row containers default to 1fr and would
@@ -65,7 +317,7 @@ class RemoteScreen(Screen[None]):
     #remote, RemoteScreen Horizontal, RemoteScreen Vertical { height: auto; }
     /* Every group is a full-width row whose content is centered, so narrow groups
        (D-pad, number pad) sit centered rather than packed to the left edge. */
-    #row-top, #row-chan-vol, #row-media, #numpad-row, #dpad {
+    #row-top, #row-chan-vol, #row-media, #numpad-row, #dpad, #custom-row {
         align-horizontal: center; margin-bottom: 1;
     }
     /* Channel/volume and media transport sit flush as one cluster, so the
@@ -84,34 +336,16 @@ class RemoteScreen(Screen[None]):
     #numpad Button { margin: 0; width: 100%; }
     """
 
-    BINDINGS = [
-        Binding("up", "send('UP')", "Up"),
-        Binding("down", "send('DOWN')", "Down"),
-        Binding("left", "send('LEFT')", "Left"),
-        Binding("right", "send('RIGHT')", "Right"),
-        Binding("k", "send('UP')", "Up", show=False),
-        Binding("j", "send('DOWN')", "Down", show=False),
-        Binding("h", "send('LEFT')", "Left", show=False),
-        Binding("l", "send('RIGHT')", "Right", show=False),
-        Binding("enter", "send('OK')", "OK"),
-        # Backspace sends the device's Back key; Escape leaves the remote page
-        # (see the exit_remote binding below), matching Escape's back-a-page role
-        # elsewhere in the app. While the text field is focused the Input consumes
-        # Backspace to delete a character, so it never reaches here.
-        Binding("backspace", "send('BACK')", "Back"),
-        Binding("space", "send('HOME')", "Home"),
-        # Digit keys drive the number pad; hidden from the footer to avoid clutter.
-        *(
-            Binding(str(digit), f"send('NUM_{digit}')", show=False)
-            for digit in range(10)
-        ),
-        Binding("t", "text_mode", "Text"),
-        # Hidden from the footer: a ninth hint does not fit the supported 80-column
-        # width, and Escape as go-back matches the rest of the app so it needs no
-        # prompt. (The prior `q` exit hint was dropped by the footer for the same
-        # width reason.)
-        Binding("escape", "exit_remote", "Exit", show=False),
-    ]
+    # Every remote hotkey is a catalogued action, built from the override map on
+    # mount. The D-pad directions (arrows + `hjkl`) are reserved and always bind;
+    # OK/Back/Home/digits/text and the twelve formerly click-only keys are
+    # rebindable. Go Back (the Global action, default Escape) is bound but kept out
+    # of the footer — a ninth hint does not fit the supported 80-column width, and
+    # Escape as go-back matches the rest of the app so it needs no prompt. While the
+    # text field is focused the Input consumes Backspace and the letters/digits, so
+    # they never reach these bindings.
+    SHORTCUT_SCOPES = frozenset({Scope.REMOTE, Scope.GLOBAL})
+    SHORTCUT_HIDE = frozenset({"global.go_back"})
 
     def __init__(
         self,
@@ -123,6 +357,9 @@ class RemoteScreen(Screen[None]):
         self._session = session
         self._capabilities = capabilities
         self._device = device
+        # When armed by the edit-mode key, the next custom-button activation opens its
+        # config instead of running its action, then clears. See `action_edit_mode`.
+        self._edit_mode = False
 
     def compose(self) -> ComposeResult:
         # The device name lives in the header (see on_mount), not a separate row,
@@ -162,11 +399,18 @@ class RemoteScreen(Screen[None]):
                     # Empty first cell of the last row so 0 sits centered under 8.
                     yield Label("", id="numpad-spacer")
                     yield self._key_button(Key.NUM_0, "0")
-            yield TextField(placeholder="Press 't' to type…", id="text", disabled=True)
-            yield Label("", id="text-status")
+            with Horizontal(id="custom-row"):
+                for index in range(1, 6):
+                    yield self._custom_button(index)
         yield Footer()
 
     def on_mount(self) -> None:
+        rebuild_shortcuts(
+            self,
+            self.app.shortcut_overrides,
+            self.SHORTCUT_SCOPES,
+            hide=self.SHORTCUT_HIDE,
+        )
         # Show the device in the header instead of a dedicated title row; restore
         # the app title when the remote closes so other screens are unaffected.
         self._previous_title = self.app.title
@@ -177,24 +421,100 @@ class RemoteScreen(Screen[None]):
         for key in Key:
             if not self._capabilities.supports(key):
                 self.query_one(f"#key-{key.name.lower()}", Button).disabled = True
-        if not self._capabilities.text:
-            self._status("Text entry is not supported on this device")
+        for index in range(1, 6):
+            self._label_custom(index)
 
     def on_unmount(self) -> None:
         self.app.title = self._previous_title
-
-    def _status(self, message: str) -> None:
-        self.query_one("#text-status", Label).update(message)
 
     def _key_button(self, key: Key, label: str) -> Button:
         button = Button(label, id=f"key-{key.name.lower()}")
         button.can_focus = False  # keyboard drives bindings; mouse drives clicks
         return button
 
+    def _custom_button(self, index: int) -> Button:
+        # Mouse-click only in Phase 1: no hotkey binds them, and leaving them
+        # unfocusable keeps Enter mapped to OK rather than pressing a focused button.
+        button = Button(default_title(index), id=f"custom-{index}")
+        button.can_focus = False
+        return button
+
+    def _label_custom(self, index: int) -> None:
+        """Set button `index`'s label to its title resolved for the active device."""
+        button = self.query_one(f"#custom-{index}", Button)
+        button.label = resolve_title(
+            self.app.custom_buttons,
+            index,
+            device_id=self._device.id,
+            platform=self._device.platform,
+        )
+        # The `label` reactive repaints text but is `layout=False`, so the button's
+        # auto width stays stale (it keeps its mount-time size until the remote is
+        # reopened). Force a layout pass so a longer/shorter title resizes it now.
+        button.refresh(layout=True)
+
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         button_id = event.button.id or ""
         if button_id.startswith("key-"):
             await self._send(Key[button_id.removeprefix("key-").upper()])
+        elif button_id.startswith("custom-"):
+            self._activate_custom(int(button_id.removeprefix("custom-")))
+
+    def _activate_custom(self, index: int) -> None:
+        # One dispatch shared by a click and the keyboard shortcut, so both behave
+        # identically. Edit-mode armed → configure and disarm; otherwise run the
+        # button's resolved action, or configure it when it has none.
+        if self._edit_mode:
+            self._set_edit_mode(False)
+            self._configure_custom(index)
+            return
+        action = resolve_action(
+            self.app.custom_buttons,
+            index,
+            device_id=self._device.id,
+            platform=self._device.platform,
+        )
+        if action:
+            self._run_action(action)
+        else:
+            self._configure_custom(index)
+
+    def action_activate_custom(self, index: int) -> None:
+        self._activate_custom(index)
+
+    def action_edit_mode(self) -> None:
+        # Toggle edit-mode: `e` arms it, `e` again disarms it. While armed, the next
+        # custom-button activation opens its config instead of running it, and the
+        # custom buttons carry a visual cue. A toast names the new state.
+        if self._edit_mode:
+            self._set_edit_mode(False)
+            self.app.notify("Edit mode off.")
+            return
+        self._set_edit_mode(True)
+        self.app.notify("Edit mode: activate a custom button to configure it.")
+
+    def _set_edit_mode(self, armed: bool) -> None:
+        # One place toggles the flag and the visual cue on the custom buttons, so the
+        # indicator can never outlive the armed state.
+        self._edit_mode = armed
+        for index in range(1, 6):
+            self.query_one(f"#custom-{index}", Button).set_class(armed, "edit-armed")
+
+    def _run_action(self, action: dict) -> None:
+        # Run in a worker so a slow script never blocks the remote; the outcome is
+        # surfaced per the action's Results choice when it finishes.
+        self.run_worker(self._execute(action))
+
+    async def _execute(self, action: dict) -> None:
+        result = await run_action(action, self._device.ip)
+        present_result(self.app, result, show_results=bool(action.get("show_results")))
+
+    def _configure_custom(self, index: int) -> None:
+        def _relabel(saved: bool | None) -> None:
+            if saved:
+                self._label_custom(index)
+
+        self.app.push_screen(ButtonConfigModal(index, self._device), _relabel)
 
     async def action_send(self, key_name: str) -> None:
         key = Key[key_name]
@@ -209,46 +529,29 @@ class RemoteScreen(Screen[None]):
         try:
             await self._session.send_key(key)
         except UnsupportedKeyError:
-            self._status(f"{key.name} is not supported on this device")
+            self.app.notify(
+                f"{key.name} is not supported on this device", severity="warning"
+            )
         except Exception:
             # A single failed key press (device timeout, dropped connection) must
             # not take down the remote — report it and stay on-screen.
-            self._status(f"{key.name} failed — the device may be unreachable")
+            self.app.notify(
+                f"{key.name} failed — the device may be unreachable",
+                severity="warning",
+            )
 
     def action_text_mode(self) -> None:
+        # Text moved off the docked field into an on-demand modal; when the adapter
+        # has no text support there is nothing to open, so surface a message instead.
         if not self._capabilities.text:
+            self.app.notify(
+                "Text entry is not supported on this device", severity="warning"
+            )
             return
-        field = self.query_one("#text", TextField)
-        field.disabled = False
-        field.focus()
+        self.app.push_screen(TextEntryModal(self._session))
 
-    async def on_input_submitted(self, event: Input.Submitted) -> None:
-        text = event.value
-        if text:
-            try:
-                await self._session.send_text(text)
-            except TextUnsupportedError:
-                self._status("Text entry is not supported on this device")
-            except Exception:
-                # A failed text send (device timeout, dropped connection) must not
-                # take down the remote — report it and stay, like the key-send path.
-                self._status("Text entry failed — the device may be unreachable")
-            else:
-                # An opted-in ADB send that fell back to Remote v2 flags itself; say
-                # so rather than leaving the user wondering why setup made no change.
-                if getattr(self._session, "adb_text_unavailable", False):
-                    self._status("ADB text unavailable — sent over the standard path")
-        self._exit_text_mode()
-
-    def on_text_field_exit_requested(self, event: TextField.ExitRequested) -> None:
-        self._exit_text_mode()
-
-    def _exit_text_mode(self) -> None:
-        field = self.query_one("#text", TextField)
-        field.value = ""
-        field.disabled = True
-        self.set_focus(None)
-
-    async def action_exit_remote(self) -> None:
+    async def action_go_back(self) -> None:
+        # The remote's Go Back closes the live session before popping the screen;
+        # every other screen's Go Back just pops.
         await self._session.close()
         self.app.pop_screen()

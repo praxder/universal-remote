@@ -18,6 +18,7 @@ from ..devices.models import Device
 from ..discovery import DiscoveredDevice, discover_one, exclude_saved, merge
 from .device_option_list import DeviceOptionList
 from .devices_screen import AdbTextHintScreen, AddDeviceScreen
+from .shortcuts import Scope, rebuild_shortcuts
 
 ADD_MANUAL_ID = "__add_manual__"
 
@@ -31,7 +32,8 @@ TITLE_ART = r""" ____  _
 class DiscoverScreen(Screen[None]):
     """Lists devices found on the LAN; select one to add it, or add manually."""
 
-    BINDINGS = [("escape", "back", "Back")]
+    # Go Back (Escape by default) is the catalogued Global action, built on mount.
+    SHORTCUT_SCOPES = frozenset({Scope.GLOBAL})
 
     SCAN_TIMEOUT = 5.0  # seconds each adapter's scan runs before it is abandoned
 
@@ -54,6 +56,7 @@ class DiscoverScreen(Screen[None]):
         yield Footer()
 
     def on_mount(self) -> None:
+        rebuild_shortcuts(self, self.app.shortcut_overrides, self.SHORTCUT_SCOPES)
         self._saved_ips = [device.ip for device in self.app.store.list()]
         self._reload()  # the manual row is present immediately
         adapters = [a for a in self.app.registry.adapters() if hasattr(a, "discover")]
@@ -128,5 +131,5 @@ class DiscoverScreen(Screen[None]):
         else:
             self.app.notify(f'Added "{device.name}".')
 
-    def action_back(self) -> None:
+    def action_go_back(self) -> None:
         self.app.pop_screen()
