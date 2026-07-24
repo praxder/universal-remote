@@ -221,17 +221,26 @@ class UniversalRemoteApp(App[None]):
                 rebuild_shortcuts(screen, self.shortcut_overrides, scopes, hide=hide)
 
     def on_mount(self) -> None:
+        from .shortcuts import without_reserved
+
         preferences = self.preferences.load()
         # Load saved shortcuts into the override map before the menu is pushed, so
-        # its bindings (and every later screen's) build from them. `update` keeps any
-        # overrides set directly on the app (e.g. in tests) when none are saved.
-        self.shortcut_overrides.update(preferences.shortcuts)
+        # its bindings (and every later screen's) build from them. Drop any override
+        # whose key has since become reserved (e.g. `e` bound to a device action before
+        # it was reserved for edit-mode): left in place it would shadow the reserved
+        # binding, so the action reverts to its default. `update` keeps any overrides
+        # set directly on the app (e.g. in tests) when none are saved.
+        kept = without_reserved(preferences.shortcuts)
+        self.shortcut_overrides.update(kept)
         # Load saved custom-button titles the same way, before any remote is opened.
         self.custom_buttons.update(preferences.custom_buttons)
         # Ignore a saved theme that is no longer registered (e.g. removed by a
         # Textual upgrade) so `_validate_theme` cannot raise; the default stands.
         if preferences.theme in self.available_themes:
             self.theme = preferences.theme
+        # Persist the cleaned overrides so a pruned stale binding stays gone next run.
+        if kept != preferences.shortcuts:
+            self.persist_preferences()
         self.push_screen(MenuScreen())
         self._mount_succeeded = True
 

@@ -42,3 +42,12 @@
 - [x] 7.3 Run the formatter and linter; fix all warnings
 - [x] 7.4 Run the full test suite and fix any failures (all feature tests pass; the sole failure, `test_tui_menu.py::…use_remote_is_clicked`, is a pre-existing mount-timing flake unrelated to this change — reproduced on a clean branch HEAD with all changes stashed)
 - [ ] 7.5 Before archiving: reconcile the two `tui-remote` MODIFIED scenarios the archive drop-guard will flag (they change scenarios Phase 1 put in the live specs). "Clicking a custom button opens its configuration" → keep that live header, narrow its WHEN to the no-action case, and add "Clicking a button with an action runs it". "Action Type is a disabled placeholder" → a genuine flip to active with no truthful in-place edit; MODIFIED can't express a single-scenario removal, so decide the mechanism at archive time (last resort `openspec archive --no-validate`)
+
+## 8. First-pass review refinements
+
+- [x] 8.1 Reset control: add a Reset button to the Button Config modal that clears the button's title and action at every scope for the active device (default title, no action), persists, and closes — with a test and the `tui-remote` scope
+- [x] 8.2 Scope save takes effect: on OK, drop the button's entry at any scope more specific than the selected scope (for the active device/type) so the chosen scope resolves, fixing "setting Global/Device Type does not take effect" — with unit + modal tests and the `tui-remote` scope
+- [x] 8.3 Edit-mode key reliability: drop saved shortcut overrides whose key is now reserved (e.g. a pre-reservation `e→Stop` override that shadowed edit-mode) on load and re-persist, so pressing `e` arms edit-mode — with unit, load, and end-to-end tests and a new `keyboard-shortcuts` delta (`e` reserved, drop-on-load)
+- [x] 8.4 Edit-mode visual indicator: the custom buttons show a warning-colored bold border while edit-mode is armed, clearing when it ends — with a test and the `tui-remote` scope
+- [x] 8.5 Run Script file source: run a script file through the shell (`/bin/sh <path>`, `~` expanded) so it needs no exec bit or shebang, and report a non-existent path as a clean start failure — fixes "Exec format error" — with tests and the `custom-button-actions` scope
+- [x] 8.6 Result modal: center the Close button (presentation only; no spec change) — with a geometry test

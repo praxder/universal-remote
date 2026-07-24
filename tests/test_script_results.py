@@ -93,6 +93,23 @@ class TestResultModalStructure:
 
         asyncio.run(scenario())
 
+    def test_given_the_result_modal_when_open_then_the_close_button_is_centered(self):
+        from textual.widgets import Button
+
+        async def scenario():
+            app = _Host()
+            async with app.run_test(size=(80, 24)) as pilot:
+                present_result(app, _OK, show_results=True)
+                await pilot.pause()
+                modal = app.screen.query_one("#script-result")
+                close = app.screen.query_one("#script-result-close", Button)
+                # Equal gaps on each side within the modal's content box == centered.
+                left_gap = close.region.x - modal.content_region.x
+                right_gap = modal.content_region.right - close.region.right
+                assert abs(left_gap - right_gap) <= 1
+
+        asyncio.run(scenario())
+
     def test_given_the_result_modal_when_shown_then_the_full_output_is_present(self):
         long_output = "line\n" * 200
         result = ScriptResult(True, 0, long_output, "", "Succeeded")

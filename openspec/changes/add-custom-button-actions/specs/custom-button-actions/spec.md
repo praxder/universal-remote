@@ -31,7 +31,7 @@ The Run Script configuration modal SHALL offer a source toggle between Script Fi
 - **THEN** no action is stored and the button is unchanged
 
 ### Requirement: Non-blocking script execution with REMOTE_IP
-Running a custom button's Run Custom Script action SHALL execute the configured shell script without blocking the user interface, in a background worker using an asynchronous subprocess. The script's environment SHALL include `REMOTE_IP` set to the connected device's IP address; `REMOTE_IP` SHALL be the only value the application injects. Execution SHALL be bounded by a fixed 30-second timeout, not user-configurable, that terminates a script still running when it elapses, and a terminated script SHALL be treated as a failure. A script that cannot be started (for example, a missing script-file path) SHALL be reported as a failure rather than crashing the remote.
+Running a custom button's Run Custom Script action SHALL execute the configured shell script without blocking the user interface, in a background worker using an asynchronous subprocess. Both source kinds SHALL run through the shell: an inline script SHALL run as shell text, and a script file SHALL be run by passing its path to the shell rather than executing the file directly, so a file needs neither an execute bit nor a shebang line. A file path SHALL have a leading `~` expanded to the user's home directory. The script's environment SHALL include `REMOTE_IP` set to the connected device's IP address; `REMOTE_IP` SHALL be the only value the application injects. Execution SHALL be bounded by a fixed 30-second timeout, not user-configurable, that terminates a script still running when it elapses, and a terminated script SHALL be treated as a failure. A script that cannot be started — a script-file path that is not an existing file, or any other spawn failure — SHALL be reported as a failure rather than crashing the remote.
 
 #### Scenario: Script runs without freezing the UI
 - **WHEN** the user activates a custom button whose action is a long-running script
@@ -44,6 +44,10 @@ Running a custom button's Run Custom Script action SHALL execute the configured 
 #### Scenario: Hung script is terminated
 - **WHEN** a script is still running when the execution timeout elapses
 - **THEN** the script is terminated and the run is treated as a failure
+
+#### Scenario: A script file runs through the shell
+- **WHEN** a Run Custom Script action points at a script file that has no shebang line and no execute permission
+- **THEN** the file is run through the shell and executes normally rather than failing with an exec-format error
 
 #### Scenario: Unstartable script fails gracefully
 - **WHEN** a Run Custom Script action points at a path that cannot be executed

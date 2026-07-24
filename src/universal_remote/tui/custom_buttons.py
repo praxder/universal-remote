@@ -107,6 +107,53 @@ def set_action(
         entry.pop("action", None)
 
 
+def clear_more_specific(
+    custom_buttons: dict,
+    index: int,
+    scope: ButtonScope,
+    *,
+    device_id: str,
+    platform: str,
+) -> None:
+    """Drop button `index`'s entry from every scope more specific than `scope`.
+
+    Saving a button at a broader scope must let that scope resolve, but a more-specific
+    entry would shadow it (resolution is most-specific-first). Clearing is keyed to the
+    current device/type only, so a device override for one device never disturbs other
+    devices' entries. Choosing the most-specific scope clears nothing.
+    """
+    order = (ButtonScope.DEVICE, ButtonScope.TYPE, ButtonScope.GLOBAL)
+    for more in order[: order.index(scope)]:
+        _clear_scope_index(custom_buttons, more, index, device_id, platform)
+
+
+def clear_entry(
+    custom_buttons: dict, index: int, *, device_id: str, platform: str
+) -> None:
+    """Remove button `index` from every scope for the current device/type.
+
+    Resets the button to its default title and no action for the active device: the
+    device entry, its device-type entry, and the global entry are all dropped so
+    nothing resolves. Other devices, other types, and other buttons are untouched.
+    """
+    for scope in (ButtonScope.DEVICE, ButtonScope.TYPE, ButtonScope.GLOBAL):
+        _clear_scope_index(custom_buttons, scope, index, device_id, platform)
+
+
+def _clear_scope_index(
+    custom_buttons: dict,
+    scope: ButtonScope,
+    index: int,
+    device_id: str,
+    platform: str,
+) -> None:
+    """Drop button `index` from `scope`'s slot for this device/type, if present."""
+    entries = custom_buttons.get(scope.value, {})
+    key = _scope_key(scope, device_id, platform)
+    slot = entries if key is None else entries.get(key, {})
+    slot.pop(str(index), None)
+
+
 def forget_device(custom_buttons: dict, device_id: str) -> None:
     """Drop every device-scoped custom-button entry for `device_id`.
 

@@ -1,5 +1,7 @@
 from universal_remote.tui.custom_buttons import (
     ButtonScope,
+    clear_entry,
+    clear_more_specific,
     default_title,
     forget_device,
     resolve_action,
@@ -200,6 +202,107 @@ class TestForgetDevice:
         forget_device(custom_buttons, "dev-1")  # must not raise
 
         assert custom_buttons == {"global": {"1": {"title": "Reboot"}}}
+
+
+class TestClearMoreSpecific:
+    def test_given_global_chosen_when_cleared_then_device_shadow_is_removed(self):
+        # Arrange: the button resolves from the device scope, shadowing a global one.
+        custom_buttons = {
+            "device": {"dev-1": {"1": {"title": "News"}}},
+            "global": {"1": {"title": "Reboot"}},
+        }
+
+        # Act: saving at Global must drop the more-specific device entry so Global wins.
+        clear_more_specific(
+            custom_buttons, 1, ButtonScope.GLOBAL, device_id="dev-1", platform="roku"
+        )
+
+        # Assert: the device shadow is gone; the global entry now resolves.
+        assert "1" not in custom_buttons["device"]["dev-1"]
+        assert (
+            resolve_title(custom_buttons, 1, device_id="dev-1", platform="roku")
+            == "Reboot"
+        )
+
+    def test_given_type_chosen_when_cleared_then_device_is_dropped_but_global_stays(
+        self,
+    ):
+        custom_buttons = {
+            "device": {"dev-1": {"1": {"title": "News"}}},
+            "type": {"roku": {"1": {"title": "Kids"}}},
+            "global": {"1": {"title": "Reboot"}},
+        }
+
+        clear_more_specific(
+            custom_buttons, 1, ButtonScope.TYPE, device_id="dev-1", platform="roku"
+        )
+
+        assert "1" not in custom_buttons["device"]["dev-1"]
+        assert custom_buttons["global"]["1"]["title"] == "Reboot"
+
+    def test_given_device_chosen_when_cleared_then_nothing_is_removed(self):
+        custom_buttons = {"device": {"dev-1": {"1": {"title": "News"}}}}
+
+        clear_more_specific(
+            custom_buttons, 1, ButtonScope.DEVICE, device_id="dev-1", platform="roku"
+        )
+
+        assert custom_buttons["device"]["dev-1"]["1"]["title"] == "News"
+
+    def test_given_another_devices_entry_when_cleared_then_it_is_untouched(self):
+        # Clearing is keyed to the current device only; a sibling device keeps its own.
+        custom_buttons = {
+            "device": {
+                "dev-1": {"1": {"title": "Mine"}},
+                "dev-2": {"1": {"title": "Theirs"}},
+            }
+        }
+
+        clear_more_specific(
+            custom_buttons, 1, ButtonScope.GLOBAL, device_id="dev-1", platform="roku"
+        )
+
+        assert custom_buttons["device"]["dev-2"]["1"]["title"] == "Theirs"
+
+
+class TestClearEntry:
+    def test_given_entries_at_every_scope_when_cleared_then_the_button_resets(self):
+        # Arrange: the button is configured at all three scopes for this device/type.
+        custom_buttons = {
+            "device": {"dev-1": {"1": {"title": "News", "action": _ACTION}}},
+            "type": {"roku": {"1": {"title": "Kids"}}},
+            "global": {"1": {"title": "Reboot"}},
+        }
+
+        # Act
+        clear_entry(custom_buttons, 1, device_id="dev-1", platform="roku")
+
+        # Assert: nothing resolves, so the button falls back to its default and no
+        # action.
+        assert (
+            resolve_title(custom_buttons, 1, device_id="dev-1", platform="roku")
+            == "Custom 1"
+        )
+        assert (
+            resolve_action(custom_buttons, 1, device_id="dev-1", platform="roku")
+            is None
+        )
+
+    def test_given_other_buttons_when_one_is_cleared_then_they_remain(self):
+        custom_buttons = {
+            "global": {"1": {"title": "Reboot"}, "2": {"title": "Keep"}},
+        }
+
+        clear_entry(custom_buttons, 1, device_id="dev-1", platform="roku")
+
+        assert custom_buttons["global"]["2"]["title"] == "Keep"
+
+    def test_given_no_entry_when_cleared_then_it_is_a_no_op(self):
+        custom_buttons: dict = {}
+
+        clear_entry(custom_buttons, 1, device_id="dev-1", platform="roku")  # no raise
+
+        assert custom_buttons == {}
 
 
 class TestSetAction:

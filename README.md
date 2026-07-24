@@ -142,18 +142,22 @@ field parked at the bottom of the remote. A row of **five custom buttons** sits
 there instead — click one to open its config pop-up and give it a title, saved
 just for this device, for every device of its type, or globally. Reopen the
 pop-up and it shows the scope the title is actually stored at, so you can see and
-change where it applies.
+change where it applies — moving a button to a broader scope takes effect at
+once. A **Reset** button clears the button back to its default title with no
+action.
 
 **Give a button an action.** In that same config pop-up, open **Action Type** and
 pick **Run Custom Script** to attach a shell script to the button. Choose **Script
-File** to point at a script on disk, or **Inline Script** to type the script right
-there. A **Results** toggle decides what a run shows: **Don't Show** stays quiet on
+File** to point at a script on disk (it runs through the shell, so it needs no
+shebang or `chmod +x`, and a leading `~` is expanded), or **Inline Script** to type
+the script right there. A **Results** toggle decides what a run shows: **Don't Show** stays quiet on
 success and only raises an error notification if the script fails, while **Show**
 always opens a scrollable window with the exit code and the full output. A button's
 title and action are stored together at the same scope. Once a button has an action,
 **clicking it runs the script** instead of opening the config; to reconfigure it,
 press **`e`** to arm edit-mode and then activate the button (by clicking it or
 pressing its shortcut) — that opens the config once, after which edit-mode clears.
+While edit-mode is armed the custom buttons highlight so you can tell it is on.
 Scripts run in the background so the remote never freezes, bounded by a fixed
 30-second timeout that kills a hung script. `REMOTE_IP` is set in the script's
 environment to the connected device's IP address.

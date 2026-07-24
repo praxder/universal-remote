@@ -88,12 +88,21 @@ async def run_script(
 
 
 async def _spawn(action: dict, env: dict) -> asyncio.subprocess.Process:
-    """Start the configured script: the given path for a file, `/bin/sh -c` inline."""
+    """Start the configured script through the shell: a file by path, inline by `-c`.
+
+    A file is run as `/bin/sh <path>` rather than exec-ed directly, so it needs no
+    execute bit or shebang — the field asks for a shell script, and inline text runs
+    the same way. A `~` prefix is expanded, and a path that is not an existing file
+    raises so the caller reports a clean start failure instead of a shell exit 127.
+    """
     script = action.get("script", "")
     pipe = asyncio.subprocess.PIPE
     if action.get("source") == "file":
+        path = os.path.expanduser(script)
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"No such script file: {script}")
         return await asyncio.create_subprocess_exec(
-            script, stdout=pipe, stderr=pipe, env=env
+            "/bin/sh", path, stdout=pipe, stderr=pipe, env=env
         )
     return await asyncio.create_subprocess_exec(
         "/bin/sh", "-c", script, stdout=pipe, stderr=pipe, env=env
@@ -228,7 +237,10 @@ class ScriptResultModal(ModalScreen[None]):
     #script-result-output {
         width: 100%; height: 1fr; border: round $primary; padding: 0 1;
     }
-    #script-result-close { width: 16; margin-top: 1; }
+    #script-result-buttons {
+        width: 100%; height: auto; align-horizontal: center; margin-top: 1;
+    }
+    #script-result-close { width: 16; }
     """
 
     def __init__(self, result: ScriptResult) -> None:
@@ -242,7 +254,8 @@ class ScriptResultModal(ModalScreen[None]):
             yield Label(f"Exit code: {code}", id="script-result-exit")
             with VerticalScroll(id="script-result-output"):
                 yield Static(self._output_text(), id="script-result-body")
-            yield Button("Close", id="script-result-close", variant="primary")
+            with Horizontal(id="script-result-buttons"):
+                yield Button("Close", id="script-result-close", variant="primary")
 
     def _output_text(self) -> str:
         """Combined stdout and stderr, or a placeholder when both are empty."""

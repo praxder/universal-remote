@@ -7,6 +7,7 @@ from universal_remote.tui.shortcuts import (
     effective_key,
     is_bare_modifier,
     is_reserved,
+    without_reserved,
 )
 
 _TWELVE_CLICK_ONLY = {
@@ -218,6 +219,32 @@ class TestConflictsAndReserved:
     def test_given_an_actions_own_default_when_checked_then_it_is_exempt(self):
         # OK legitimately defaults to `enter`, itself a reserved key.
         assert conflicts("remote.ok", "enter", {}) is False
+
+
+class TestWithoutReserved:
+    def test_given_an_override_on_a_now_reserved_key_when_pruned_then_it_is_dropped(
+        self,
+    ):
+        # `e` was assignable to Stop before it became reserved for edit-mode; a saved
+        # override on it would shadow the reserved binding, so it must be dropped.
+        overrides = {"remote.stop": "e", "remote.play_pause": "p"}
+
+        pruned = without_reserved(overrides)
+
+        assert "remote.stop" not in pruned
+        assert pruned["remote.play_pause"] == "p"
+
+    def test_given_only_free_key_overrides_when_pruned_then_they_are_kept(self):
+        overrides = {"remote.mute": "m", "remote.menu": "o"}
+
+        assert without_reserved(overrides) == overrides
+
+    def test_given_overrides_when_pruned_then_the_original_map_is_unchanged(self):
+        overrides = {"remote.stop": "e"}
+
+        without_reserved(overrides)
+
+        assert overrides == {"remote.stop": "e"}
 
 
 class TestDisplayLabel:

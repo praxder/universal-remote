@@ -3,7 +3,7 @@ import asyncio
 from textual.widgets import DataTable
 
 from universal_remote.devices.store import DeviceStore
-from universal_remote.preferences.store import PreferencesStore
+from universal_remote.preferences.store import Preferences, PreferencesStore
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
 from universal_remote.tui.devices_screen import DeviceListScreen
@@ -463,3 +463,30 @@ class TestCommandPalette:
                 assert any(n.severity == "error" for n in app._notifications)
 
         asyncio.run(scenario())
+
+
+class TestReservedOverrideMigration:
+    def test_given_an_override_on_a_now_reserved_key_when_loaded_then_it_is_dropped(
+        self, tmp_path
+    ):
+        # `e` was assignable to Stop before it was reserved for edit-mode; a stale
+        # saved override on it must be pruned on load and re-persisted, while a free
+        # override survives.
+        prefs = PreferencesStore(path=tmp_path / "settings.json")
+        prefs.save(Preferences(shortcuts={"remote.stop": "e", "remote.mute": "m"}))
+
+        async def scenario():
+            app = UniversalRemoteApp(
+                store=DeviceStore(path=tmp_path / "d.json"),
+                registry=AdapterRegistry(),
+                preferences=prefs,
+            )
+            async with app.run_test(size=_SIZE) as pilot:
+                await pilot.pause()
+                assert "remote.stop" not in app.shortcut_overrides
+                assert app.shortcut_overrides["remote.mute"] == "m"
+
+        asyncio.run(scenario())
+
+        # The cleaned map was written back, so the stale override stays gone next run.
+        assert "remote.stop" not in prefs.load().shortcuts

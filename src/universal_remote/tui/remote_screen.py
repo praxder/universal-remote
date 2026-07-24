@@ -28,6 +28,8 @@ from .actions import (
 )
 from .custom_buttons import (
     ButtonScope,
+    clear_entry,
+    clear_more_specific,
     default_title,
     resolve_action,
     resolve_scope,
@@ -123,7 +125,7 @@ class ButtonConfigModal(ModalScreen[bool]):
     DEFAULT_CSS = """
     ButtonConfigModal { align: center middle; background: $background 60%; }
     #button-config {
-        width: 60%; height: auto; padding: 1 2;
+        width: 70%; height: auto; padding: 1 2;
         border: thick $primary; background: $surface;
     }
     #button-config-title {
@@ -134,7 +136,9 @@ class ButtonConfigModal(ModalScreen[bool]):
     #button-config-scope { width: 100%; margin-bottom: 1; }
     #button-config-action-type { width: 100%; margin-bottom: 1; }
     #button-config-buttons { width: 100%; height: auto; align-horizontal: center; }
-    #button-config-buttons Button { width: 16; margin: 0 1; }
+    /* min-width overrides Textual's Button default (16) so three buttons fit the row
+       without the last one clipping. */
+    #button-config-buttons Button { width: 14; min-width: 0; margin: 0 1; }
     """
 
     def __init__(self, index: int, device: "Device") -> None:
@@ -166,6 +170,7 @@ class ButtonConfigModal(ModalScreen[bool]):
             with Horizontal(id="button-config-buttons"):
                 yield Button("OK", id="button-config-ok", variant="primary")
                 yield Button("Cancel", id="button-config-cancel")
+                yield Button("Reset", id="button-config-reset")
 
     def _current_action(self) -> dict | None:
         """The button's currently assigned action, resolved for the active device."""
@@ -209,6 +214,8 @@ class ButtonConfigModal(ModalScreen[bool]):
             self._save()
         elif event.button.id == "button-config-cancel":
             self.dismiss(False)
+        elif event.button.id == "button-config-reset":
+            self._reset()
         elif event.button.id == "button-config-action-type":
             self.app.push_screen(ActionTypeListModal(), self._action_chosen)
 
@@ -223,6 +230,15 @@ class ButtonConfigModal(ModalScreen[bool]):
     def _save(self) -> None:
         title = self.query_one("#button-config-title-input", Input).value
         scope = self._selected_scope()
+        # Keep the button in one place: drop any entry at a more-specific scope so the
+        # chosen scope is what resolves, then write the title and action there.
+        clear_more_specific(
+            self.app.custom_buttons,
+            self._index,
+            scope,
+            device_id=self._device.id,
+            platform=self._device.platform,
+        )
         set_title(
             self.app.custom_buttons,
             self._index,
@@ -236,6 +252,18 @@ class ButtonConfigModal(ModalScreen[bool]):
             self._index,
             self._action,
             scope,
+            device_id=self._device.id,
+            platform=self._device.platform,
+        )
+        self.app.persist_preferences()
+        self.dismiss(True)
+
+    def _reset(self) -> None:
+        # Clear the button at every scope for this device, so it returns to its default
+        # title and no action, then persist and close.
+        clear_entry(
+            self.app.custom_buttons,
+            self._index,
             device_id=self._device.id,
             platform=self._device.platform,
         )
@@ -276,6 +304,9 @@ class RemoteScreen(Screen[None]):
         min-width: 0; padding: 0 1; margin: 0 1;
     }
     #remote Button:disabled { text-opacity: 40% !important; }
+    /* Edit-mode cue: the custom buttons switch to a warning-colored, bold border
+       while edit-mode is armed, so it reads as "editing" rather than "run". */
+    #remote Button.edit-armed { border: round $warning; text-style: bold; }
     /* Auto heights so the button set sizes to its content: if it exceeds the
        terminal the screen scrolls (a visible, testable signal) rather than the
        rows silently compressing. The row containers default to 1fr and would
@@ -432,7 +463,7 @@ class RemoteScreen(Screen[None]):
         # identically. Edit-mode armed → configure and disarm; otherwise run the
         # button's resolved action, or configure it when it has none.
         if self._edit_mode:
-            self._edit_mode = False
+            self._set_edit_mode(False)
             self._configure_custom(index)
             return
         action = resolve_action(
@@ -451,9 +482,16 @@ class RemoteScreen(Screen[None]):
 
     def action_edit_mode(self) -> None:
         # Arm edit-mode: the next custom-button activation opens its config instead of
-        # running it. A toast is the only cue, since the gesture is otherwise silent.
-        self._edit_mode = True
+        # running it. The custom buttons pick up a visual cue, and a toast names it.
+        self._set_edit_mode(True)
         self.app.notify("Edit mode: activate a custom button to configure it.")
+
+    def _set_edit_mode(self, armed: bool) -> None:
+        # One place toggles the flag and the visual cue on the custom buttons, so the
+        # indicator can never outlive the armed state.
+        self._edit_mode = armed
+        for index in range(1, 6):
+            self.query_one(f"#custom-{index}", Button).set_class(armed, "edit-armed")
 
     def _run_action(self, action: dict) -> None:
         # Run in a worker so a slow script never blocks the remote; the outcome is

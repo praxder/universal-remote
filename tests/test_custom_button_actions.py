@@ -11,6 +11,7 @@ from universal_remote.tui.actions import (
     RunScriptConfigModal,
     ScriptResultModal,
 )
+from universal_remote.preferences.store import Preferences, PreferencesStore
 from universal_remote.tui.app import UniversalRemoteApp
 from universal_remote.tui.custom_buttons import ButtonScope, set_action
 from universal_remote.tui.remote_screen import ButtonConfigModal, RemoteScreen
@@ -129,6 +130,65 @@ class TestEditGesture:
                 await pilot.click("#button-config-cancel")
                 await pilot.pause()
                 assert app.screen._edit_mode is False
+
+        asyncio.run(scenario())
+
+    def test_given_edit_mode_armed_then_the_custom_buttons_show_an_indicator(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                button = app.screen.query_one("#custom-1", Button)
+                assert button.has_class("edit-armed") is False
+                await pilot.press("e")  # arm edit-mode
+                await pilot.pause()
+                # Every custom button carries the armed cue while edit-mode is on.
+                assert button.has_class("edit-armed") is True
+                # Activating a button disarms it, so the cue clears on return.
+                await pilot.click("#custom-1")
+                await pilot.pause()
+                await pilot.click("#button-config-cancel")
+                await pilot.pause()
+                assert isinstance(app.screen, RemoteScreen)
+                assert (
+                    app.screen.query_one("#custom-1", Button).has_class("edit-armed")
+                    is False
+                )
+
+        asyncio.run(scenario())
+
+    def test_given_a_stale_reserved_override_on_e_when_pressed_then_edit_mode_arms(
+        self, tmp_path
+    ):
+        # A pre-reservation override bound Stop to `e`. It is pruned on load, so `e`
+        # arms edit-mode as intended rather than sending Stop.
+        store = _store_with_device(tmp_path)
+        device = store.list()[0]
+        adapter = FakeAdapter(platform="fake-tv")
+        PreferencesStore().save(Preferences(shortcuts={"remote.stop": "e"}))
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                set_action(
+                    app.custom_buttons,
+                    1,
+                    _SHOW_OK_ACTION,
+                    ButtonScope.DEVICE,
+                    device_id=device.id,
+                    platform="fake-tv",
+                )
+                await _goto_remote(app, pilot)
+                await pilot.press("e")  # must arm edit-mode, not send Stop
+                await pilot.pause()
+                await pilot.click("#custom-1")
+                await pilot.pause()
+                assert isinstance(app.screen, ButtonConfigModal)
 
         asyncio.run(scenario())
 

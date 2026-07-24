@@ -149,6 +149,75 @@ class TestButtonConfigModal:
 
         asyncio.run(scenario())
 
+    def test_given_a_device_title_when_scope_switched_to_global_then_global_wins(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        device = store.list()[0]
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                # A device-scoped title already shadows every broader scope.
+                set_title(
+                    app.custom_buttons,
+                    1,
+                    "News",
+                    ButtonScope.DEVICE,
+                    device_id=device.id,
+                    platform="fake-tv",
+                )
+                await _goto_remote(app, pilot)
+                await _open_config(app, pilot, 1)
+                # Switch this button to Global with a new title and save.
+                app.screen.query_one(
+                    "#button-config-title-input", Input
+                ).value = "Reboot"
+                await pilot.click("#scope-global")
+                await pilot.pause()
+                await pilot.click("#button-config-ok")
+                await pilot.pause()
+                # The Global title takes effect — the old device shadow was cleared.
+                assert str(app.screen.query_one("#custom-1", Button).label) == "Reboot"
+                assert "1" not in app.custom_buttons["device"][device.id]
+                assert app.custom_buttons["global"]["1"]["title"] == "Reboot"
+
+        asyncio.run(scenario())
+
+    def test_given_a_configured_button_when_reset_then_it_returns_to_default(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        device = store.list()[0]
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                set_title(
+                    app.custom_buttons,
+                    1,
+                    "News",
+                    ButtonScope.DEVICE,
+                    device_id=device.id,
+                    platform="fake-tv",
+                )
+                await _goto_remote(app, pilot)
+                await _open_config(app, pilot, 1)
+                await pilot.click("#button-config-reset")
+                await pilot.pause()
+                # Reset closes the modal and the button reads its default again.
+                assert isinstance(app.screen, RemoteScreen)
+                assert (
+                    str(app.screen.query_one("#custom-1", Button).label) == "Custom 1"
+                )
+                assert "1" not in app.custom_buttons.get("device", {}).get(
+                    device.id, {}
+                )
+
+        asyncio.run(scenario())
+
     def test_given_edits_when_cancel_then_the_saved_title_is_unchanged(self, tmp_path):
         store = _store_with_device(tmp_path)
         device = store.list()[0]

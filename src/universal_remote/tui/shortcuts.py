@@ -210,6 +210,17 @@ def is_reserved(key: str) -> bool:
     return key in RESERVED_KEYS
 
 
+def without_reserved(overrides: dict[str, str]) -> dict[str, str]:
+    """`overrides` with any entry whose key is now reserved dropped.
+
+    A key can become reserved after a user already bound it — for example `e` was
+    assignable to a device action before it was reserved for edit-mode. Such a stale
+    override would shadow the reserved binding, so it is dropped on load and the action
+    reverts to its default. Returns a new map; the original is untouched.
+    """
+    return {aid: key for aid, key in overrides.items() if not is_reserved(key)}
+
+
 # A lone modifier press (Shift, Ctrl, …) is never a valid shortcut. Most terminals
 # never deliver one, but the Kitty keyboard protocol can, so reject it defensively.
 _MODIFIER_ONLY: frozenset[str] = frozenset(

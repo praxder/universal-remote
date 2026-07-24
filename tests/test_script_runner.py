@@ -95,3 +95,29 @@ class TestUnstartableScript:
 
         assert result.ok is True
         assert result.stdout == "9.9.9.9"
+
+    def test_given_a_file_without_shebang_or_exec_bit_when_run_then_it_still_runs(
+        self, tmp_path
+    ):
+        # A plain shell file with no shebang and no execute permission: exec-ing it
+        # directly would fail with "Exec format error", but the runner invokes it
+        # through the shell so it still runs.
+        script = tmp_path / "plain.sh"
+        script.write_text('printf "%s" "$REMOTE_IP"\n')
+
+        result = asyncio.run(run_script(_file(str(script)), "5.5.5.5"))
+
+        assert result.ok is True
+        assert result.stdout == "5.5.5.5"
+
+    def test_given_a_tilde_path_when_run_then_the_home_prefix_is_expanded(
+        self, tmp_path, monkeypatch
+    ):
+        # A `~/...` path is expanded against HOME so a user's stored tilde path runs.
+        monkeypatch.setenv("HOME", str(tmp_path))
+        (tmp_path / "tilde.sh").write_text("printf ok\n")
+
+        result = asyncio.run(run_script(_file("~/tilde.sh"), "1.1.1.1"))
+
+        assert result.ok is True
+        assert result.stdout == "ok"
