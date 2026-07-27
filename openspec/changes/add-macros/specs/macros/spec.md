@@ -118,8 +118,8 @@ A macro SHALL NOT contain a step that invokes another macro. When the user activ
 custom button whose resolved action is Run Macro while recording, the application SHALL
 run that action but SHALL NOT capture it as a step, and SHALL report that nested macros
 are not supported. Should a nested Run Macro step nevertheless be present — for example
-in a hand-edited preferences file — playback SHALL refuse that step, report it, and
-continue with the remaining steps rather than recursing.
+in a hand-edited preferences file — playback SHALL refuse that step, report it, and abort
+the run rather than recursing.
 
 #### Scenario: Recording refuses to capture a Run Macro button
 - **WHEN** the user activates a custom button whose action is Run Macro while recording
@@ -127,7 +127,7 @@ continue with the remaining steps rather than recursing.
 
 #### Scenario: Playback refuses a nested macro step
 - **WHEN** a macro being played reaches a step that invokes another macro
-- **THEN** that step is not run, the refusal is reported, and playback continues with the next step
+- **THEN** that step is not run, the refusal is reported as an error notification, and the run aborts without recursing
 
 ### Requirement: Default macro names use a monotonic counter
 A newly recorded macro SHALL be named `Macro N`, where `N` comes from a counter that is
@@ -248,9 +248,12 @@ Playing a macro SHALL present a modal reporting that the macro is playing, namin
 showing progress through its steps, together with a Cancel control. While that modal is
 shown the remote SHALL NOT respond to any keyboard shortcut or button press, so no user
 interaction can interleave with the macro's own sends. The modal SHALL dismiss itself when
-the last step completes. Activating Cancel, or pressing the Go Back key, SHALL stop
+the last step completes, and SHALL likewise dismiss when a step fails and the run aborts
+(see "A failed step aborts playback"). Activating Cancel, or pressing the Go Back key, SHALL stop
 playback at whichever step it has reached and dismiss the modal; steps already performed
-SHALL NOT be undone.
+SHALL NOT be undone. A run stopped this way SHALL report an unsuccessful outcome naming the
+step it stopped at, since it did not complete, but SHALL NOT raise an error notification —
+the user chose to stop it, and an error reporting their own choice back to them is noise.
 
 #### Scenario: Playback shows a progress modal
 - **WHEN** a macro begins playing
@@ -266,31 +269,50 @@ SHALL NOT be undone.
 
 #### Scenario: Cancel stops playback where it is
 - **WHEN** the user activates Cancel or presses the Go Back key while a macro is playing
-- **THEN** playback stops at the current step, the modal dismisses, and no further steps run
+- **THEN** playback stops at the current step, the modal dismisses, no further steps run, and no error notification is raised
 
-### Requirement: A failed step does not stop playback
+#### Scenario: A cancelled run reports that it did not complete
+- **WHEN** the user cancels a macro partway through
+- **THEN** the reported outcome is unsuccessful and names the step it stopped at
+
+### Requirement: A failed step aborts playback
 When a step fails during playback — an unsupported key, a failed send, a script that exits
-non-zero or times out, or a refused nested macro — the application SHALL report that
-failure and SHALL continue with the next step. When playback completes, the outcome SHALL
-summarise how many steps ran and how many failed. Playback SHALL NOT present a per-step
-result modal, even for a captured script step configured to show its results, so nothing
-interrupts the run waiting on the user.
+non-zero or times out, or a refused nested macro — the application SHALL abort the macro:
+no further step SHALL run, the playback modal SHALL dismiss, and an error notification
+SHALL name the macro, the step the run stopped at, and why that step failed. The outcome
+reported for an aborted run SHALL report failure rather than success and SHALL name the
+step it stopped at. Steps already performed SHALL NOT be undone. A run in which every step
+succeeds SHALL report success and how many steps ran. Playback SHALL NOT present a
+per-step result modal, even for a captured script step configured to show its results, so
+nothing interrupts the run waiting on the user.
 
-#### Scenario: Playback continues past an unsupported key
+#### Scenario: An unsupported key aborts playback
 - **WHEN** a macro played on a device whose adapter lacks support for one of its keys reaches that step
-- **THEN** the failure is reported and playback continues with the next step
+- **THEN** the failure is reported as an error notification, the playback modal dismisses, and no later step runs
 
-#### Scenario: Playback continues past a failed script step
+#### Scenario: A failed script step aborts playback
 - **WHEN** a captured script step exits non-zero during playback
-- **THEN** the failure is reported and playback continues with the next step
+- **THEN** the failure is reported as an error notification and no later step runs
 
-#### Scenario: A show-results script step does not interrupt playback
-- **WHEN** playback runs a captured script step whose stored Results choice is Show
+#### Scenario: A succeeding show-results script step does not interrupt playback
+- **WHEN** playback runs a captured script step that succeeds and whose stored Results choice is Show
 - **THEN** no result modal is presented and playback continues to the next step
 
-#### Scenario: The outcome summarises the run
-- **WHEN** a macro finishes playing after some steps failed
-- **THEN** the reported outcome states how many steps ran and how many failed
+#### Scenario: A failing show-results script step aborts without a result modal
+- **WHEN** playback runs a captured script step that fails and whose stored Results choice is Show
+- **THEN** no result modal is presented, the failure is reported as an error notification, and the run aborts
+
+#### Scenario: Steps performed before the failure are not undone
+- **WHEN** a macro aborts at one of its steps
+- **THEN** the steps that already ran keep their effect on the device
+
+#### Scenario: An aborted run reports failure
+- **WHEN** a macro aborts partway through
+- **THEN** the reported outcome states that the macro failed and names the step it stopped at
+
+#### Scenario: A completed run reports success
+- **WHEN** every step of a macro succeeds
+- **THEN** the reported outcome states that the macro completed and how many steps ran
 
 ### Requirement: Macros persist with their own identity
 Each macro SHALL be stored with a stable identifier that is independent of its name and

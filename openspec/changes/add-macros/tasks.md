@@ -131,17 +131,25 @@ The chain has six links and one of them silently eats data. Complete it end to e
       `MacroPlaybackModal`, starting its step loop in `on_mount`.
 - [ ] 8.2 Implement the step loop: `key` → `session.send_key`, `text` →
       `session.send_text`, `pause` → sleep for its duration, `action` → `run_action`
-      **directly**. Write the regression test first: a macro holding a captured script
-      step with `show_results: true` must not present a result modal during playback
-      (never reuse `RemoteScreen._execute`, which calls `present_result`).
-- [ ] 8.3 Write tests for continue-on-failure — an unsupported key, a failed send, a
-      non-zero script exit — each reporting the failure and continuing to the next step,
-      with the final result summarising how many steps ran and how many failed. Then
-      implement it.
-- [ ] 8.4 Write a test that a nested `run_macro` step is refused, reported, and skipped
-      rather than recursing, then implement the depth guard.
+      **directly**. Write the regression test first, in both variants: a macro holding a
+      captured script step with `show_results: true` must not present a result modal
+      during playback whether that step succeeds (playback continues) or fails (the run
+      aborts). Never reuse `RemoteScreen._execute`, which calls `present_result`.
+- [ ] 8.3 Write tests for abort-on-failure — an unsupported key, a failed send, a non-zero
+      script exit — each dismissing the modal, running no later step, and raising an error
+      notification naming the macro, the failing step, and the reason, with the returned
+      result unsuccessful. Include the complement: a run whose every step succeeds returns
+      a successful result summarising how many steps ran. Then implement it.
+- [ ] 8.4 Write a test that a nested `run_macro` step is refused, reported, and aborts the
+      run rather than recursing, then implement the depth guard.
 - [ ] 8.5 Write a test that Cancel and the Go Back key each stop playback at the current
-      step and dismiss the modal, with no further steps sent, then implement it.
+      step and dismiss the modal, with no further steps sent, an unsuccessful result naming
+      that step, and **no** error notification. Then implement it.
+- [ ] 8.5a Add `reports_own_outcome: bool = False` to `ActionType`, set it on the
+      `run_macro` entry, and skip `present_result` in `RemoteScreen._execute` for a type
+      that declares it. Write the test first: an aborted or cancelled macro must raise no
+      `"Script failed"` toast on top of the modal's own reporting, since `present_result`
+      toasts any not-ok result under that title. `run_script` keeps its current path.
 - [ ] 8.6 Add the `run_macro` catalog entry whose runner resolves the macro id from
       `context.macros` and awaits `app.push_screen_wait(MacroPlaybackModal(...))`. Test
       that a button pointing at a deleted macro reports the macro is missing and sends

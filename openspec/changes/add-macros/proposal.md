@@ -27,8 +27,9 @@ Macros are the first real payoff on that extensibility.
   the whole macro. Edits live in an in-memory draft; only Save writes.
 - **Playback via a new `run_macro` action type.** A custom button can be assigned
   `Run Macro` and pointed at a macro by id. Playback shows a blocking modal with
-  progress and Cancel, so the remote is frozen while a macro runs. A failed step toasts
-  and playback continues.
+  progress and Cancel, so the remote is frozen while a macro runs. A failed step aborts
+  the run: the remaining steps do not run, the modal dismisses, and an error notification
+  names the macro, the step it stopped at, and why.
 - **BREAKING (internal):** the action-catalog runner signature widens from
   `(action, remote_ip)` to `(action, context)`. Macro playback needs the live session,
   the notifier, and the custom-button map — none of which fit the current two-argument
@@ -36,8 +37,8 @@ Macros are the first real payoff on that extensibility.
 - **BREAKING (internal):** `ScriptResult` is renamed `ActionResult`, since it is now the
   return type of every catalog action rather than only Run Custom Script.
 - Nested macros are refused: a macro step that would invoke another macro is rejected at
-  record time with a message, and a depth guard rejects it at playback for
-  hand-edited data.
+  record time with a message, and a depth guard rejects it at playback for hand-edited
+  data, aborting the run like any other failed step.
 
 ## Capabilities
 

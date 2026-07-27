@@ -90,7 +90,7 @@ ActionContext(remote_ip, session, notify, macros, custom_buttons, device_id, pla
 ```
 
 `run_script` reads only `remote_ip`. `run_macro` needs the live `session` (to send keys
-and text), `notify` (per-step failure toasts), `macros` (to resolve the id), and
+and text), `notify` (the abort notification), `macros` (to resolve the id), and
 `custom_buttons` + `device_id` + `platform` (unused today, but a future step type that
 resolves a button would need them).
 
@@ -212,7 +212,8 @@ Custom 3 ──action──▶ run_macro("login")
 ```
 
 Record time refuses to capture it and says so. Playback keeps a depth guard that rejects
-a `run_macro` reached from inside a macro, so hand-edited JSON cannot recurse either.
+a `run_macro` reached from inside a macro — a rejected step is a failed step, so it aborts
+the run per Decision 10, and hand-edited JSON cannot recurse either.
 
 *Why refuse at record time rather than only at playback:* a playback-only guard lets the
 user build a step that looks valid in the detail modal and always fails when run. Better
@@ -227,8 +228,10 @@ _activate_custom → _run_action → worker → run_macro(action, ctx)
 ```
 
 The modal's `on_mount` starts the step loop, each step updates its label
-(`Step 3 of 12`), completion dismisses with an `ActionResult`, and Cancel or Escape stops
-the loop and dismisses. `run_macro` forwards whatever the modal returns.
+(`Step 3 of 12`), completion dismisses with a successful `ActionResult`, a failed step
+dismisses with an unsuccessful one naming that step, and Cancel or Escape stops the loop
+and dismisses. `run_macro` forwards whatever the modal returns, which is what makes the
+aborted run read as a failure to the caller rather than as a partial success.
 
 **The trap:** a snapshotted Run Custom Script action carries its `show_results` flag. The
 per-step loop must call `run_action` directly and must **not** reuse
@@ -237,17 +240,35 @@ per-step loop must call `run_action` directly and must **not** reuse
 `_execute` looks like good reuse and is wrong.
 
 `run_macro` therefore has no Results toggle in its config: the playback modal *is* the
-progress UI, and per-step failures already toast.
+progress UI, and a failing step already aborts with an error notification (Decision 10).
 
-### 10. A failed step toasts and playback continues
+**The second trap, new with abort:** `_execute` calls `present_result(result,
+show_results=action.get("show_results"))` on whatever `run_action` returns, and
+`present_result` toasts `result.message` under the title **"Script failed"** whenever the
+result is not ok. A macro used to return `ok=True` with a summary, so this never fired.
+An aborted run returns `ok=False`, so it now fires — a second toast, mis-titled, after the
+modal's own. The playback modal owns its reporting, so the catalog needs a way to say so:
+`ActionType` gains `reports_own_outcome: bool = False`, set true for `run_macro`, and
+`_execute` skips `present_result` for such a type. A cancelled run returns `ok=False` too
+(it did not complete) and that flag is what keeps it silent, as the spec requires.
 
-An unsupported key, a failed send, a non-zero script exit — each toasts and playback
-moves to the next step. The final `ActionResult` message summarises
-(`Macro 'Login': 12 steps, 2 failed`).
+### 10. A failed step aborts the run
 
-*Why:* a partial run is usually still useful, and this behavior falls out of the existing
-`_send` handling. It also dissolves the cross-device capability problem for free: a
-digit step on Apple TV raises `UnsupportedKeyError`, toasts, and the macro carries on.
+An unsupported key, a failed send, a non-zero script exit — each stops the macro where it
+is. The modal dismisses, an error notification names the macro, the step, and the reason
+(`Macro 'Login' failed at step 4 (Key: DOWN): device unreachable`), and the returned
+`ActionResult` is unsuccessful. A completed run's message stays a summary
+(`Macro 'Login': 12 steps`).
+
+*Why:* a macro's later steps assume its earlier ones landed. `HOME, DOWN, DOWN, OK` with
+one `DOWN` dropped does not do most of what the user asked — it opens the wrong thing.
+Continuing past a failure converts a legible error into silent wrong behavior on the
+device, which is worse than stopping. Aborting also keeps the notification unambiguous:
+one error naming one step, not a stream of toasts the user has to reassemble.
+
+*Consequence:* the cross-device capability gap is surfaced rather than absorbed. A macro
+holding a digit step aborts on Apple TV at that step instead of skipping it. That is the
+intended reading — the macro genuinely cannot do what it says on that device.
 
 ### 11. Default names use a monotonic counter, not a count
 
@@ -300,6 +321,11 @@ Preferences field → load() branch → save() key → app attr → on_mount() p
   timeout means three script steps can run 90 seconds; cancelling the worker cancels the
   `await`, but the spawned shell may outlive it. → Accepted. The script is the user's own
   on their own machine, and the existing timeout still reaps it.
+- **A macro recorded on one device aborts partway on another.** A key the target adapter
+  lacks stops the run at that step instead of skipping it, so a macro can leave the device
+  half-navigated with nothing undone. → Accepted (Decision 10). Stopping at a legible
+  failure beats sending the remaining steps into whatever state the device is actually in.
+  The error names the step, so the user can see which key the device does not support.
 - **A snapshotted step goes stale when its custom button is retuned.** → Accepted and
   intended (Decision 7). The detail modal renders the snapshot's own description so what
   is shown is what will run.
