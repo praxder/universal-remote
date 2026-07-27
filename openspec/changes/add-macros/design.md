@@ -1,0 +1,330 @@
+## Context
+
+The remote surface funnels every key press through one place. `RemoteScreen._send(key)`
+is reached by a mouse click on a button and by a rebindable hotkey alike, and
+`action_send` already early-returns on an unsupported key *before* reaching it. That
+single choke point is what makes recording tractable: one hook captures both input
+methods and never captures a press that did not actually happen.
+
+The action catalog (`tui/actions.py`) was built to be extended — its docstring and the
+`ACTION_CATALOG` comment both say adding a type should not touch the remote surface or
+the Button Config modal. It currently holds exactly one type, `run_script`, whose runner
+signature is `Callable[[dict, str], Awaitable[ScriptResult]]`: an action dict and the
+device IP.
+
+Constraints that shape the design:
+
+- **The remote's vertical budget is spent.** The supported baseline is 80×45
+  (`tests/test_tui_remote_surface.py:17`) and the rendered remote is roughly 40 rows.
+  `test_given_the_full_button_set_at_the_baseline_size_then_the_remote_does_not_scroll`
+  pins that. A recording banner row plus a Stop Recording button row is about five
+  rows — it would pass at exactly the baseline with zero slack.
+- **The footer is at capacity.** `remote_screen.py` already keeps Go Back out of the
+  footer because "a ninth hint does not fit the supported 80-column width."
+- **A modal freezes the screens below it.** Textual's `Screen._modal_binding_chain`
+  (`screen.py:449-455`) truncates the binding chain at the last modal, so a
+  `ModalScreen` on the stack stops the remote's bindings from firing.
+- **`App.push_screen_wait` exists** (`app.py:2981`) and is awaitable from a worker.
+  `RemoteScreen._run_action` already runs its action in a worker.
+- **Escape is rebindable.** `global.go_back` is an editable catalog entry, so any
+  on-screen text naming Escape must be derived, not hardcoded.
+
+## Goals / Non-Goals
+
+**Goals:**
+
+- Record a sequence of remote interactions — keys (click or hotkey), text sends, and
+  custom-button actions — with one hook per input path.
+- Persist macros across runs with their own identity, so invokers reference a macro
+  rather than embedding it.
+- Replay a macro with the remote frozen, showing progress and offering cancellation.
+- Make a macro editable after recording: rename, reorder, delete, append, insert pauses.
+- Add recording UI without growing the remote's height.
+
+**Non-Goals:**
+
+- **Nested macros.** A macro invoking another macro is refused, not supported.
+- **Conditional or looping steps.** A macro is a flat, linear list.
+- **Macro scoping.** The registry is flat and global. Scoping comes free from the custom
+  button that invokes it, which is already layered device/type/global.
+- **Timing fidelity.** Recording does not capture the wall-clock gaps between presses.
+  Pauses are explicit steps the user adds deliberately.
+- **Undo of a partially played macro.** Keys already sent stay sent.
+- **New invocation surfaces beyond a custom button.** The macro's stable id makes a
+  hotkey or CLI trigger straightforward later; neither is in this change.
+
+## Decisions
+
+### 1. Playback is a catalog action type, not a bespoke remote path
+
+`run_macro` becomes the catalog's second entry. A custom button holds
+`{"type": "run_macro", "macro_id": "<id>"}` and its config modal is a picker over saved
+macros.
+
+*Why:* the extensibility the catalog already promises. `_activate_custom` needs no
+change — it resolves an action and runs it, whatever the type. Custom buttons also
+already carry an optional user-assignable hotkey (`remote.custom_N`), so macros get
+keyboard invocation for free.
+
+*Alternative rejected:* special-casing `run_macro` inside `_activate_custom`. Fewer
+lines now, but it breaks the catalog contract the codebase already paid for and would
+make a third action type harder, not easier.
+
+### 2. The macro is referenced by id, never embedded in the button
+
+A flat registry keyed by opaque id holds the macros; the button holds only the id.
+
+*Why:* one macro, many invokers. A later hotkey, CLI trigger, or list-modal Play button
+all point at the same object, and editing the macro changes every invoker at once.
+Embedding the macro in the button would fork it per invoker.
+
+*Consequence:* a button pointing at a deleted macro is a dangling reference. Playback
+resolves it and reports "That macro no longer exists" rather than crashing.
+
+### 3. The runner signature widens to a context object
+
+```
+ActionType.runner: Callable[[dict, ActionContext], Awaitable[ActionResult]]
+
+ActionContext(remote_ip, session, notify, macros, custom_buttons, device_id, platform)
+```
+
+`run_script` reads only `remote_ip`. `run_macro` needs the live `session` (to send keys
+and text), `notify` (per-step failure toasts), `macros` (to resolve the id), and
+`custom_buttons` + `device_id` + `platform` (unused today, but a future step type that
+resolves a button would need them).
+
+*Why:* macro playback fundamentally needs the session, and an IP string cannot carry it.
+There is exactly one `run_action` call site (`remote_screen.py:509`), so the widening is
+cheap.
+
+*Alternative rejected:* threading extra positional parameters. Each new action type
+would widen the signature again and every runner would have to accept parameters it
+ignores. A frozen context dataclass grows without touching existing runners.
+
+`ScriptResult` is renamed `ActionResult` in the same pass — it is now every action's
+return type, and a macro returning a "ScriptResult" would be actively misleading.
+
+### 4. Recording adds zero rows: the fourth button changes role
+
+```
+idle        [☰ Menu] [⌂ Home] [↩ Back] [ Macros ]
+
+recording   [☰ Menu] [⌂ Home] [↩ Back] [ ■ Stop ]   ● REC · ESC cancels
+(append)
+
+recording   [☰ Menu] [⌂ Home] [↩ Back] [ ■ Cancel ] ● REC · one action · ESC cancels
+(capture one)
+```
+
+The recording indicator is a label inside the existing `#row-top`, and the Stop control
+*is* the Macros button relabelled.
+
+*Why:* the height budget above. A separate banner row plus a Stop button row lands on
+the baseline with no slack, so any later addition to the remote breaks the no-scroll
+test. Relabelling costs nothing vertically, and the top row is 48 of 80 columns so the
+indicator fits horizontally. It also reads well: the button you pressed to start is the
+button you press to stop.
+
+*Alternative rejected:* the header subtitle. `Screen.sub_title` works and is watched,
+but `app.title` already holds `Name: … • Type: … • IP: …` at roughly 55 characters, so
+appending a subtitle overflows 80 columns and truncates.
+
+The `ESC` in the indicator is rendered from
+`display_label(effective_key("global.go_back", overrides))`, not hardcoded, because the
+user can rebind it.
+
+### 5. An in-memory draft carries edits across the round trip
+
+Both Create Macro and Add Step leave a modal, land on the live remote, and come back.
+The user may have renamed the macro and reordered its steps first.
+
+```
+              ┌─────────── draft: {name, steps[]} ───────────┐
+              │        lives outside any one modal           │
+              └─────────────────────────────────────────────┘
+                   ▲                              │
+   re-push w/ draft│                              │dismiss(draft)
+                   │                              ▼
+ ┌────────────┐  ┌─┴────────────┐  ┌──────────────────────────┐
+ │ List Modal │─▶│ Detail Modal │─▶│ Remote (recording state) │
+ └────────────┘  └──────────────┘  └──────────────────────────┘
+       │                │                  ▲          │
+       │ Create Macro   │ Save → prefs     │          │
+       └────────────────┼──────────────────┘          │
+                        └───────◀─────────────────────┘
+```
+
+The detail modal renders from the draft, never from the persisted macro. Save is the
+only write to preferences. That is what makes Close-discards-changes true and Add Step
+non-destructive.
+
+Two record modes fall out:
+
+| Mode | Entered from | Ends on | Returns to |
+|---|---|---|---|
+| `APPEND_UNTIL_STOP` | List → Create Macro | `■ Stop` | List, new macro selected |
+| | | Escape | List, nothing saved |
+| `CAPTURE_ONE` | Detail → Add Step | one captured action | Detail, draft + 1 step |
+| | | Escape / `■ Cancel` | Detail, draft unchanged |
+
+`CAPTURE_ONE` labels the fourth button `■ Cancel` rather than `■ Stop`: there is nothing
+to stop, and pressing it returns without capturing — exactly what Escape does.
+
+### 6. Modals are dismissed before recording, not layered under the remote
+
+Because a modal freezes the screens below it (Decision 4's mechanism, in reverse), the
+list and detail modals must be **dismissed** before recording starts — not hidden, not
+left on the stack. The return path is a fresh push carrying the draft.
+
+*Why this is worth stating:* "push the remote under the modal" or "hide the modal" both
+look simpler and both produce a remote that ignores every key.
+
+### 7. Step model
+
+```
+{"type": "key",      "key": "HOME"}
+{"type": "text",     "text": "user@example.com"}
+{"type": "action",   "action": {…frozen copy of a custom button's action…}}
+{"type": "pause",    "ms": 1000}
+```
+
+A custom-button press is recorded as a **snapshot** — a frozen copy of the button's
+resolved action dict — not a reference to the button index.
+
+*Why:* the macro keeps working when the button is later reconfigured or when the same
+macro runs on a device where that button index resolves to something different. A
+reference would silently change what the macro does.
+
+*Trade-off accepted:* retuning a custom button does not update macros that captured it.
+That is the point, but it will occasionally surprise.
+
+### 8. Nested macros are refused at record time, and again at playback
+
+Because steps are snapshots, clicking a `run_macro` button while recording would freeze
+`{"type": "run_macro", …}` into the step list — a step the detail modal would render as
+`Run Macro: Login` and that could recurse forever:
+
+```
+Custom 3 ──action──▶ run_macro("login")
+                          │
+ macro "login".steps ─────┘──▶ [ …, snapshot of run_macro("login") ] ──▶ ∞
+```
+
+Record time refuses to capture it and says so. Playback keeps a depth guard that rejects
+a `run_macro` reached from inside a macro, so hand-edited JSON cannot recurse either.
+
+*Why refuse at record time rather than only at playback:* a playback-only guard lets the
+user build a step that looks valid in the detail modal and always fails when run. Better
+to say no immediately.
+
+### 9. Playback owns its own modal, and never calls `present_result`
+
+```
+_activate_custom → _run_action → worker → run_macro(action, ctx)
+                                              └─▶ await app.push_screen_wait(
+                                                        MacroPlaybackModal(macro, ctx))
+```
+
+The modal's `on_mount` starts the step loop, each step updates its label
+(`Step 3 of 12`), completion dismisses with an `ActionResult`, and Cancel or Escape stops
+the loop and dismisses. `run_macro` forwards whatever the modal returns.
+
+**The trap:** a snapshotted Run Custom Script action carries its `show_results` flag. The
+per-step loop must call `run_action` directly and must **not** reuse
+`RemoteScreen._execute`, which calls `present_result` — that would push a
+`ScriptResultModal` on top of the playback modal, mid-macro, waiting on the user. Reusing
+`_execute` looks like good reuse and is wrong.
+
+`run_macro` therefore has no Results toggle in its config: the playback modal *is* the
+progress UI, and per-step failures already toast.
+
+### 10. A failed step toasts and playback continues
+
+An unsupported key, a failed send, a non-zero script exit — each toasts and playback
+moves to the next step. The final `ActionResult` message summarises
+(`Macro 'Login': 12 steps, 2 failed`).
+
+*Why:* a partial run is usually still useful, and this behavior falls out of the existing
+`_send` handling. It also dissolves the cross-device capability problem for free: a
+digit step on Apple TV raises `UnsupportedKeyError`, toasts, and the macro carries on.
+
+### 11. Default names use a monotonic counter, not a count
+
+The registry persists `next_number` alongside its items. `Macro 1`, `Macro 2`, delete
+`Macro 2`, next is `Macro 3`.
+
+*Why:* `count + 1` collides after any deletion.
+
+### 12. Macros persist inside the existing preferences file
+
+```json
+"macros": {
+  "next_number": 4,
+  "items": {
+    "a3f9…": { "name": "Login", "steps": [ … ] }
+  }
+}
+```
+
+*Why:* macros are user configuration, exactly like `custom_buttons`, and reusing the
+established path means the fault-tolerant load and best-effort save already apply.
+
+*Alternative rejected:* a separate store file. `DeviceStore` is separate because devices
+are a different domain with their own lifecycle; macros are not.
+
+**The persistence chain has one link that silently eats data.** `App.persist_preferences`
+rebuilds `Preferences` from explicit keyword arguments, and `watch_theme` calls it on
+every theme change. Omitting `macros=` there means changing the theme wipes every macro
+with no error. The chain must be completed end to end:
+
+```
+Preferences field → load() branch → save() key → app attr → on_mount() populate
+                                                         → persist_preferences() kwarg
+```
+
+## Risks / Trade-offs
+
+- **`persist_preferences` omission wipes every macro.** → Decision 12 names it; a test
+  asserts macros survive a theme change (mirroring the existing "actions coexist with
+  theme, shortcuts, and titles" scenario).
+- **Reusing `_execute` for playback steps pops a result modal mid-macro.** → Decision 9
+  names it; a test plays a macro containing a snapshotted script step with
+  `show_results: true` and asserts no result modal appears.
+- **Recording UI pushes the remote past the no-scroll baseline.** → Decision 4 makes
+  recording cost zero rows, so the existing test stays green by construction rather than
+  by measurement.
+- **A recording that leaves a modal on the stack produces a dead remote.** → Decision 6;
+  a test records a key press and asserts the step was captured.
+- **Cancel during a script step leaves a lingering `/bin/sh`.** `run_script`'s 30-second
+  timeout means three script steps can run 90 seconds; cancelling the worker cancels the
+  `await`, but the spawned shell may outlive it. → Accepted. The script is the user's own
+  on their own machine, and the existing timeout still reaps it.
+- **A snapshotted step goes stale when its custom button is retuned.** → Accepted and
+  intended (Decision 7). The detail modal renders the snapshot's own description so what
+  is shown is what will run.
+- **A button pointing at a deleted macro.** → Playback reports it and does nothing
+  (Decision 2). Deleting a macro does not walk the custom-button map to clean up
+  references.
+- **The Macros hint cannot fit in the footer.** → The button is mouse-reachable and the
+  action is registered with `show=False`, matching how Go Back is already handled.
+
+## Migration Plan
+
+No data migration. `Preferences.load` already tolerates a missing key, so an existing
+`settings.json` loads with an empty macro registry. The renames (`ScriptResult` →
+`ActionResult`) and the widened runner are internal; no persisted data references
+either.
+
+Rollback is a revert: a `settings.json` written by this change carries an extra `macros`
+key that an older build ignores on load — but note that an older build's `save` would
+then drop it, so a downgrade after creating macros loses them.
+
+## Open Questions
+
+None blocking. Deferred by choice:
+
+- Additional invocation surfaces (a Play button in the list modal, a dedicated hotkey,
+  a CLI trigger). The stable macro id is what makes these cheap to add later.
+- Recording the real wall-clock gaps between presses as implicit pauses.
+- Cleaning up custom buttons that reference a macro when it is deleted.
