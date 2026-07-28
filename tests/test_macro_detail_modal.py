@@ -278,6 +278,121 @@ class TestDetailModalRendersTheDraft:
         asyncio.run(scenario())
 
 
+class TestDetailModalLayout:
+    def test_given_a_tall_terminal_when_open_then_a_blank_row_separates_the_items(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, _macro())
+
+                # The steps label is the one exception: it belongs to the list under it.
+                for above, below in (
+                    ("#macro-detail-title", "#macro-detail-name"),
+                    ("#macro-detail-name", "#macro-detail-steps-label"),
+                    ("#macro-detail-steps", "#macro-detail-step-buttons"),
+                    ("#macro-detail-step-buttons", "#macro-detail-pause-row"),
+                    ("#macro-detail-pause-row", "#macro-detail-buttons"),
+                ):
+                    gap = app.screen.query_one(below).region.y - (
+                        app.screen.query_one(above).region.bottom
+                    )
+                    assert gap == 1, f"{above} -> {below}"
+
+        asyncio.run(scenario())
+
+    def test_given_the_modal_when_open_then_every_item_shares_one_left_edge(
+        self, tmp_path
+    ):
+        # The name text, the step rows, and both button rows read as one column.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, _macro())
+
+                # Text sits inside a border and padding, so the content edge is what
+                # lines up for the labelled items; a button's own box edge is its text's.
+                edges = {
+                    app.screen.query_one(selector).content_region.x
+                    for selector in (
+                        "#macro-detail-name",
+                        "#macro-detail-steps-label",
+                        "#macro-detail-steps",
+                        "#macro-detail-pause-label",
+                    )
+                } | {
+                    app.screen.query_one(selector).region.x
+                    for selector in ("#step-up", "#macro-save")
+                }
+                assert len(edges) == 1
+
+        asyncio.run(scenario())
+
+    def test_given_a_short_terminal_when_open_then_the_items_are_not_spaced_apart(
+        self, tmp_path
+    ):
+        # The spacing costs five rows the shortest supported terminal cannot spare.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_SHORT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, _macro())
+
+                title = app.screen.query_one("#macro-detail-title")
+                name = app.screen.query_one("#macro-detail-name")
+                assert name.region.y == title.region.bottom
+
+        asyncio.run(scenario())
+
+    def test_given_an_open_modal_when_the_terminal_shrinks_then_the_spacing_goes(
+        self, tmp_path
+    ):
+        # The modal is already open, so only a resize can drop the spacing in time.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, _macro())
+
+                await pilot.resize_terminal(*_SHORT_SIZE)
+                await pilot.pause()
+
+                title = app.screen.query_one("#macro-detail-title")
+                name = app.screen.query_one("#macro-detail-name")
+                assert name.region.y == title.region.bottom
+
+        asyncio.run(scenario())
+
+    def test_given_the_run_control_then_it_reads_as_the_go_action(self, tmp_path):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, _macro())
+
+                assert app.screen.query_one("#macro-run", Button).variant == "success"
+
+        asyncio.run(scenario())
+
+
 class TestDetailModalFits:
     def test_given_a_short_terminal_when_open_then_the_steps_scroll_and_buttons_fit(
         self, tmp_path

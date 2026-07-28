@@ -269,6 +269,12 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
 
     BINDINGS = [Binding("escape", "close", "Close")]
 
+    # Terminal rows the spacing between items needs. The modal is 90% of the terminal
+    # less its border and padding, so it holds `height * 0.9 - 4` rows: 14 of them are
+    # the fixed controls, five are the blank rows between items, and the step list wants
+    # three to still be a list — 22 rows, which is what 30 gives with one to spare.
+    _ROOMY_HEIGHT = 30
+
     DEFAULT_CSS = """
     MacroDetailModal { align: center middle; background: $background 60%; }
     /* A bounded height with a 1fr step list is what keeps both button rows reachable
@@ -277,29 +283,43 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
         width: 90%; height: 90%; padding: 1 2;
         border: thick $primary; background: $surface;
     }
-    /* No vertical margins anywhere in here: the default-pause row costs three rows the
-       shortest supported terminal does not have spare, and the three margins that used
-       to sit under the title, under the name, and above the buttons pay for it. */
+    /* The blank row between items is conditional, because it is five rows the shortest
+       supported terminal does not have: 80x24 leaves 17 content rows for 14 rows of
+       fixed controls, so the spacing would squeeze the 1fr step list to nothing. See
+       `_ROOMY_HEIGHT` for the height that earns the class. The steps label is the one
+       item with no margin: it belongs to the list beneath it. */
+    #macro-detail.-roomy > #macro-detail-title,
+    #macro-detail.-roomy > #macro-detail-name,
+    #macro-detail.-roomy > #macro-detail-steps,
+    #macro-detail.-roomy > #macro-detail-step-buttons,
+    #macro-detail.-roomy > #macro-detail-pause-row { margin-bottom: 1; }
+    /* Capitals in the accent colour, because a terminal has no larger type: the case
+       and the colour are what make the title read as a heading, not another row. */
     #macro-detail-title {
-        width: 100%; text-align: center; text-style: bold;
+        width: 100%; text-align: center; text-style: bold; color: $accent;
     }
-    #macro-detail-name { width: 100%; }
-    #macro-detail-steps-label { width: 100%; color: $text-muted; }
+    /* No horizontal padding, unlike Input's default of two columns: it is what puts the
+       name's text on the same column as the step rows and the buttons under them. */
+    #macro-detail-name { width: 100%; padding: 0; }
+    /* The one column the label and the list are indented is the name input's border. */
+    #macro-detail-steps-label { width: 100%; color: $text-muted; padding-left: 1; text-style: bold; }
     /* No border, unlike OptionList's default: its `tall` border costs the list two
        rows, which on the shortest supported terminal (80x24) is the whole height the
        1fr list gets — it rendered empty. The modal's own border already frames it. */
-    #macro-detail-steps { width: 100%; height: 1fr; border: none; }
+    #macro-detail-steps { width: 100%; height: 1fr; border: none; padding-left: 1; }
     #macro-detail-step-buttons {
         width: 100%; height: auto; align-horizontal: center;
     }
     /* The label shares the input's three rows rather than taking one of its own. */
-    #macro-detail-pause-row { width: 100%; height: 3; }
+    #macro-detail-pause-row { width: 100%; height: 3; padding-left: 1; }
     #macro-detail-pause-label {
         width: auto; height: 3; content-align: left middle; margin-right: 1;
     }
     #macro-detail-pause { width: 12; }
+    /* Left, not centered like the step buttons: centering four fixed-width buttons in a
+       row wider than they need starts them a column right of everything else. */
     #macro-detail-buttons {
-        width: 100%; height: auto; align-horizontal: center;
+        width: 100%; height: auto; align-horizontal: left;
     }
     /* Five step controls share the row (1fr) and four macro controls take a fixed
        width; min-width overrides Textual's Button default of 16, which would
@@ -317,7 +337,7 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="macro-detail"):
-            yield Label("Edit Macro", id="macro-detail-title")
+            yield Label("EDIT MACRO", id="macro-detail-title")
             yield Input(
                 value=self._draft.name, placeholder="Macro name", id="macro-detail-name"
             )
@@ -331,7 +351,7 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
                 yield Button("+ Pause", id="step-pause")
             with Horizontal(id="macro-detail-pause-row"):
                 yield Label(
-                    "Default pause between steps (ms)", id="macro-detail-pause-label"
+                    "Default pause between steps (ms):", id="macro-detail-pause-label"
                 )
                 yield Input(
                     value=str(self._draft.step_pause_ms),
@@ -340,7 +360,7 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
                 )
             with Horizontal(id="macro-detail-buttons"):
                 yield Button("Save", id="macro-save", variant="primary")
-                yield Button("Run", id="macro-run")
+                yield Button("Run", id="macro-run", variant="success")
                 yield Button("Close", id="macro-close")
                 yield Button("Delete", id="macro-delete", variant="error")
 
@@ -354,10 +374,19 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
         ]
 
     def on_mount(self) -> None:
+        self._space_items()
         steps = self.query_one("#macro-detail-steps", MacroOptionList)
         steps.focus()
         if self._draft.steps:
             steps.highlighted = min(self._selected, len(self._draft.steps) - 1)
+
+    def on_resize(self) -> None:
+        self._space_items()
+
+    def _space_items(self) -> None:
+        """Space the items apart only on a terminal with the rows to spare."""
+        roomy = self.size.height >= self._ROOMY_HEIGHT
+        self.query_one("#macro-detail").set_class(roomy, "-roomy")
 
     def _selected_index(self) -> int:
         """The highlighted step's index, or -1 when the draft holds no steps."""
