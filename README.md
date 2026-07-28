@@ -217,9 +217,9 @@ and back.
 reach for often, give a custom button the **Run Macro** action (**Action Type** → **Run
 Macro** → pick a macro) and activating that button plays it. The button stores the
 macro's identity, not a copy, so renaming or editing the macro changes what the
-button does. Playback opens a progress window (`Step 3 of 12`) with **Cancel**; the
-remote is frozen behind it so nothing of yours can interleave with the macro's own
-keys. **Cancel** or **Esc** stops it where it is. A step that fails — a key the TV
+button does. Playback opens a progress window naming the step it is on
+(`Step 3 of 12 (Text: "hello")`) with **Cancel**; the remote is frozen behind it so
+nothing of yours can interleave with the macro's own keys. **Cancel** or **Esc** stops it where it is. A step that fails — a key the TV
 lacks, an unreachable device, a script that exits non-zero — **aborts the run**: the
 later steps don't run, and one error names the macro, the step it stopped at, and
 why. A macro's later steps assume its earlier ones landed, so stopping at a legible

@@ -279,8 +279,10 @@ _activate_custom → _run_action → worker → run_macro(action, ctx)
                                                         MacroPlaybackModal(macro, ctx))
 ```
 
-The modal's `on_mount` starts the step loop, each step updates its label
-(`Step 3 of 12`), completion dismisses with a successful `ActionResult`, a failed step
+The modal's `on_mount` starts the step loop, each step updates its label with its own
+position and description (`Step 3 of 12 (Text: "hello")`, from the same
+`step_description` the detail modal's list and the abort message use), completion
+dismisses with a successful `ActionResult`, a failed step
 dismisses with an unsuccessful one naming that step, and Cancel or Escape stops the loop
 and dismisses. `run_macro` forwards whatever the modal returns, which is what makes the
 aborted run read as a failure to the caller rather than as a partial success.

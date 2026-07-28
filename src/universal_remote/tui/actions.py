@@ -377,7 +377,18 @@ class MacroPlaybackModal(ModalScreen[ActionResult]):
         self._worker = self.run_worker(self._play())
 
     def _progress_text(self) -> str:
-        return f"Step {max(self._index, 1)} of {len(self._macro.steps)}"
+        """Where the run has reached, naming the step so the user sees what it does.
+
+        Named in the same parenthetical shape an abort and a cancellation use, so the
+        step the user watched go by reads the same as the step they are told about.
+        Before the first step runs the line already names step 1 — the one about to go.
+        """
+        total = len(self._macro.steps)
+        if not total:
+            return "No steps"
+        number = max(self._index, 1)
+        step = self._macro.steps[number - 1]
+        return f"Step {number} of {total} ({step_description(step)})"
 
     async def _play(self) -> None:
         """Run every step in order, stopping at the first one that fails.

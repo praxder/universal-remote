@@ -322,7 +322,10 @@ macro alone: changing one macro's default SHALL NOT change any other macro's.
 
 ### Requirement: Playback freezes the remote behind a modal
 Playing a macro SHALL present a modal reporting that the macro is playing, naming it, and
-showing progress through its steps, together with a Cancel control. While that modal is
+showing progress through its steps, together with a Cancel control. The progress line SHALL
+give both the step's position in the run and a description of what that step does, named the
+same way the macro's own step list names it, so the user can tell which of several similar
+steps the run is on; a macro with no steps at all has no step to name. While that modal is
 shown the remote SHALL NOT respond to any keyboard shortcut or button press, so no user
 interaction can interleave with the macro's own sends. The modal SHALL dismiss itself when
 the last step completes, and SHALL likewise dismiss when a step fails and the run aborts
@@ -335,6 +338,10 @@ the user chose to stop it, and an error reporting their own choice back to them 
 #### Scenario: Playback shows a progress modal
 - **WHEN** a macro begins playing
 - **THEN** a modal names the macro, reports that it is playing, and shows its progress through the steps
+
+#### Scenario: The progress line names the step it is on
+- **WHEN** playback reaches a step
+- **THEN** the progress line gives that step's position in the run and a description of what it does
 
 #### Scenario: The remote is frozen during playback
 - **WHEN** the user presses a remote keyboard shortcut while a macro is playing

@@ -287,3 +287,20 @@ and finding a custom button wired to it.
       test already asserts every button stays on screen.
 - [x] 15.4 Update the README's macro-editing and playback paragraphs for the button.
 - [x] 15.5 Preflight: formatter, lint, full suite.
+
+## 16. Name the step playback is on
+
+`Step 3 of 10` says how far along a run is but not what it is doing, which is no help
+when a macro holds several similar steps.
+
+- [x] 16.1 Write tests that the progress line names the step's description alongside its
+      number, that it renames itself as the run advances, and that a macro with no steps
+      still opens. Then have `_progress_text` describe `steps[number - 1]` in the same
+      parenthetical shape `_abort` and `_cancel` already use.
+- [x] 16.2 Guard the empty step list: `compose` renders the line while `_index` is 0, so
+      indexing the list would raise on mount for a macro whose steps were all deleted —
+      deleting every step and saving is allowed.
+- [x] 16.3 Cover the 80x24 fit with a long text step: the description wraps and
+      `#macro-playback` is `height: auto`, so assert **Cancel** stays on screen.
+- [x] 16.4 Update the README's playback paragraph for the named step.
+- [x] 16.5 Preflight: formatter, lint, full suite.

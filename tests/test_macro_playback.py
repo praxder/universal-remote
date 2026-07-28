@@ -27,6 +27,7 @@ from universal_remote.tui.custom_buttons import ButtonScope, set_action
 from universal_remote.tui.remote_screen import RemoteScreen
 
 _FIT_SIZE = (80, 45)
+_SHORT_SIZE = (80, 24)
 
 _OK_SCRIPT = {
     "type": "run_script",
@@ -148,7 +149,91 @@ class TestPlaybackModal:
                 title = app.screen.query_one("#macro-playback-title")
                 progress = app.screen.query_one("#macro-playback-progress")
                 assert "Login" in str(title.content)
-                assert str(progress.content) == "Step 1 of 2"
+                assert str(progress.content) == "Step 1 of 2 (Pause: 5000ms)"
+
+                await pilot.click("#macro-playback-cancel")
+                await asyncio.wait_for(worker.wait(), 2)
+
+        asyncio.run(scenario())
+
+    def test_given_the_run_advances_when_the_next_step_starts_then_it_is_named(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        # The second step is a long pause so the run sits on it long enough to read the
+        # line naming it; a key or text send lands too fast to observe.
+        macro = Macro(
+            name="Login",
+            steps=[key_step("HOME"), pause_step(5000)],
+            step_pause_ms=0,
+        )
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+
+                worker = await _start(app, pilot, adapter, macro)
+                progress = app.screen.query_one("#macro-playback-progress")
+                for _ in range(50):
+                    if "Step 2" in str(progress.content):
+                        break
+                    await pilot.pause()
+
+                assert str(progress.content) == "Step 2 of 2 (Pause: 5000ms)"
+
+                await pilot.click("#macro-playback-cancel")
+                await asyncio.wait_for(worker.wait(), 2)
+
+        asyncio.run(scenario())
+
+    def test_given_a_macro_with_no_steps_when_played_then_the_run_completes(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        macro = Macro(name="Empty", steps=[], step_pause_ms=0)
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+
+                result = await _play(app, pilot, adapter, macro)
+
+                assert result.ok
+                assert "0 steps" in result.message
+
+        asyncio.run(scenario())
+
+    def test_given_a_long_step_description_when_played_then_cancel_stays_on_screen(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        # The macro's own gap is waited before the index advances, so a long gap holds
+        # the line on step 1 — the step whose description has to fit.
+        macro = Macro(
+            name="Search",
+            steps=[
+                text_step("a very long search query the user typed in full"),
+                key_step("OK"),
+            ],
+            step_pause_ms=5000,
+        )
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_SHORT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+
+                worker = await _start(app, pilot, adapter, macro)
+
+                progress = app.screen.query_one("#macro-playback-progress")
+                cancel = app.screen.query_one("#macro-playback-cancel")
+                assert progress.size.height > 1  # the description wraps
+                assert cancel.region.bottom <= _SHORT_SIZE[1]
 
                 await pilot.click("#macro-playback-cancel")
                 await asyncio.wait_for(worker.wait(), 2)
