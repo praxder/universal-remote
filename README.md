@@ -199,8 +199,10 @@ it, record one more step after it (**+ Step**, which returns you to the live rem
 for exactly one interaction), or insert a wait after it (**+ Pause**, in
 milliseconds — Enter on an existing pause step reopens the prompt to change it).
 Every edit is a draft: **Save** writes it, **Close** throws away everything you
-changed, and **Delete** removes the macro. Edits made before **+ Step** survive the
-trip out to the remote and back.
+changed, and **Delete** removes the macro after you confirm — the prompt names the
+macro and starts on **Cancel**, and cancelling drops you back on the editor with your
+unsaved edits intact. Edits made before **+ Step** survive the trip out to the remote
+and back.
 
 **Play one.** Give a custom button the **Run Macro** action (**Action Type** → **Run
 Macro** → pick a macro) and activating that button plays it. The button stores the

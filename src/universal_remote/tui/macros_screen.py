@@ -32,6 +32,10 @@ from ..macros.models import (
 )
 from ..macros.registry import list_macros
 
+# ConfirmDeleteScreen lives with the device screens that first needed it; its
+# "Delete {name}?" prompt is name-agnostic, so a macro reuses it as-is.
+from .devices_screen import ConfirmDeleteScreen
+
 # What the list modal dismisses with, paired with a macro id where one applies.
 CREATE_MACRO = "create"
 OPEN_MACRO = "open"
@@ -310,7 +314,23 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
         elif button_id == "macro-close":
             self.dismiss(None)
         elif button_id == "macro-delete":
-            self.dismiss((DELETE_MACRO, self._draft, index))
+            self._confirm_delete(index)
+
+    def _confirm_delete(self, index: int) -> None:
+        """Ask before deleting, dismissing only once the user confirms.
+
+        Cancelling leaves this modal mounted with its draft untouched, which is why the
+        prompt is pushed from here rather than after a dismiss: there is nothing to
+        restore. The name is synced first so the prompt names the macro as the user has
+        just renamed it, not as it was saved.
+        """
+        self._sync_name()
+
+        def _confirmed(confirmed: bool | None) -> None:
+            if confirmed:
+                self.dismiss((DELETE_MACRO, self._draft, index))
+
+        self.app.push_screen(ConfirmDeleteScreen(self._draft.name), _confirmed)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         # Opening an existing pause step reopens the duration prompt on it, so the

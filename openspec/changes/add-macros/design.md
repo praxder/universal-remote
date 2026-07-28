@@ -309,6 +309,22 @@ Preferences field → load() branch → save() key → app attr → on_mount() p
                                                          → persist_preferences() kwarg
 ```
 
+### 13. Deleting a macro is confirmed from inside the detail modal
+
+Delete is destructive and unlike every other edit in the modal it is not covered by
+Close-discards-changes (Decision 5) — the macro is gone from preferences. So it asks
+first, reusing `ConfirmDeleteScreen` from `devices_screen.py`, which already reads
+`Delete {name}?` and already focuses Cancel by default.
+
+The prompt is pushed by the detail modal itself, and the modal dismisses with
+`DELETE_MACRO` only once the user confirms — mirroring the device edit form, which
+deletes and pops from inside its confirm callback.
+
+*Alternative rejected:* dismiss with `DELETE_MACRO` first and have `RemoteScreen` confirm.
+The draft would already be gone from the screen stack, so Cancel would have to re-push the
+detail modal to restore it — a visible flicker and a second place holding the draft, to
+buy nothing.
+
 ## Risks / Trade-offs
 
 - **`persist_preferences` omission wipes every macro.** → Decision 12 names it; a test

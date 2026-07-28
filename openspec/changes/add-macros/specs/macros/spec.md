@@ -150,9 +150,13 @@ it does. All edits made in the detail modal — the name, the order of steps, de
 insertions, and pause values — SHALL be held in an in-memory draft and SHALL NOT be
 persisted until the user saves. The modal SHALL provide Save, Close, and Delete controls:
 Save SHALL persist the draft's name and steps to the macro and close the modal; Close
-SHALL discard every unsaved edit and close the modal; Delete SHALL remove the macro
-entirely and close the modal. After Save, Close, or Delete, the macros list SHALL be
-shown reflecting the outcome.
+SHALL discard every unsaved edit and close the modal; Delete SHALL require the user to
+confirm before the macro is removed. The confirmation prompt SHALL name the macro as the
+draft currently names it, and SHALL default keyboard focus to its cancel action. Only when
+the user confirms SHALL the macro be removed entirely and the detail modal close; when the
+user cancels, the macro SHALL be left untouched and the detail modal SHALL remain open
+with every unsaved edit still present. After Save, Close, or a confirmed Delete, the
+macros list SHALL be shown reflecting the outcome.
 
 #### Scenario: Detail modal shows the name and steps
 - **WHEN** the user opens a macro's detail modal
@@ -166,9 +170,22 @@ shown reflecting the outcome.
 - **WHEN** the user renames a macro and reorders its steps, then activates Close
 - **THEN** the macro is unchanged and the macros list shows its original name
 
-#### Scenario: Delete removes the macro
+#### Scenario: Delete prompts for confirmation
 - **WHEN** the user activates Delete on a macro's detail modal
-- **THEN** the macro is removed and the macros list no longer shows it
+- **THEN** a confirmation prompt naming that macro is shown with keyboard focus on its cancel action
+- **AND** the macro is still saved while the prompt is open
+
+#### Scenario: Confirming the prompt removes the macro
+- **WHEN** the confirmation prompt is shown and the user confirms the deletion
+- **THEN** the macro is removed, the detail modal closes, and the macros list no longer shows it
+
+#### Scenario: Cancelling the prompt keeps the macro and the draft
+- **WHEN** the user renames a macro, reorders its steps, activates Delete, and then cancels the confirmation prompt
+- **THEN** the macro is not removed and the detail modal is shown again still holding the new name and the reordered steps
+
+#### Scenario: The prompt names the macro as the draft names it
+- **WHEN** the user renames a macro in the detail modal and then activates Delete
+- **THEN** the confirmation prompt names the macro by the edited name rather than its saved one
 
 ### Requirement: Step editing controls
 With a step selected in the detail modal, the application SHALL offer controls to move

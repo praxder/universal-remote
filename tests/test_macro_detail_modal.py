@@ -1,6 +1,6 @@
 import asyncio
 
-from textual.widgets import Button, Input
+from textual.widgets import Button, Input, Label
 
 from tests.fakes import FakeAdapter
 from universal_remote.devices.models import Device
@@ -9,6 +9,7 @@ from universal_remote.macros.models import Macro, key_step, pause_step, text_ste
 from universal_remote.macros.registry import add, get, list_macros
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
+from universal_remote.tui.devices_screen import ConfirmDeleteScreen
 from universal_remote.tui.macros_screen import (
     MacroDetailModal,
     MacroOptionList,
@@ -173,7 +174,34 @@ class TestDetailModalRendersTheDraft:
 
         asyncio.run(scenario())
 
-    def test_given_a_macro_when_deleted_then_it_is_gone_from_the_list(self, tmp_path):
+    def test_given_delete_when_activated_then_it_asks_before_removing_anything(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        macro = _macro()
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, macro)
+
+                await pilot.click("#macro-delete")
+                await pilot.pause()
+
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                message = app.screen.query_one("#confirm-message", Label)
+                assert "Login" in str(message.content)
+                # Cancel is focused by default, so a stray Enter cannot delete.
+                assert app.screen.focused is app.screen.query_one("#cancel", Button)
+                assert get(app.macros, macro.id) is not None
+
+        asyncio.run(scenario())
+
+    def test_given_the_prompt_when_confirmed_then_the_macro_is_gone_from_the_list(
+        self, tmp_path
+    ):
         store = _store_with_device(tmp_path)
         adapter = FakeAdapter(platform="fake-tv")
 
@@ -182,14 +210,67 @@ class TestDetailModalRendersTheDraft:
             async with app.run_test(size=_FIT_SIZE) as pilot:
                 await _goto_remote(app, pilot)
                 await _open_detail(app, pilot, _macro())
-
                 await pilot.click("#macro-delete")
+                await pilot.pause()
+
+                await pilot.click("#confirm")
                 await pilot.pause()
 
                 assert isinstance(app.screen, MacrosListModal)
                 assert _list_rows(app) == ["No macros yet"]
                 assert list_macros(app.macros) == []
                 assert app.preferences.load().macros["items"] == {}
+
+        asyncio.run(scenario())
+
+    def test_given_the_prompt_when_cancelled_then_the_draft_survives_untouched(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        macro = _macro()
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, macro)
+                app.screen.query_one("#macro-detail-name", Input).value = "Renamed"
+                await pilot.press("down")
+                await pilot.click("#step-up")
+                await pilot.click("#macro-delete")
+                await pilot.pause()
+
+                await pilot.click("#cancel")
+                await pilot.pause()
+
+                assert isinstance(app.screen, MacroDetailModal)
+                assert (
+                    app.screen.query_one("#macro-detail-name", Input).value == "Renamed"
+                )
+                assert _step_rows(app) == ["1. Key: DOWN", "2. Key: HOME", "3. Key: OK"]
+                assert get(app.macros, macro.id).name == "Login"
+
+        asyncio.run(scenario())
+
+    def test_given_an_unsaved_rename_when_delete_then_the_prompt_names_the_new_name(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, _macro())
+                app.screen.query_one("#macro-detail-name", Input).value = "Renamed"
+
+                await pilot.click("#macro-delete")
+                await pilot.pause()
+
+                message = app.screen.query_one("#confirm-message", Label)
+                assert "Renamed" in str(message.content)
 
         asyncio.run(scenario())
 

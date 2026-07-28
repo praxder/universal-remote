@@ -180,3 +180,17 @@ The chain has six links and one of them silently eats data. Complete it end to e
 - [x] 10.3 Preflight: run the formatter, fix all lint findings, and run the full suite.
 - [ ] 10.4 Verify against the specs by hand on a real device — record a macro, edit it,
       assign it to a custom button, play it, and cancel a play mid-run.
+
+## 11. Confirm before deleting a macro
+
+- [x] 11.1 Update `test_macro_detail_modal.py`'s delete test: clicking Delete must now show
+      a `ConfirmDeleteScreen` naming the macro with the macro still saved, and only
+      confirming removes it and reopens the list. Then add a test that cancelling returns
+      to the detail modal with its unsaved rename and reorder intact, and one that the
+      prompt names the macro by the edited name rather than the saved one.
+- [x] 11.2 Have `MacroDetailModal` push `ConfirmDeleteScreen` (imported from
+      `devices_screen.py`) on Delete, syncing the edited name into the draft first, and
+      dismiss with `DELETE_MACRO` only from the confirm callback (design decision 13).
+- [x] 11.3 Update the README's macro-editing paragraph so Delete reads as a confirmed
+      action, naming the Cancel default and that cancelling keeps the unsaved edits.
+- [x] 11.4 Preflight: formatter, lint, full suite.
