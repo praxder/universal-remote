@@ -380,8 +380,14 @@ class MacroPlaybackModal(ModalScreen[ActionResult]):
         return f"Step {max(self._index, 1)} of {len(self._macro.steps)}"
 
     async def _play(self) -> None:
-        """Run every step in order, stopping at the first one that fails."""
+        """Run every step in order, stopping at the first one that fails.
+
+        The macro's own gap is waited *before* the index advances, so a cancel landing
+        inside a gap names the step that ran rather than the one about to.
+        """
         for index, step in enumerate(self._macro.steps, start=1):
+            if index > 1:
+                await asyncio.sleep(self._macro.step_pause_ms / 1000)
             self._index = index
             self.query_one("#macro-playback-progress", Label).update(
                 self._progress_text()

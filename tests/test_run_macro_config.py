@@ -262,6 +262,7 @@ class TestTheActionRefersToTheMacro:
                         name="Renamed",
                         steps=[key_step("HOME"), key_step("OK")],
                         id=macro.id,
+                        step_pause_ms=0,  # no gap to wait out in a test
                     ),
                 )
 

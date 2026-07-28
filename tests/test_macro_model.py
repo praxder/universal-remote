@@ -1,4 +1,5 @@
 from universal_remote.macros.models import (
+    DEFAULT_STEP_PAUSE_MS,
     Macro,
     action_step,
     delete_step,
@@ -74,6 +75,7 @@ class TestMacroPersistence:
         assert macro.to_dict() == {
             "name": "Login",
             "steps": [{"type": "key", "key": "HOME"}],
+            "step_pause_ms": 500,
         }
 
     def test_given_a_stored_body_when_read_then_it_round_trips_with_its_id(self):
@@ -89,6 +91,40 @@ class TestMacroPersistence:
         restored = Macro.from_dict("abc", {"steps": "not a list"})
 
         assert restored == Macro(name="", steps=[], id="abc")
+
+
+class TestDefaultStepPause:
+    def test_given_a_new_macro_when_built_then_it_pauses_500ms_between_steps(self):
+        assert Macro(name="Login").step_pause_ms == DEFAULT_STEP_PAUSE_MS == 500
+
+    def test_given_an_edited_default_when_serialized_then_the_body_holds_it(self):
+        macro = Macro(name="Login", step_pause_ms=1200)
+
+        assert macro.to_dict()["step_pause_ms"] == 1200
+
+    def test_given_a_stored_default_when_read_then_it_round_trips(self):
+        macro = Macro(name="Login", steps=[key_step("HOME")], step_pause_ms=0)
+
+        restored = Macro.from_dict(macro.id, macro.to_dict())
+
+        assert restored.step_pause_ms == 0
+
+    def test_given_a_body_without_a_default_when_read_then_it_loads_as_500(self):
+        # A macro stored before this field existed, and every malformed value, reads as
+        # the default rather than raising or replaying with no gap at all.
+        restored = Macro.from_dict("abc", {"name": "Login", "steps": []})
+
+        assert restored.step_pause_ms == 500
+
+    def test_given_a_negative_stored_default_when_read_then_it_loads_as_500(self):
+        restored = Macro.from_dict("abc", {"name": "Login", "step_pause_ms": -1})
+
+        assert restored.step_pause_ms == 500
+
+    def test_given_a_fractional_stored_default_when_read_then_it_loads_as_500(self):
+        restored = Macro.from_dict("abc", {"name": "Login", "step_pause_ms": 12.5})
+
+        assert restored.step_pause_ms == 500
 
 
 class TestDraftStepOperations:

@@ -297,8 +297,11 @@ class TestDetailModalFits:
                     assert region.width > 0 and region.height > 0
                     assert region.right <= width
                     assert region.bottom <= height
-                # The list is what scrolls, so the buttons never had to.
+                # The list is what scrolls, so the buttons never had to — and it still
+                # has rows to scroll: a 1fr list squeezed to zero height draws blank
+                # while every button assertion above still passes.
                 steps = app.screen.query_one("#macro-detail-steps", MacroOptionList)
+                assert steps.region.height > 0
                 assert steps.max_scroll_y > 0
 
         asyncio.run(scenario())
@@ -713,5 +716,147 @@ class TestPauseSteps:
 
                 assert isinstance(app.screen, MacroDetailModal)
                 assert _step_rows(app) == ["1. Pause: 250ms"]
+
+        asyncio.run(scenario())
+
+
+class TestDefaultStepPause:
+    def test_given_a_macro_when_opened_then_its_default_pause_is_prefilled(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+
+                await _open_detail(app, pilot, _macro())
+
+                assert app.screen.query_one("#macro-detail-pause", Input).value == "500"
+
+        asyncio.run(scenario())
+
+    def test_given_an_edited_default_pause_when_saved_then_it_is_persisted(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        macro = _macro()
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, macro)
+
+                app.screen.query_one("#macro-detail-pause", Input).value = "1200"
+                await pilot.click("#macro-save")
+                await pilot.pause()
+
+                assert get(app.macros, macro.id).step_pause_ms == 1200
+                stored = app.preferences.load().macros["items"][macro.id]
+                assert stored["step_pause_ms"] == 1200
+
+        asyncio.run(scenario())
+
+    def test_given_an_edited_default_pause_when_closed_then_it_is_discarded(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        macro = _macro()
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, macro)
+
+                app.screen.query_one("#macro-detail-pause", Input).value = "1200"
+                await pilot.click("#macro-close")
+                await pilot.pause()
+
+                assert get(app.macros, macro.id).step_pause_ms == 500
+
+        asyncio.run(scenario())
+
+    def test_given_an_invalid_default_pause_when_saved_then_the_old_value_is_kept(
+        self, tmp_path
+    ):
+        # Same rule as the pause prompt: anything that is not a non-negative whole
+        # number of milliseconds changes nothing rather than storing a nonsense pace.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        macro = _macro()
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, macro)
+
+                # Cleared to retype, then given something that is not a number at all.
+                for value in ("", "abc"):
+                    app.screen.query_one("#macro-detail-pause", Input).value = value
+                    await pilot.click("#macro-save")
+                    await pilot.pause()
+
+                    assert get(app.macros, macro.id).step_pause_ms == 500, (
+                        f"{value!r} was accepted"
+                    )
+                    await pilot.press("enter")  # reopen it for the next value
+                    await pilot.pause()
+
+        asyncio.run(scenario())
+
+    def test_given_an_edited_default_pause_when_a_step_is_added_then_it_survives(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, _macro())
+
+                app.screen.query_one("#macro-detail-pause", Input).value = "0"
+                await pilot.click("#step-add")
+                await pilot.pause()
+                await pilot.press("enter")  # the one captured interaction
+                await pilot.pause()
+
+                assert isinstance(app.screen, MacroDetailModal)
+                assert app.screen.query_one("#macro-detail-pause", Input).value == "0"
+
+        asyncio.run(scenario())
+
+    def test_given_one_macros_default_pause_when_changed_then_others_keep_theirs(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        edited = Macro(name="Edited", steps=[key_step("OK")])
+        other = Macro(name="Other", steps=[key_step("OK")], step_pause_ms=250)
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                add(app.macros, edited)  # first, so it is the highlighted row
+                add(app.macros, other)
+                await pilot.click("#macros")
+                await pilot.pause()
+                await pilot.press("enter")
+                await pilot.pause()
+
+                app.screen.query_one("#macro-detail-pause", Input).value = "1200"
+                await pilot.click("#macro-save")
+                await pilot.pause()
+
+                assert get(app.macros, other.id).step_pause_ms == 250
 
         asyncio.run(scenario())

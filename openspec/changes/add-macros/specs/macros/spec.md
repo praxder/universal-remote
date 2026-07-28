@@ -147,9 +147,10 @@ later macro to reuse a name.
 The macro detail modal SHALL present an editable text input holding the macro's name and
 a navigable list of its steps, each step described in a human-readable form naming what
 it does. All edits made in the detail modal — the name, the order of steps, deletions,
-insertions, and pause values — SHALL be held in an in-memory draft and SHALL NOT be
-persisted until the user saves. The modal SHALL provide Save, Close, and Delete controls:
-Save SHALL persist the draft's name and steps to the macro and close the modal; Close
+insertions, pause values, and the macro's default pause between steps — SHALL be held in
+an in-memory draft and SHALL NOT be persisted until the user saves. The modal SHALL
+provide Save, Close, and Delete controls: Save SHALL persist the draft's name, steps, and
+default pause between steps to the macro and close the modal; Close
 SHALL discard every unsaved edit and close the modal; Delete SHALL require the user to
 confirm before the macro is removed. The confirmation prompt SHALL name the macro as the
 draft currently names it, and SHALL default keyboard focus to its cancel action. Only when
@@ -241,8 +242,9 @@ in milliseconds and insert a pause step holding that duration after the selected
 pause step SHALL be listed showing its duration. Selecting an existing pause step and
 opening it SHALL reopen the duration prompt prefilled with its current value, so the
 duration can be changed. During playback, a pause step SHALL delay for its duration
-before the next step runs. A prompt cancelled or given a value that is not a
-non-negative whole number of milliseconds SHALL insert or change nothing.
+before the next step runs, and that duration SHALL be additional to the macro's default
+pause between steps rather than replacing it. A prompt cancelled or given a value that is
+not a non-negative whole number of milliseconds SHALL insert or change nothing.
 
 #### Scenario: Insert a pause
 - **WHEN** the user selects a step, activates the add-pause control, and enters a duration in milliseconds
@@ -259,6 +261,49 @@ non-negative whole number of milliseconds SHALL insert or change nothing.
 #### Scenario: An invalid duration inserts nothing
 - **WHEN** the user cancels the duration prompt, or enters a value that is not a non-negative whole number
 - **THEN** no pause step is inserted and no existing pause is changed
+
+### Requirement: Each macro has its own default pause between steps
+Every macro SHALL hold a default pause, a whole number of milliseconds, that playback
+waits between one step and the next; a newly recorded macro's default SHALL be 500
+milliseconds. Playback SHALL wait that default before every step after the first, and
+SHALL NOT wait before the first step or after the last. The detail modal SHALL present
+the value in an editable text input below the step list, prefilled with the macro's
+current default; an edit to it SHALL be held in the draft like every other edit and
+persisted only when the user saves. A value that is not a non-negative whole number of
+milliseconds SHALL leave the draft's default unchanged. The default SHALL belong to that
+macro alone: changing one macro's default SHALL NOT change any other macro's.
+
+#### Scenario: A newly recorded macro pauses 500ms between steps
+- **WHEN** the user records a macro and opens it
+- **THEN** its default pause between steps reads 500 milliseconds
+
+#### Scenario: Playback waits the default between steps
+- **WHEN** playback finishes a step and the macro has a later step
+- **THEN** it waits the macro's default pause before running that later step
+
+#### Scenario: Playback does not wait before the first step
+- **WHEN** a macro whose default pause is long begins playing
+- **THEN** its first step runs without waiting
+
+#### Scenario: An edited default is persisted on save
+- **WHEN** the user changes the default pause and activates Save
+- **THEN** the macro is stored with the new default and playback uses it
+
+#### Scenario: Close discards an edited default
+- **WHEN** the user changes the default pause and activates Close
+- **THEN** the macro keeps the default it had
+
+#### Scenario: An invalid default changes nothing
+- **WHEN** the user enters a value that is not a non-negative whole number and activates Save
+- **THEN** the macro keeps the default it had
+
+#### Scenario: The default survives adding a step
+- **WHEN** the user changes the default pause, activates the add-step control, and performs one interaction
+- **THEN** the reopened detail modal still shows the changed default
+
+#### Scenario: One macro's default does not affect another
+- **WHEN** the user changes one macro's default pause and saves it
+- **THEN** every other macro keeps its own default
 
 ### Requirement: Playback freezes the remote behind a modal
 Playing a macro SHALL present a modal reporting that the macro is playing, naming it, and

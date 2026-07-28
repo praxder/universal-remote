@@ -47,8 +47,9 @@ Constraints that shape the design:
 - **Conditional or looping steps.** A macro is a flat, linear list.
 - **Macro scoping.** The registry is flat and global. Scoping comes free from the custom
   button that invokes it, which is already layered device/type/global.
-- **Timing fidelity.** Recording does not capture the wall-clock gaps between presses.
-  Pauses are explicit steps the user adds deliberately.
+- **Timing fidelity.** Recording does not capture the wall-clock gaps between presses. A
+  macro paces itself with one editable default gap between steps (Decision 14), plus
+  explicit pause steps the user adds where a longer wait matters.
 - **Undo of a partially played macro.** Keys already sent stay sent.
 - **New invocation surfaces beyond a custom button.** The macro's stable id makes a
   hotkey or CLI trigger straightforward later; neither is in this change.
@@ -306,7 +307,7 @@ The registry persists `next_number` alongside its items. `Macro 1`, `Macro 2`, d
 "macros": {
   "next_number": 4,
   "items": {
-    "a3f9…": { "name": "Login", "steps": [ … ] }
+    "a3f9…": { "name": "Login", "steps": [ … ], "step_pause_ms": 500 }
   }
 }
 ```
@@ -343,6 +344,41 @@ The draft would already be gone from the screen stack, so Cancel would have to r
 detail modal to restore it — a visible flicker and a second place holding the draft, to
 buy nothing.
 
+### 14. One editable default gap per macro, 500 ms, additive with pause steps
+
+Every macro carries `step_pause_ms` (default 500) and playback sleeps it before each step
+after the first:
+
+```
+step 1 ──▶ gap ──▶ step 2 ──▶ gap ──▶ [pause 2000] ──▶ gap ──▶ step 3
+           500              500          2000          500
+```
+
+*Why per-macro rather than one global preference:* the right gap is a property of what the
+macro drives — a TV app that redraws slowly needs a longer one than a settings menu — and
+a global value would be tuned for the slowest macro and waste time in every other. It also
+keeps the value where the user is already editing that macro.
+
+*Why 500 ms:* keys sent back to back land faster than most TV UIs redraw, so the naive
+macro recorded before this existed replayed too fast to work. Half a second is slow enough
+for a typical menu transition and short enough that a ten-step macro still finishes in
+seconds.
+
+*Why additive rather than a floor:* a pause step means "wait longer here", and reading it
+as a replacement would make a 100 ms pause step *shorter* than no pause step at all.
+
+*Why not before the first step or after the last:* the gap exists to separate one send from
+the next. A leading gap only delays the whole run, and a trailing one delays the modal's
+dismissal for nothing.
+
+The sleep happens **before** `self._index` advances, so a cancel landing inside a gap
+reports the last step that actually ran rather than one that never started.
+
+The input costs the detail modal three rows (a `Label` beside a bordered `Input`), which
+80×24 does not have spare: the fixed rows already leave the `1fr` step list three rows.
+The three vertical margins inside the modal — under the title, under the name input, and
+above the button row — pay for it, so the list keeps the same height it had.
+
 ## Risks / Trade-offs
 
 - **`persist_preferences` omission wipes every macro.** → Decision 12 names it; a test
@@ -373,6 +409,10 @@ buy nothing.
   references.
 - **The Macros hint cannot fit in the footer.** → The button is mouse-reachable and the
   action is registered with `show=False`, matching how Go Back is already handled.
+- **The default-pause input collapses the step list at 80×24.** A `1fr` list starved to
+  zero rows renders blank while every assertion about the buttons still passes. →
+  Decision 14 pays for the row with the modal's three vertical margins, and the existing
+  short-terminal test is the check.
 
 ## Migration Plan
 

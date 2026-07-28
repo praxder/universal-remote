@@ -219,3 +219,34 @@ recording indicator sits among buttons though it reports application state.
 - [x] 12.5 Update the README's recording paragraph for the divider and the header
       indicator.
 - [x] 12.6 Preflight: formatter, lint, full suite.
+
+## 13. A per-macro default pause between steps
+
+Keys sent back to back outrun most TV UIs, so a macro needs a gap it can tune (design
+decision 14).
+
+- [x] 13.1 Write tests for the model: a new `Macro` carries `step_pause_ms` of 500, it
+      round-trips through `to_dict`/`from_dict`, and a stored value that is missing,
+      negative, or not a whole number loads as 500. Then add the field.
+- [x] 13.2 Write a test that a macro's changed default survives a restart, then confirm the
+      persistence chain needs no change — the field rides inside the macro body already
+      round-tripping under the `macros` key.
+- [x] 13.3 Write tests for the detail modal's default-pause input: it is prefilled with the
+      macro's current value; an edited value is persisted on Save; Close discards it; a
+      value that is not a non-negative whole number leaves the draft's value alone; and the
+      value survives the add-step round trip. Then add the input below the step buttons and
+      sync it into the draft everywhere the name is already synced.
+- [x] 13.4 Drop the three vertical margins inside the detail modal to pay for the input's
+      row, then run the short-terminal test (`_SHORT_SIZE`) and check the step list still
+      renders — a `1fr` list starved to zero rows draws blank while the button assertions
+      still pass.
+- [x] 13.5 Write tests for playback: with a long default, the first step runs immediately
+      and the second does not run until the gap elapses; the gap is additive with an
+      explicit pause step. Then sleep the default before each step after the first, ahead
+      of advancing the step index so a cancel inside a gap names the step that ran.
+- [x] 13.6 Set `step_pause_ms=0` on the existing playback fixtures in
+      `test_macro_playback.py` and `test_run_macro_config.py`, so they keep isolating the
+      behavior under test rather than waiting out gaps.
+- [x] 13.7 Update the README's macro-editing paragraph and its "record your timing" bullet
+      for the default gap.
+- [x] 13.8 Preflight: formatter, lint, full suite.

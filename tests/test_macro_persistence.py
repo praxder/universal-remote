@@ -58,6 +58,27 @@ class TestMacrosLoadedAtStartup:
 
         asyncio.run(scenario())
 
+    def test_given_a_changed_default_pause_when_relaunched_then_it_is_still_held(
+        self, tmp_path
+    ):
+        # The pacing rides inside the macro body already round-tripping under the
+        # `macros` key, so the persistence chain itself needs nothing added.
+        prefs = PreferencesStore(path=tmp_path / "settings.json")
+        saved: dict = {}
+        macro = create(saved, [key_step("HOME")])
+        macro.step_pause_ms = 1200
+        add(saved, macro)
+        prefs.save(Preferences(macros=saved))
+
+        async def scenario():
+            app = _app(tmp_path, prefs)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+
+                assert get(app.macros, macro.id).step_pause_ms == 1200
+
+        asyncio.run(scenario())
+
     def test_given_two_saved_macros_when_relaunched_then_the_counter_continues(
         self, tmp_path
     ):

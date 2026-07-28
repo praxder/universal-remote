@@ -200,6 +200,10 @@ own name), and with a step selected you can move it **Up** or **Down**, **Remove
 it, record one more step after it (**+ Step**, which returns you to the live remote
 for exactly one interaction), or insert a wait after it (**+ Pause**, in
 milliseconds — Enter on an existing pause step reopens the prompt to change it).
+Below the steps, **Default pause between steps (ms)** is the gap this macro leaves
+between one step and the next — 500ms to begin with, and its own value per macro, so
+pacing a slow app's macro doesn't slow every other one down. A **+ Pause** step waits
+its duration *on top of* that gap, for the places one screen takes noticeably longer.
 Every edit is a draft: **Save** writes it, **Close** throws away everything you
 changed, and **Delete** removes the macro after you confirm — the prompt names the
 macro and starts on **Cancel**, and cancelling drops you back on the editor with your
@@ -225,8 +229,9 @@ failure beats sending the rest into whatever state the TV is actually in.
 - **track a retuned button.** A captured custom-button step is a frozen snapshot of
   the action as it was when recorded, so reconfiguring that button later doesn't
   change the macro. What the step list shows is what will run.
-- **record your timing.** The gaps between your presses aren't captured; add
-  **+ Pause** steps where a wait matters.
+- **record your timing.** The gaps between your presses aren't captured. Playback paces
+  itself with the macro's own default pause, and **+ Pause** steps go where a longer
+  wait matters.
 - **undo a partial run.** Keys already sent stay sent.
 
 Every key above is a **default you can change**, and the on-screen-only buttons

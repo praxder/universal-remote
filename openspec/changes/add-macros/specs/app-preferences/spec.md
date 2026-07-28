@@ -3,12 +3,14 @@
 ### Requirement: Macros persisted across runs
 The application SHALL persist the saved macros in the same preferences file as the theme,
 the custom shortcuts, and the custom buttons. The stored macro registry SHALL hold each
-macro under its stable identifier, together with the macro's name and its ordered steps,
-and SHALL hold the default-name counter alongside them so numbering survives a restart.
+macro under its stable identifier, together with the macro's name, its ordered steps, and
+its default pause between steps, and SHALL hold the default-name counter alongside them so
+numbering survives a restart.
 Reading or writing macros MUST follow the same fault-tolerant behavior as the rest of the
 preferences file: a missing, malformed, or non-object macro registry SHALL load as no
-saved macros rather than raising, and an unwritable configuration directory SHALL be
-ignored rather than crashing the application.
+saved macros rather than raising, a macro whose stored default pause is missing or is not a
+non-negative whole number SHALL load with the 500-millisecond default, and an unwritable
+configuration directory SHALL be ignored rather than crashing the application.
 
 Saving any one preference SHALL preserve all the others. In particular, persisting the
 theme, a shortcut, or a custom button SHALL NOT drop the saved macros, and saving a macro
@@ -37,6 +39,14 @@ SHALL NOT disturb the saved theme, shortcuts, or custom buttons.
 #### Scenario: Macros coexist with theme, shortcuts, and custom buttons
 - **WHEN** the user has a saved theme, custom shortcuts, custom-button titles and actions, and saved macros
 - **THEN** restarting applies all of them, and saving one does not overwrite the others
+
+#### Scenario: A macro's default pause persists to the next run
+- **WHEN** the user changes a macro's default pause between steps, saves, and restarts the application
+- **THEN** that macro still holds the changed default
+
+#### Scenario: A malformed default pause loads as 500
+- **WHEN** the preferences file holds a macro whose default pause is missing or is not a non-negative whole number
+- **THEN** that macro loads with a 500-millisecond default and the application does not raise
 
 #### Scenario: A malformed macro registry loads as none
 - **WHEN** the preferences file holds a macro registry that is missing or is not an object

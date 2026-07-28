@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from tests.fakes import FakeAdapter
 from universal_remote.capabilities import Capabilities
@@ -132,7 +133,9 @@ class TestPlaybackModal:
     ):
         store = _store_with_device(tmp_path)
         adapter = FakeAdapter(platform="fake-tv")
-        macro = Macro(name="Login", steps=[pause_step(5000), key_step("OK")])
+        macro = Macro(
+            name="Login", steps=[pause_step(5000), key_step("OK")], step_pause_ms=0
+        )
 
         async def scenario():
             app = _app(store, adapter)
@@ -157,7 +160,9 @@ class TestPlaybackModal:
     ):
         store = _store_with_device(tmp_path)
         adapter = FakeAdapter(platform="fake-tv")
-        macro = Macro(name="Login", steps=[key_step("HOME"), key_step("OK")])
+        macro = Macro(
+            name="Login", steps=[key_step("HOME"), key_step("OK")], step_pause_ms=0
+        )
 
         async def scenario():
             app = _app(store, adapter)
@@ -177,7 +182,9 @@ class TestPlaybackModal:
         # The modal freezes the remote: only the macro's own steps reach the device.
         store = _store_with_device(tmp_path)
         adapter = FakeAdapter(platform="fake-tv")
-        macro = Macro(name="Slow", steps=[key_step("HOME"), pause_step(5000)])
+        macro = Macro(
+            name="Slow", steps=[key_step("HOME"), pause_step(5000)], step_pause_ms=0
+        )
 
         async def scenario():
             app = _app(store, adapter)
@@ -209,6 +216,7 @@ class TestStepLoop:
         macro = Macro(
             name="Mixed",
             steps=[key_step("HOME"), pause_step(0), text_step("hi"), key_step("OK")],
+            step_pause_ms=0,
         )
 
         async def scenario():
@@ -230,7 +238,9 @@ class TestStepLoop:
     ):
         store = _store_with_device(tmp_path)
         adapter = FakeAdapter(platform="fake-tv")
-        macro = Macro(name="Login", steps=[key_step("HOME"), key_step("OK")])
+        macro = Macro(
+            name="Login", steps=[key_step("HOME"), key_step("OK")], step_pause_ms=0
+        )
 
         async def scenario():
             app = _app(store, adapter)
@@ -252,7 +262,11 @@ class TestStepLoop:
         # would sit mid-run waiting on the user. Playback continues to the next step.
         store = _store_with_device(tmp_path)
         adapter = FakeAdapter(platform="fake-tv")
-        macro = Macro(name="Scripted", steps=[action_step(_OK_SCRIPT), key_step("OK")])
+        macro = Macro(
+            name="Scripted",
+            steps=[action_step(_OK_SCRIPT), key_step("OK")],
+            step_pause_ms=0,
+        )
 
         async def scenario():
             app = _app(store, adapter)
@@ -275,7 +289,9 @@ class TestStepLoop:
         store = _store_with_device(tmp_path)
         adapter = FakeAdapter(platform="fake-tv")
         macro = Macro(
-            name="Scripted", steps=[action_step(_FAILING_SCRIPT), key_step("OK")]
+            name="Scripted",
+            steps=[action_step(_FAILING_SCRIPT), key_step("OK")],
+            step_pause_ms=0,
         )
 
         async def scenario():
@@ -304,7 +320,9 @@ class TestAbortOnFailure:
             platform="fake-tv", capabilities=Capabilities(keys=keys, text=True)
         )
         macro = Macro(
-            name="Digits", steps=[key_step("HOME"), key_step("NUM_1"), key_step("OK")]
+            name="Digits",
+            steps=[key_step("HOME"), key_step("NUM_1"), key_step("OK")],
+            step_pause_ms=0,
         )
 
         async def scenario():
@@ -329,7 +347,9 @@ class TestAbortOnFailure:
     def test_given_a_failed_send_when_reached_then_the_run_aborts(self, tmp_path):
         store = _store_with_device(tmp_path)
         adapter = FakeAdapter(platform="fake-tv")
-        macro = Macro(name="Login", steps=[key_step("HOME"), key_step("OK")])
+        macro = Macro(
+            name="Login", steps=[key_step("HOME"), key_step("OK")], step_pause_ms=0
+        )
 
         async def scenario():
             app = _app(store, adapter)
@@ -350,7 +370,9 @@ class TestAbortOnFailure:
     def test_given_a_failed_text_send_when_reached_then_the_run_aborts(self, tmp_path):
         store = _store_with_device(tmp_path)
         adapter = FakeAdapter(platform="fake-tv")
-        macro = Macro(name="Sign in", steps=[text_step("hi"), key_step("OK")])
+        macro = Macro(
+            name="Sign in", steps=[text_step("hi"), key_step("OK")], step_pause_ms=0
+        )
 
         async def scenario():
             app = _app(store, adapter)
@@ -380,6 +402,7 @@ class TestAbortOnFailure:
                 action_step({"type": RUN_MACRO, "macro_id": inner.id}),
                 key_step("OK"),
             ],
+            step_pause_ms=0,
         )
 
         async def scenario():
@@ -408,7 +431,9 @@ class TestCancellation:
         store = _store_with_device(tmp_path)
         adapter = FakeAdapter(platform="fake-tv")
         macro = Macro(
-            name="Slow", steps=[key_step("HOME"), pause_step(5000), key_step("OK")]
+            name="Slow",
+            steps=[key_step("HOME"), pause_step(5000), key_step("OK")],
+            step_pause_ms=0,
         )
 
         async def scenario():
@@ -434,7 +459,9 @@ class TestCancellation:
     def test_given_playback_when_go_back_is_pressed_then_it_stops(self, tmp_path):
         store = _store_with_device(tmp_path)
         adapter = FakeAdapter(platform="fake-tv")
-        macro = Macro(name="Slow", steps=[pause_step(5000), key_step("OK")])
+        macro = Macro(
+            name="Slow", steps=[pause_step(5000), key_step("OK")], step_pause_ms=0
+        )
 
         async def scenario():
             app = _app(store, adapter)
@@ -599,5 +626,93 @@ class TestPlaybackFromACustomButton:
 
                 assert "Script failed" not in _titles(app)
                 assert _titles(app) == ["Macro failed"]
+
+        asyncio.run(scenario())
+
+
+class TestDefaultStepPause:
+    def test_given_a_long_default_pause_when_played_then_the_first_step_runs_at_once(
+        self, tmp_path
+    ):
+        # The gap separates one send from the next, so there is nothing to wait for
+        # before the first step.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        macro = Macro(
+            name="Paced", steps=[key_step("HOME"), key_step("OK")], step_pause_ms=5000
+        )
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                worker = await _start(app, pilot, adapter, macro)
+
+                for _ in range(50):
+                    await pilot.pause()
+                    if adapter.sessions[-1].sent_keys:
+                        break
+
+                assert adapter.sessions[-1].sent_keys == [Key.HOME]
+
+                await pilot.click("#macro-playback-cancel")
+                await asyncio.wait_for(worker.wait(), 2)
+
+        asyncio.run(scenario())
+
+    def test_given_a_default_pause_when_a_step_ends_then_the_next_waits_it_out(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        macro = Macro(
+            name="Paced", steps=[key_step("HOME"), key_step("OK")], step_pause_ms=5000
+        )
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                worker = await _start(app, pilot, adapter, macro)
+
+                for _ in range(50):
+                    await pilot.pause()
+
+                # Still inside the five-second gap, so the second key has not gone.
+                assert adapter.sessions[-1].sent_keys == [Key.HOME]
+
+                await pilot.click("#macro-playback-cancel")
+                result = await asyncio.wait_for(worker.wait(), 2)
+
+                # Cancelling inside a gap names the step that ran, not the one waiting.
+                assert "step 1" in result.message
+
+        asyncio.run(scenario())
+
+    def test_given_a_pause_step_when_played_then_its_wait_adds_to_the_default(
+        self, tmp_path
+    ):
+        # A pause step means "wait longer here": its duration is on top of the default
+        # gap, not instead of it. Three keys and one 200ms pause with a 200ms default
+        # is two gaps plus the pause — 600ms at the least.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        macro = Macro(
+            name="Paced",
+            steps=[key_step("HOME"), pause_step(200), key_step("OK")],
+            step_pause_ms=200,
+        )
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+
+                started = time.monotonic()
+                result = await _play(app, pilot, adapter, macro)
+                elapsed = time.monotonic() - started
+
+                assert result.ok is True
+                assert elapsed >= 0.6, elapsed
 
         asyncio.run(scenario())

@@ -2,7 +2,8 @@
 
 The registry is the raw dict persisted under the preferences file's `macros` key:
 
-    {"next_number": 4, "items": {"<id>": {"name": …, "steps": [ … ]}}}
+    {"next_number": 4,
+     "items": {"<id>": {"name": …, "steps": [ … ], "step_pause_ms": 500}}}
 
 `next_number` is a monotonic counter, not a count of the items, so deleting a macro
 never lets a later one reuse its default name. Reads tolerate a malformed registry —

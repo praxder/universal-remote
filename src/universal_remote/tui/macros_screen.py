@@ -213,10 +213,13 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
         width: 90%; height: 90%; padding: 1 2;
         border: thick $primary; background: $surface;
     }
+    /* No vertical margins anywhere in here: the default-pause row costs three rows the
+       shortest supported terminal does not have spare, and the three margins that used
+       to sit under the title, under the name, and above the buttons pay for it. */
     #macro-detail-title {
-        width: 100%; text-align: center; text-style: bold; margin-bottom: 1;
+        width: 100%; text-align: center; text-style: bold;
     }
-    #macro-detail-name { width: 100%; margin-bottom: 1; }
+    #macro-detail-name { width: 100%; }
     #macro-detail-steps-label { width: 100%; color: $text-muted; }
     /* No border, unlike OptionList's default: its `tall` border costs the list two
        rows, which on the shortest supported terminal (80x24) is the whole height the
@@ -225,8 +228,14 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
     #macro-detail-step-buttons {
         width: 100%; height: auto; align-horizontal: center;
     }
+    /* The label shares the input's three rows rather than taking one of its own. */
+    #macro-detail-pause-row { width: 100%; height: 3; }
+    #macro-detail-pause-label {
+        width: auto; height: 3; content-align: left middle; margin-right: 1;
+    }
+    #macro-detail-pause { width: 12; }
     #macro-detail-buttons {
-        width: 100%; height: auto; align-horizontal: center; margin-top: 1;
+        width: 100%; height: auto; align-horizontal: center;
     }
     /* Five step controls share the row (1fr) and three macro controls take a fixed
        width; min-width overrides Textual's Button default of 16, which would
@@ -254,6 +263,15 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
                 yield Button("Remove", id="step-remove")
                 yield Button("+ Step", id="step-add")
                 yield Button("+ Pause", id="step-pause")
+            with Horizontal(id="macro-detail-pause-row"):
+                yield Label(
+                    "Default pause between steps (ms)", id="macro-detail-pause-label"
+                )
+                yield Input(
+                    value=str(self._draft.step_pause_ms),
+                    placeholder="500",
+                    id="macro-detail-pause",
+                )
             with Horizontal(id="macro-detail-buttons"):
                 yield Button("Save", id="macro-save", variant="primary")
                 yield Button("Close", id="macro-close")
@@ -289,9 +307,17 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
         if self._draft.steps:
             steps.highlighted = max(0, min(selected, len(self._draft.steps) - 1))
 
-    def _sync_name(self) -> None:
-        """Take the edited name into the draft before it leaves this modal."""
+    def _sync_inputs(self) -> None:
+        """Take the edited name and default pause into the draft before it leaves.
+
+        An invalid pause leaves the draft's own value alone, matching the pause prompt:
+        a value that is not a non-negative whole number of milliseconds changes nothing
+        rather than storing a nonsense pace.
+        """
         self._draft.name = self.query_one("#macro-detail-name", Input).value
+        ms = _milliseconds(self.query_one("#macro-detail-pause", Input).value)
+        if ms is not None:
+            self._draft.step_pause_ms = ms
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         button_id = event.button.id or ""
@@ -304,12 +330,12 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
             delete_step(self._draft.steps, index)
             self._refresh_steps(index)
         elif button_id == "step-add":
-            self._sync_name()
+            self._sync_inputs()
             self.dismiss((ADD_STEP, self._draft, index))
         elif button_id == "step-pause":
             self._prompt_pause(index)
         elif button_id == "macro-save":
-            self._sync_name()
+            self._sync_inputs()
             self.dismiss((SAVE_MACRO, self._draft, index))
         elif button_id == "macro-close":
             self.dismiss(None)
@@ -324,7 +350,7 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
         restore. The name is synced first so the prompt names the macro as the user has
         just renamed it, not as it was saved.
         """
-        self._sync_name()
+        self._sync_inputs()
 
         def _confirmed(confirmed: bool | None) -> None:
             if confirmed:
