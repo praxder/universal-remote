@@ -51,8 +51,10 @@ Constraints that shape the design:
   macro paces itself with one editable default gap between steps (Decision 14), plus
   explicit pause steps the user adds where a longer wait matters.
 - **Undo of a partially played macro.** Keys already sent stay sent.
-- **New invocation surfaces beyond a custom button.** The macro's stable id makes a
-  hotkey or CLI trigger straightforward later; neither is in this change.
+- **New invocation surfaces beyond a custom button and the editor's Run.** The macro's
+  stable id makes a hotkey or CLI trigger straightforward later; neither is in this
+  change. Run dispatches the same `run_macro` catalog action a custom button does
+  (Decision 1), so it is not a second playback path.
 
 ## Decisions
 

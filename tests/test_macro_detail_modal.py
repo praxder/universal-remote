@@ -5,9 +5,11 @@ from textual.widgets import Button, Input, Label
 from tests.fakes import FakeAdapter
 from universal_remote.devices.models import Device
 from universal_remote.devices.store import DeviceStore
+from universal_remote.keys import Key
 from universal_remote.macros.models import Macro, key_step, pause_step, text_step
 from universal_remote.macros.registry import add, get, list_macros
 from universal_remote.registry import AdapterRegistry
+from universal_remote.tui.actions import MacroPlaybackModal
 from universal_remote.tui.app import UniversalRemoteApp
 from universal_remote.tui.devices_screen import ConfirmDeleteScreen
 from universal_remote.tui.macros_screen import (
@@ -303,6 +305,106 @@ class TestDetailModalFits:
                 steps = app.screen.query_one("#macro-detail-steps", MacroOptionList)
                 assert steps.region.height > 0
                 assert steps.max_scroll_y > 0
+
+        asyncio.run(scenario())
+
+
+class TestRunFromTheDetailModal:
+    def test_given_the_run_control_when_activated_then_the_macro_plays(self, tmp_path):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        # A long first step keeps the playback modal up long enough to be asserted on.
+        macro = Macro(
+            name="Login", steps=[pause_step(5000), key_step("OK")], step_pause_ms=0
+        )
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, macro)
+
+                await pilot.click("#macro-run")
+                await pilot.pause()
+
+                assert isinstance(app.screen, MacroPlaybackModal)
+                title = app.screen.query_one("#macro-playback-title")
+                assert "Login" in str(title.content)
+
+        asyncio.run(scenario())
+
+    def test_given_a_cancelled_run_when_it_ends_then_the_remote_is_shown(
+        self, tmp_path
+    ):
+        # Run leaves the macros list behind, unlike Save, Close, and Delete: the user
+        # asked for the macro, not for more editing.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        macro = Macro(
+            name="Login", steps=[pause_step(5000), key_step("OK")], step_pause_ms=0
+        )
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, macro)
+
+                await pilot.click("#macro-run")
+                await pilot.pause()
+                await pilot.click("#macro-playback-cancel")
+                await pilot.pause()
+                await pilot.pause()
+
+                assert isinstance(app.screen, RemoteScreen)
+
+        asyncio.run(scenario())
+
+    def test_given_a_completed_run_when_it_ends_then_the_remote_is_shown(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        macro = Macro(name="Login", steps=[key_step("OK")], step_pause_ms=0)
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, macro)
+
+                await pilot.click("#macro-run")
+                for _ in range(200):
+                    if isinstance(app.screen, RemoteScreen):
+                        break
+                    await pilot.pause()
+
+                assert isinstance(app.screen, RemoteScreen)
+                assert adapter.sessions[-1].sent_keys[-1] is Key.OK
+
+        asyncio.run(scenario())
+
+    def test_given_unsaved_edits_when_run_then_the_saved_macro_plays(self, tmp_path):
+        # Run discards edits like Close does: what plays is the macro as saved.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        macro = Macro(
+            name="Login", steps=[pause_step(5000), key_step("OK")], step_pause_ms=0
+        )
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, macro)
+
+                app.screen.query_one("#macro-detail-name", Input).value = "Renamed"
+                await pilot.click("#macro-run")
+                await pilot.pause()
+
+                title = app.screen.query_one("#macro-playback-title")
+                assert "Login" in str(title.content)
+                assert get(app.macros, macro.id).name == "Login"
 
         asyncio.run(scenario())
 

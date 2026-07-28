@@ -149,15 +149,18 @@ a navigable list of its steps, each step described in a human-readable form nami
 it does. All edits made in the detail modal — the name, the order of steps, deletions,
 insertions, pause values, and the macro's default pause between steps — SHALL be held in
 an in-memory draft and SHALL NOT be persisted until the user saves. The modal SHALL
-provide Save, Close, and Delete controls: Save SHALL persist the draft's name, steps, and
-default pause between steps to the macro and close the modal; Close
-SHALL discard every unsaved edit and close the modal; Delete SHALL require the user to
-confirm before the macro is removed. The confirmation prompt SHALL name the macro as the
+provide Save, Run, Close, and Delete controls: Save SHALL persist the draft's name, steps,
+and default pause between steps to the macro and close the modal; Run SHALL close the
+modal and play the macro as it is saved, discarding every unsaved edit like Close does;
+Close SHALL discard every unsaved edit and close the modal; Delete SHALL require the user
+to confirm before the macro is removed. The confirmation prompt SHALL name the macro as the
 draft currently names it, and SHALL default keyboard focus to its cancel action. Only when
 the user confirms SHALL the macro be removed entirely and the detail modal close; when the
 user cancels, the macro SHALL be left untouched and the detail modal SHALL remain open
 with every unsaved edit still present. After Save, Close, or a confirmed Delete, the
-macros list SHALL be shown reflecting the outcome.
+macros list SHALL be shown reflecting the outcome. After Run, the macros list SHALL NOT be
+reopened: the run behaves exactly as playing that macro from a custom button does, and
+when it ends the live remote SHALL be shown.
 
 #### Scenario: Detail modal shows the name and steps
 - **WHEN** the user opens a macro's detail modal
@@ -170,6 +173,18 @@ macros list SHALL be shown reflecting the outcome.
 #### Scenario: Close discards the edits
 - **WHEN** the user renames a macro and reorders its steps, then activates Close
 - **THEN** the macro is unchanged and the macros list shows its original name
+
+#### Scenario: Run plays the macro
+- **WHEN** the user activates Run on a macro's detail modal
+- **THEN** the detail modal closes and that macro plays behind the playback modal, naming it
+
+#### Scenario: Run discards unsaved edits
+- **WHEN** the user renames a macro and then activates Run
+- **THEN** the macro is unchanged and what plays is the macro as it was saved
+
+#### Scenario: A run started from the detail modal ends on the remote
+- **WHEN** a macro played from the detail modal finishes or is cancelled
+- **THEN** the live remote is shown rather than the macros list
 
 #### Scenario: Delete prompts for confirmation
 - **WHEN** the user activates Delete on a macro's detail modal

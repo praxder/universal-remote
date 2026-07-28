@@ -268,3 +268,22 @@ the indicator fades out and back in while a recording runs (design decision 4).
       device's name, type, and IP are unaffected.
 - [x] 14.4 Update the README's recording paragraph for the pulse.
 - [x] 14.5 Preflight: formatter, lint, full suite.
+
+## 15. Run from the detail modal
+
+A macro under edit is the one you want to try, and reaching it meant closing the editor
+and finding a custom button wired to it.
+
+- [x] 15.1 Write tests that **Run** on the detail modal plays that macro behind the
+      playback modal, that an unsaved rename does not reach the run (it plays the macro as
+      saved, like **Close**), and that the run ends on the live remote rather than
+      reopening the macros list. Then add the button, dismiss with a `PLAY_MACRO` outcome,
+      and dispatch it from `_macro_detail_closed` as a `run_macro` catalog action.
+- [x] 15.2 Name the outcome constant `PLAY_MACRO`, not `RUN_MACRO`: the remote already
+      imports `RUN_MACRO` (the action-type id) from `.actions`, and shadowing it would
+      silence the nested-macro guard in `_capture_action`.
+- [x] 15.3 Narrow `#macro-detail-buttons Button` from 16 to 14: four buttons plus margins
+      are 64 columns against the modal's 66 at the supported 80. The short-terminal fit
+      test already asserts every button stays on screen.
+- [x] 15.4 Update the README's macro-editing and playback paragraphs for the button.
+- [x] 15.5 Preflight: formatter, lint, full suite.

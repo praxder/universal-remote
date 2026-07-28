@@ -25,7 +25,8 @@ Macros are the first real payoff on that extensibility.
 - **Macro detail modal.** Rename the macro, reorder steps, delete a step, record one
   additional step, insert a pause with a millisecond value, set the macro's own default
   pause between steps (500ms to begin with, and additional to any pause step), then Save,
-  Close, or Delete the whole macro. Edits live in an in-memory draft; only Save writes.
+  Run, Close, or Delete the whole macro. Edits live in an in-memory draft; only Save
+  writes — Run plays the macro as saved, discarding unsaved edits like Close does.
 - **Playback via a new `run_macro` action type.** A custom button can be assigned
   `Run Macro` and pointed at a macro by id. Playback shows a blocking modal with
   progress and Cancel, so the remote is frozen while a macro runs. A failed step aborts

@@ -205,13 +205,16 @@ Below the steps, **Default pause between steps (ms)** is the gap this macro leav
 between one step and the next — 500ms to begin with, and its own value per macro, so
 pacing a slow app's macro doesn't slow every other one down. A **+ Pause** step waits
 its duration *on top of* that gap, for the places one screen takes noticeably longer.
-Every edit is a draft: **Save** writes it, **Close** throws away everything you
+Every edit is a draft: **Save** writes it, **Run** closes the editor and plays the
+macro as it is *saved* (so save first if you want to try what you just changed),
+**Close** throws away everything you
 changed, and **Delete** removes the macro after you confirm — the prompt names the
 macro and starts on **Cancel**, and cancelling drops you back on the editor with your
 unsaved edits intact. Edits made before **+ Step** survive the trip out to the remote
 and back.
 
-**Play one.** Give a custom button the **Run Macro** action (**Action Type** → **Run
+**Play one.** **Run** in the editor plays the macro you have open. For a macro you
+reach for often, give a custom button the **Run Macro** action (**Action Type** → **Run
 Macro** → pick a macro) and activating that button plays it. The button stores the
 macro's identity, not a copy, so renaming or editing the macro changes what the
 button does. Playback opens a progress window (`Step 3 of 12`) with **Cancel**; the
@@ -229,7 +232,8 @@ failure beats sending the rest into whatever state the TV is actually in.
 - **loop or branch.** A macro is a flat, linear list of steps.
 - **track a retuned button.** A captured custom-button step is a frozen snapshot of
   the action as it was when recorded, so reconfiguring that button later doesn't
-  change the macro. What the step list shows is what will run.
+  change the macro. What the step list shows is what will run — once you've saved it,
+  since **Run** plays the saved macro and not your unsaved edits.
 - **record your timing.** The gaps between your presses aren't captured. Playback paces
   itself with the macro's own default pause, and **+ Pause** steps go where a longer
   wait matters.

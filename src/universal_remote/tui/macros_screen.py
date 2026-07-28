@@ -44,6 +44,9 @@ OPEN_MACRO = "open"
 SAVE_MACRO = "save"
 DELETE_MACRO = "delete"
 ADD_STEP = "add_step"
+# Deliberately not named RUN_MACRO: that name is already the action-type id the remote
+# imports from `.actions`, and shadowing it would silence the nested-macro guard.
+PLAY_MACRO = "play"
 
 
 class MacroOptionList(OptionList):
@@ -199,8 +202,8 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
 
     Renders from the draft it is given and mutates only that draft, so Close discards
     everything. Dismisses None on Close, or `(choice, draft, selected_index)` where
-    choice is Save, Delete, or Add Step — the remote persists, deletes, or starts a
-    capture-one recording accordingly.
+    choice is Save, Delete, Add Step, or Run — the remote persists, deletes, starts a
+    capture-one recording, or plays the saved macro accordingly.
     """
 
     BINDINGS = [Binding("escape", "close", "Close")]
@@ -237,11 +240,13 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
     #macro-detail-buttons {
         width: 100%; height: auto; align-horizontal: center;
     }
-    /* Five step controls share the row (1fr) and three macro controls take a fixed
+    /* Five step controls share the row (1fr) and four macro controls take a fixed
        width; min-width overrides Textual's Button default of 16, which would
        overflow the supported 80 columns on either row. */
     #macro-detail-step-buttons Button { width: 1fr; min-width: 0; margin: 0 1; }
-    #macro-detail-buttons Button { width: 16; min-width: 0; margin: 0 1; }
+    /* 14, not 16: four buttons plus their side margins are 64 columns, and the modal's
+       content is only 66 wide at the supported 80 — a fourth 16 would overflow. */
+    #macro-detail-buttons Button { width: 14; min-width: 0; margin: 0 1; }
     """
 
     def __init__(self, draft: Macro, selected: int = 0) -> None:
@@ -274,6 +279,7 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
                 )
             with Horizontal(id="macro-detail-buttons"):
                 yield Button("Save", id="macro-save", variant="primary")
+                yield Button("Run", id="macro-run")
                 yield Button("Close", id="macro-close")
                 yield Button("Delete", id="macro-delete", variant="error")
 
@@ -337,6 +343,10 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
         elif button_id == "macro-save":
             self._sync_inputs()
             self.dismiss((SAVE_MACRO, self._draft, index))
+        elif button_id == "macro-run":
+            # No `_sync_inputs`: Run leaves the draft behind like Close does, so what
+            # plays is the macro as saved.
+            self.dismiss((PLAY_MACRO, self._draft, index))
         elif button_id == "macro-close":
             self.dismiss(None)
         elif button_id == "macro-delete":

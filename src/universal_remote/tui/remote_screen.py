@@ -38,6 +38,7 @@ from .macros_screen import (
     CREATE_MACRO,
     DELETE_MACRO,
     OPEN_MACRO,
+    PLAY_MACRO,
     SAVE_MACRO,
     MacroDetailModal,
     MacrosListModal,
@@ -701,7 +702,7 @@ class RemoteScreen(Screen[None]):
         )
 
     def _macro_detail_closed(self, outcome: tuple[str, Macro, int] | None) -> None:
-        """Persist, delete, or record one step, per the detail modal's choice.
+        """Persist, delete, play, or record one step, per the detail modal's choice.
 
         None means Close, which discards every edit the draft held — the detail modal
         never writes, so simply dropping the draft is what makes that true.
@@ -718,6 +719,12 @@ class RemoteScreen(Screen[None]):
             delete(self.app.macros, draft.id)
             self.app.persist_preferences()
             self._open_macros_list()
+        elif choice == PLAY_MACRO:
+            # Dispatched as the catalogued Run Macro action, which is what makes it play
+            # exactly as a custom button plays it: the saved macro, behind the playback
+            # modal, reporting its own outcome. The list is not reopened — the user asked
+            # for the macro, not for more editing.
+            self._run_action({"type": RUN_MACRO, "macro_id": draft.id})
         elif choice == ADD_STEP:
             self._start_recording(
                 RecordMode.CAPTURE_ONE,
