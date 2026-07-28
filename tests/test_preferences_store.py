@@ -116,17 +116,45 @@ class TestPreferencesStorePersistence:
 
         assert PreferencesStore(path=path).load().macros == {}
 
+    def test_given_a_suppressed_recording_hint_when_reloaded_then_it_round_trips(
+        self, tmp_path
+    ):
+        path = tmp_path / "settings.json"
+        PreferencesStore(path=path).save(Preferences(hide_recording_hint=True))
+
+        assert PreferencesStore(path=path).load().hide_recording_hint is True
+
+    def test_given_an_old_file_without_the_hint_flag_when_loaded_then_it_is_not_suppressed(
+        self, tmp_path
+    ):
+        # A fresh install and an older settings file both have to show the hint.
+        path = tmp_path / "settings.json"
+        path.write_text('{"theme": "nord"}')
+
+        assert PreferencesStore(path=path).load().hide_recording_hint is False
+
+    def test_given_a_non_boolean_hint_flag_when_loaded_then_it_is_not_suppressed(
+        self, tmp_path
+    ):
+        # Only an explicit true suppresses: anything else must not hide a state the
+        # user never chose.
+        path = tmp_path / "settings.json"
+        path.write_text('{"hide_recording_hint": "yes"}')
+
+        assert PreferencesStore(path=path).load().hide_recording_hint is False
+
     def test_given_theme_shortcuts_custom_buttons_and_macros_when_reloaded_then_all_round_trip(
         self, tmp_path
     ):
         # Saving one preference must not overwrite the others: theme, shortcuts,
-        # custom-button titles, and macros coexist in the one settings file.
+        # custom-button titles, macros, and the hint flag coexist in the one file.
         path = tmp_path / "settings.json"
         preferences = Preferences(
             theme="gruvbox",
             shortcuts={"remote.vol_up": "="},
             custom_buttons={"global": {"1": {"title": "Reboot"}}},
             macros={"next_number": 2, "items": {"abc": {"name": "Login", "steps": []}}},
+            hide_recording_hint=True,
         )
 
         PreferencesStore(path=path).save(preferences)

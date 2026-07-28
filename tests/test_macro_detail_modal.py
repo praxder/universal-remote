@@ -17,6 +17,7 @@ from universal_remote.tui.macros_screen import (
     MacroOptionList,
     MacrosListModal,
     PauseDurationModal,
+    RecordingHintModal,
 )
 from universal_remote.tui.remote_screen import RemoteScreen
 
@@ -571,6 +572,32 @@ class TestAddStepByRecording:
                     "3. Key: DOWN",
                     "4. Key: OK",
                 ]
+
+        asyncio.run(scenario())
+
+    def test_given_add_step_when_activated_then_no_recording_hint_is_presented(
+        self, tmp_path
+    ):
+        # The hint gates Create Macro alone: a user adding one step to a macro they are
+        # already editing has met the recording state.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, _macro())
+
+                await pilot.click("#step-add")
+                await pilot.pause()
+
+                assert isinstance(app.screen, RemoteScreen)
+                assert not any(
+                    isinstance(screen, RecordingHintModal)
+                    for screen in app.screen_stack
+                )
+                assert app.screen._recording is not None
 
         asyncio.run(scenario())
 

@@ -409,6 +409,32 @@ The input costs the detail modal three rows (a `Label` beside a bordered `Input`
 The three vertical margins inside the modal — under the title, under the name input, and
 above the button row — pay for it, so the list keeps the same height it had.
 
+### 15. A hint gates Create Macro, suppressed by one persisted boolean
+
+Create Macro dismisses every modal and hands back a remote that looks exactly as it did
+before (Decision 4 spends no rows on the recording state beyond a relabelled button and a
+header indicator). To a user meeting it for the first time that is indistinguishable from
+having closed the list, so a modal explains the recording state before it starts.
+
+`RemoteScreen` pushes it, not `MacrosListModal`: the list has already dismissed itself by
+the time the remote acts on `CREATE_MACRO`, and Decision 6 requires the stack be clear
+before recording anyway. Cancel therefore re-pushes the list — free, since the list is
+stateless and re-reads `app.macros` — matching what Go Back during a recording already
+does.
+
+*Why one top-level `hide_recording_hint` boolean:* the macro registry's persisted shape is
+`next_number` plus `items` (Decision 12) and a UI preference is neither. Storing
+suppression rather than "show" makes a missing or malformed value load as *show*, which is
+what "a fresh install sees it" requires. One boolean rather than a generic suppressed-hints
+map: there is one hint.
+
+*Why the checkbox only takes effect on OK:* Cancel means nothing happened. A checkbox that
+persisted on the way out would make Cancel a two-outcome control.
+
+*Why Create Macro alone and not `+ Step`:* the add-step round trip also returns to the live
+remote, but only from the detail modal of a macro the user is already editing — they have
+met the recording state. A hint on every added step is a modal in the way.
+
 ## Risks / Trade-offs
 
 - **`persist_preferences` omission wipes every macro.** → Decision 12 names it; a test
@@ -443,6 +469,11 @@ above the button row — pay for it, so the list keeps the same height it had.
   zero rows renders blank while every assertion about the buttons still passes. →
   Decision 14 pays for the row with the modal's three vertical margins, and the existing
   short-terminal test is the check.
+- **`hide_recording_hint` un-checks itself on the next theme change.** The same
+  `persist_preferences` trap as the macros registry: `watch_theme` rebuilds `Preferences`
+  from keyword arguments, so a field missing from that call is erased. → Decision 15 names
+  the five sites; a test suppresses the hint, changes the theme, and asserts it stayed
+  suppressed.
 
 ## Migration Plan
 

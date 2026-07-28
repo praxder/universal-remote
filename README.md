@@ -183,7 +183,10 @@ it on demand.
 
 **Record one.** The top row's fourth button, **Macros** — set off by a divider,
 because it opens an app screen rather than sending a key to the TV — opens the list of
-saved macros. **Create Macro** closes the list, hands you back the live remote, and
+saved macros. **Create Macro** first explains what is about to happen — you are going
+back to the remote and everything you do there is recorded — with **Cancel** to back out
+and a **Don't show this again** box for once you know the drill. **OK** hands you back the
+live remote and
 starts recording: the Macros button becomes **■ Stop** and a red `● RECORDING` appears
 on the right of the header bar, beside the device you are connected to, fading in and
 out for as long as the recording runs (recording adds no rows, so the remote still fits

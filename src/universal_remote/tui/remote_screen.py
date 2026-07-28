@@ -42,6 +42,7 @@ from .macros_screen import (
     SAVE_MACRO,
     MacroDetailModal,
     MacrosListModal,
+    RecordingHintModal,
 )
 from .custom_buttons import (
     ButtonScope,
@@ -673,13 +674,40 @@ class RemoteScreen(Screen[None]):
             return
         choice, macro_id = outcome
         if choice == CREATE_MACRO:
-            self._start_recording(
-                RecordMode.APPEND_UNTIL_STOP, self._new_macro_recorded
-            )
+            self._begin_new_macro()
         elif choice == OPEN_MACRO and macro_id:
             macro = get(self.app.macros, macro_id)
             if macro is not None:
                 self._open_macro_detail(macro)
+
+    def _begin_new_macro(self) -> None:
+        """Explain the recording state, then start recording — or start it straight away.
+
+        The hint is pushed from here rather than from the macros list because the list
+        has already dismissed itself by now, and recording needs the screen stack clear
+        anyway. Gating on the saved preference is what makes "don't show this again"
+        mean it.
+        """
+        if self.app.hide_recording_hint:
+            self._start_recording(
+                RecordMode.APPEND_UNTIL_STOP, self._new_macro_recorded
+            )
+            return
+        self.app.push_screen(RecordingHintModal(), self._recording_hint_closed)
+
+    def _recording_hint_closed(self, suppress: bool | None) -> None:
+        """Start recording once the hint is acknowledged; Cancel reopens the list.
+
+        `suppress` is the checkbox's state, so False is a real answer — only None means
+        the user cancelled, and cancelling stores nothing however the box was left.
+        """
+        if suppress is None:
+            self._open_macros_list()
+            return
+        if suppress:
+            self.app.hide_recording_hint = True
+            self.app.persist_preferences()
+        self._start_recording(RecordMode.APPEND_UNTIL_STOP, self._new_macro_recorded)
 
     def _new_macro_recorded(self, steps: list[dict] | None) -> None:
         """Save an append-mode recording, then reopen the list on its outcome."""

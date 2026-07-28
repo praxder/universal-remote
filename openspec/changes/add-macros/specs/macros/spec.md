@@ -7,8 +7,9 @@ with the Vim keys `k` and `j`, matching the navigation used elsewhere in the
 application. When no macros are saved, the list SHALL show a single placeholder row
 reading that there are no macros yet; that row SHALL NOT be selectable and SHALL NOT
 open a macro. The modal SHALL provide a Close control that dismisses it without change,
-and a Create Macro control that begins recording a new macro. Pressing Enter on a
-selected macro row SHALL open that macro's detail modal.
+and a Create Macro control that starts recording a new macro, by way of the hint
+described in "A hint precedes a new recording". Pressing Enter on a selected macro row
+SHALL open that macro's detail modal.
 
 #### Scenario: List shows saved macros
 - **WHEN** the user activates the Macros control with one or more macros saved
@@ -34,10 +35,62 @@ selected macro row SHALL open that macro's detail modal.
 - **WHEN** the user highlights a saved macro and presses Enter
 - **THEN** that macro's detail modal opens
 
+### Requirement: A hint precedes a new recording
+Activating Create Macro SHALL first present a modal explaining what is about to happen:
+that the user is being returned to the live remote, that every interaction they then make
+is recorded as a step, and that the remote's Stop control ends the recording. Returning to
+a remote that looks unchanged is otherwise indistinguishable from having closed the list,
+so the hint is what makes recording legible to a user meeting it for the first time.
+
+The modal SHALL offer an OK control that dismisses it and starts the recording, a Cancel
+control that starts nothing and reopens the macros list unchanged, and a checkbox reading
+that the hint should not be shown again. Pressing Esc SHALL cancel exactly as Cancel does.
+Keyboard focus SHALL default to OK, since nothing here is destructive.
+
+The checkbox SHALL take effect only when the user activates OK: cancelling SHALL leave the
+preference exactly as it was, however the checkbox was left. Once the hint is suppressed,
+activating Create Macro SHALL start recording immediately without presenting it. The hint
+SHALL be presented on a fresh installation and SHALL keep being presented until the user
+suppresses it themselves; no number of acknowledgements SHALL suppress it on its own.
+
+This hint gates a new macro's recording alone. The detail modal's add-step control, which
+also returns to the live remote to capture one interaction, SHALL NOT present it: the user
+asking for one more step has already met the recording state.
+
+#### Scenario: Create Macro explains itself before recording
+- **WHEN** the user activates Create Macro with the hint not suppressed
+- **THEN** a modal explains that the remote is about to record and offers OK, Cancel, and a do-not-show-again checkbox, with keyboard focus on OK
+- **AND** no recording has started
+
+#### Scenario: OK starts the recording
+- **WHEN** the user activates OK on the hint
+- **THEN** the modal dismisses and the live remote is shown in its recording state
+
+#### Scenario: Cancel records nothing
+- **WHEN** the user activates Cancel on the hint, or presses Esc
+- **THEN** no recording starts and the macros list reopens unchanged
+
+#### Scenario: The checkbox suppresses the hint
+- **WHEN** the user checks the do-not-show-again box, activates OK, and later activates Create Macro again
+- **THEN** recording starts immediately and no hint is presented
+
+#### Scenario: Cancelling does not suppress the hint
+- **WHEN** the user checks the do-not-show-again box and then activates Cancel
+- **THEN** the hint is presented again the next time the user activates Create Macro
+
+#### Scenario: An acknowledged hint returns
+- **WHEN** the user activates OK without checking the box and later activates Create Macro again
+- **THEN** the hint is presented again
+
+#### Scenario: Adding one step presents no hint
+- **WHEN** the user activates the add-step control in a macro's detail modal
+- **THEN** the remote returns in its capture-one recording state with no hint presented
+
 ### Requirement: Recording a new macro
-Activating Create Macro SHALL dismiss the macros list modal, return the user to the live
-remote, and place the remote in a recording state that captures every subsequent remote
-interaction as an ordered step until the user stops or cancels. Recording SHALL continue
+Once a new recording has been confirmed on the hint above, the application SHALL dismiss
+the macros list modal, return the user to the live remote, and place the remote in a
+recording state that captures every subsequent remote interaction as an ordered step until
+the user stops or cancels. Recording SHALL continue
 across any number of interactions. Activating the remote's Stop control SHALL end
 recording, save the captured steps as a new macro under a default name, and reopen the
 macros list modal with the new macro present and selected. Pressing the Go Back key
@@ -47,7 +100,7 @@ macro; the application SHALL report that nothing was recorded and reopen the mac
 unchanged.
 
 #### Scenario: Create Macro returns to the live remote
-- **WHEN** the user activates Create Macro on the macros list
+- **WHEN** the user activates Create Macro on the macros list and confirms the recording hint
 - **THEN** the modal is dismissed and the live remote is shown in its recording state
 
 #### Scenario: Interactions are captured in order

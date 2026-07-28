@@ -1,5 +1,5 @@
-"""The macros modals: the saved-macro list, a macro's detail editor, and the pause
-prompt, plus the Vim-navigable option list they share.
+"""The macros modals: the saved-macro list, the pre-recording hint, a macro's detail
+editor, and the pause prompt, plus the Vim-navigable option list they share.
 
 Neither the list nor the detail modal drives the flow itself — each dismisses with
 what the user chose and lets `RemoteScreen` act on it. That is deliberate: recording
@@ -18,7 +18,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, OptionList
+from textual.widgets import Button, Checkbox, Input, Label, OptionList
 from textual.widgets.option_list import Option
 
 from ..macros.models import (
@@ -125,6 +125,67 @@ class MacrosListModal(ModalScreen[tuple[str, str | None] | None]):
             self.dismiss(None)
 
     def action_close(self) -> None:
+        self.dismiss(None)
+
+
+class RecordingHintModal(ModalScreen[bool | None]):
+    """Explains the recording state before Create Macro starts it.
+
+    Dismisses None on Cancel, or the do-not-show-again checkbox's state on OK — so the
+    checkbox only ever takes effect on the way through, never on the way out. `False` is
+    a real answer here, not a refusal, which is why the remote tests it for None.
+
+    Recording costs the remote no rows beyond a relabelled button and a header
+    indicator, so returning to it looks exactly like having closed the macros list.
+    This is what tells a user meeting it for the first time that it did not.
+    """
+
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
+    _BODY = (
+        "You are about to go back to the remote, and everything you do there will be "
+        "recorded as a step — every key, text you send, and any custom button you "
+        "activate. Press ■ Stop on the remote when you are done to save the macro, or "
+        "Esc to throw the recording away."
+    )
+
+    DEFAULT_CSS = """
+    RecordingHintModal { align: center middle; background: $background 60%; }
+    #recording-hint {
+        width: 62; height: auto; padding: 1 2;
+        border: thick $primary; background: $surface;
+    }
+    #recording-hint-title {
+        width: 100%; text-align: center; text-style: bold; margin-bottom: 1;
+    }
+    #recording-hint-body { width: 100%; margin-bottom: 1; }
+    #recording-hint-suppress { width: 100%; margin-bottom: 1; }
+    #recording-hint-buttons { width: 100%; height: auto; align-horizontal: center; }
+    /* min-width overrides Textual's Button default (16), which would clip at 14. */
+    #recording-hint-buttons Button { width: 14; min-width: 0; margin: 0 1; }
+    """
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="recording-hint"):
+            yield Label("Recording a macro", id="recording-hint-title")
+            yield Label(self._BODY, id="recording-hint-body")
+            yield Checkbox("Don't show this again", id="recording-hint-suppress")
+            with Horizontal(id="recording-hint-buttons"):
+                yield Button("OK", id="recording-hint-ok", variant="primary")
+                yield Button("Cancel", id="recording-hint-cancel")
+
+    def on_mount(self) -> None:
+        # OK, not Cancel: nothing here is destructive, unlike the delete prompt.
+        self.query_one("#recording-hint-ok", Button).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "recording-hint-ok":
+            self.dismiss(self.query_one("#recording-hint-suppress", Checkbox).value)
+        else:
+            self.action_cancel()
+
+    def action_cancel(self) -> None:
+        # None however the checkbox was left: Cancel means nothing happened.
         self.dismiss(None)
 
 

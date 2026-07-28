@@ -304,3 +304,40 @@ when a macro holds several similar steps.
       `#macro-playback` is `height: auto`, so assert **Cancel** stays on screen.
 - [x] 16.4 Update the README's playback paragraph for the named step.
 - [x] 16.5 Preflight: formatter, lint, full suite.
+
+## 17. Explain the recording state before Create Macro starts it
+
+Create Macro drops the user back on a remote that looks unchanged, which reads as "nothing
+happened" to anyone meeting it for the first time (design decision 15).
+
+- [x] 17.1 Thread `hide_recording_hint: bool = False` through all five persistence sites —
+      the `Preferences` dataclass, a `raw.get(...) is True` guard in
+      `PreferencesStore.load` (so a missing or non-boolean value loads as *not* suppressed),
+      the key in `save`, `UniversalRemoteApp.__init__`, and `on_mount`. Then **add it to the
+      `Preferences(...)` call in `persist_preferences`** — the same trap as 3.3: omit it and
+      the flag un-checks itself on every theme change. Write that guard test first
+      (suppress → change theme → assert still suppressed), plus the store's round-trip and
+      malformed-value tests.
+- [x] 17.2 Write tests for `RecordingHintModal` (in `test_macros_list_modal.py`, beside
+      `TestCreateMacro`): activating Create Macro presents it with no recording started and
+      focus on OK; OK dismisses it and leaves the remote in append-mode recording; Cancel
+      and the Go Back key each start nothing and reopen the list unchanged. Then implement
+      it in `macros_screen.py` as a `ModalScreen[bool | None]` — `None` for Cancel, the
+      checkbox's state for OK — modelled on `AdbTextHintScreen` with
+      `PauseDurationModal`'s two-button row.
+- [x] 17.3 Write tests for suppression, then wire it: checking the box and activating OK
+      makes the next Create Macro record immediately; checking it and cancelling leaves the
+      hint showing; activating OK **without** the box leaves it showing. Gate the push in
+      `RemoteScreen` on `app.hide_recording_hint`, and persist only from the OK branch.
+- [x] 17.4 Write a test that the add-step control presents no hint, so the gate stays on
+      Create Macro alone (design decision 15).
+- [x] 17.5 Update the six existing Create Macro drives in `test_macros_list_modal.py` to go
+      through the hint via one `_create_macro` helper. Do **not** default-suppress the hint
+      in `conftest.py` — that would hide it from the tests in 17.2 that must assert it
+      appears.
+- [x] 17.6 Add the 80×24 fit test: the checkbox and both buttons stay on screen. Textual's
+      `min-width: 16` clips a narrower button, so the row needs `min-width: 0` like every
+      other button row in the file.
+- [x] 17.7 Update the README's "Record one." paragraph — **Create Macro** no longer closes
+      the list and starts recording in one step.
+- [x] 17.8 Preflight: formatter, lint, full suite.

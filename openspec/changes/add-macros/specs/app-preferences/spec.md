@@ -55,3 +55,28 @@ SHALL NOT disturb the saved theme, shortcuts, or custom buttons.
 #### Scenario: An unwritable configuration directory is ignored
 - **WHEN** saving a macro fails because the configuration directory cannot be written
 - **THEN** the failure is ignored and the application continues rather than crashing
+
+### Requirement: The recording hint's suppression persists
+The application SHALL persist whether the user has suppressed the pre-recording hint in the
+same preferences file as the theme, the custom shortcuts, the custom buttons, and the
+macros. Only an explicitly stored true SHALL suppress the hint: a missing value, or one
+that is not a boolean, SHALL load as not suppressed, so a fresh installation and a
+malformed file both show the hint rather than hiding a state the user never chose. Saving
+any other preference SHALL preserve the stored suppression, and storing the suppression
+SHALL preserve every other preference.
+
+#### Scenario: A suppressed hint stays suppressed across runs
+- **WHEN** the user suppresses the hint and restarts the application
+- **THEN** activating Create Macro starts recording without presenting the hint
+
+#### Scenario: A fresh installation shows the hint
+- **WHEN** the preferences file holds no suppression value
+- **THEN** the hint is presented
+
+#### Scenario: A malformed suppression loads as not suppressed
+- **WHEN** the preferences file holds a suppression value that is not a boolean
+- **THEN** the hint is presented and the application does not raise
+
+#### Scenario: Changing the theme does not un-suppress the hint
+- **WHEN** the user has suppressed the hint and then changes the application theme
+- **THEN** the hint stays suppressed, both immediately and after a restart

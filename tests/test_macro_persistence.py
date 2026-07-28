@@ -122,6 +122,28 @@ class TestMacrosSurviveOtherWrites:
 
         asyncio.run(scenario())
 
+    def test_given_a_suppressed_hint_when_the_theme_changes_then_it_stays_suppressed(
+        self, tmp_path
+    ):
+        # The same trap the macros registry has: `persist_preferences` rebuilds
+        # Preferences from keyword arguments and `watch_theme` calls it on every theme
+        # change, so omitting `hide_recording_hint=` would un-check the user's choice.
+        prefs = PreferencesStore(path=tmp_path / "settings.json")
+        prefs.save(Preferences(hide_recording_hint=True))
+
+        async def scenario():
+            app = _app(tmp_path, prefs)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                assert app.hide_recording_hint is True
+
+                app.theme = "gruvbox"
+                await pilot.pause()
+
+                assert prefs.load().hide_recording_hint is True
+
+        asyncio.run(scenario())
+
     def test_given_every_preference_saved_when_relaunched_then_all_of_them_apply(
         self, tmp_path
     ):
