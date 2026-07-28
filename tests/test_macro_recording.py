@@ -1,6 +1,6 @@
 import asyncio
 
-from textual.widgets import Button, Footer, Input, Label
+from textual.widgets import Button, Footer, Header, Input, Label
 
 from tests.fakes import FakeAdapter
 from universal_remote.capabilities import Capabilities
@@ -81,6 +81,31 @@ class TestMacrosControl:
 
                 ids = [button.id for button in app.screen.query("#row-top Button")]
                 assert ids == ["key-menu", "key-home", "key-back", "macros"]
+
+        asyncio.run(scenario())
+
+    def test_given_the_top_row_when_shown_then_a_divider_separates_back_from_macros(
+        self, tmp_path
+    ):
+        # Menu/Home/Back send keys to the device; Macros is an app control, so a
+        # divider marks where the device keys end.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+
+                row = app.screen.query_one("#row-top")
+                ids = [child.id for child in row.children]
+                assert ids == [
+                    "key-menu",
+                    "key-home",
+                    "key-back",
+                    "row-top-divider",
+                    "macros",
+                ]
 
         asyncio.run(scenario())
 
@@ -167,6 +192,25 @@ class TestRecordingState:
 
         asyncio.run(scenario())
 
+    def test_given_a_recording_then_the_indicator_sits_in_the_header(self, tmp_path):
+        # The indicator belongs to the header bar that already names the device, not
+        # to the remote's button rows.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _record(pilot, app.screen)
+                await pilot.pause()
+
+                header = app.screen.query_one(Header)
+                assert header.query_one("#recording-indicator", Label) is not None
+                assert "RECORDING" in _indicator(app.screen)
+
+        asyncio.run(scenario())
+
     def test_given_a_capture_one_recording_then_the_macros_button_becomes_cancel(
         self, tmp_path
     ):
@@ -205,50 +249,6 @@ class TestRecordingState:
 
                 assert str(app.screen.query_one("#macros", Button).label) == "Macros"
                 assert app.screen.query_one("#recording-indicator").display is False
-
-        asyncio.run(scenario())
-
-
-class TestCancelHint:
-    def test_given_a_recording_when_started_then_the_indicator_names_the_cancel_key(
-        self, tmp_path
-    ):
-        store = _store_with_device(tmp_path)
-        adapter = FakeAdapter(platform="fake-tv")
-
-        async def scenario():
-            app = _app(store, adapter)
-            async with app.run_test(size=_FIT_SIZE) as pilot:
-                await _goto_remote(app, pilot)
-
-                await _record(pilot, app.screen)
-                await pilot.pause()
-
-                assert "ESC" in _indicator(app.screen)
-
-        asyncio.run(scenario())
-
-    def test_given_go_back_rebound_when_recording_then_the_hint_names_the_new_key(
-        self, tmp_path
-    ):
-        # The hint is rendered from the Go Back action's current key, not a fixed one,
-        # so it stays accurate after the user rebinds it.
-        store = _store_with_device(tmp_path)
-        adapter = FakeAdapter(platform="fake-tv")
-
-        async def scenario():
-            app = _app(store, adapter)
-            async with app.run_test(size=_FIT_SIZE) as pilot:
-                await _goto_remote(app, pilot)
-                app.shortcut_overrides["global.go_back"] = "f4"
-                app.apply_shortcuts()
-
-                await _record(pilot, app.screen)
-                await pilot.pause()
-
-                hint = _indicator(app.screen)
-                assert "F4" in hint
-                assert "ESC" not in hint
 
         asyncio.run(scenario())
 

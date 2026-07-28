@@ -20,8 +20,8 @@ Macros are the first real payoff on that extensibility.
   and Close, and shows a non-selectable "No macros yet" row when empty.
 - **Recording mode on the remote.** Create Macro dismisses the modal, returns to the
   live remote, and records every key press, text send, and custom-button action until
-  the user stops. The recording indicator and Stop control reuse the top row, so
-  recording adds **zero rows** to the remote's height.
+  the user stops. The Stop control reuses the top row and the recording indicator sits
+  on the right of the header bar, so recording adds **zero rows** to the remote's height.
 - **Macro detail modal.** Rename the macro, reorder steps, delete a step, record one
   additional step, insert a pause with a millisecond value, then Save, Close, or Delete
   the whole macro. Edits live in an in-memory draft; only Save writes.
@@ -48,10 +48,11 @@ Macros are the first real payoff on that extensibility.
   model, and the blocking playback modal.
 
 ### Modified Capabilities
-- `tui-remote`: the on-screen remote surface gains a fourth top-row button (`Macros`)
-  and a recording state in which that button becomes the Stop/Cancel control and a
-  recording indicator is shown; Escape on the remote cancels recording instead of
-  leaving the remote while a recording is in progress.
+- `tui-remote`: the on-screen remote surface gains a fourth top-row button (`Macros`),
+  set off by a divider because it is an application control rather than a device key, and
+  a recording state in which that button becomes the Stop/Cancel control and a recording
+  indicator appears on the right of the header bar; Escape on the remote cancels
+  recording instead of leaving the remote while a recording is in progress.
 - `custom-button-actions`: the action catalog gains a second type, `Run Macro`, and the
   catalog's runner contract widens from an IP string to an execution context so an
   action can reach the live session. Run Custom Script's own execution is unchanged, but

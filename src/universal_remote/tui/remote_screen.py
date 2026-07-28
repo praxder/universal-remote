@@ -18,6 +18,7 @@ from textual.widgets import (
     Label,
     RadioButton,
     RadioSet,
+    Rule,
 )
 
 from ..errors import TextUnsupportedError, UnsupportedKeyError
@@ -52,7 +53,7 @@ from .custom_buttons import (
     set_action,
     set_title,
 )
-from .shortcuts import Scope, display_label, effective_key, rebuild_shortcuts
+from .shortcuts import Scope, rebuild_shortcuts
 
 if TYPE_CHECKING:
     from ..capabilities import Capabilities
@@ -82,6 +83,36 @@ class Recording:
     mode: RecordMode
     on_done: Callable[[list[dict] | None], None]
     steps: list[dict] = field(default_factory=list)
+
+
+# The header's recording indicator. Kept to eleven columns because the header also
+# holds the device's name, type, and IP: a longer text (naming the cancelling key, say)
+# ellipsizes that at the supported 80-column width.
+RECORDING_TEXT = "● RECORDING"
+
+
+class RemoteHeader(Header):
+    """The header bar, plus a recording indicator on its right side.
+
+    The indicator lives here rather than among the remote's buttons because it
+    reports application state (a recording is running), not a key you can press —
+    the same bar already carries the device's name, type, and IP. It takes the slot
+    Textual reserves for the optional header clock, which this app never shows, so
+    the indicator sits flush right and the device text keeps those columns while no
+    recording is running.
+    """
+
+    DEFAULT_CSS = """
+    RemoteHeader HeaderClockSpace { display: none; }
+    RemoteHeader #recording-indicator {
+        dock: right; width: auto; height: 1; padding: 0 1;
+        color: $error; text-style: bold; display: none;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        yield from super().compose()
+        yield Label("", id="recording-indicator")
 
 
 class TextEntryModal(ModalScreen[str | None]):
@@ -377,14 +408,10 @@ class RemoteScreen(Screen[None]):
     /* Fill the grid cell (no side margin) so the digit is not clipped: a grid
        cell minus the button's own margin left zero content width. */
     #numpad Button { margin: 0; width: 100%; }
-    /* The recording indicator shares the existing top row, so entering the recording
-       state costs no rows and a remote that fits the baseline still fits. Its height
-       matches the bordered buttons so the text sits on their middle line; it is
-       hidden until a recording starts. */
-    #recording-indicator {
-        display: none; width: auto; height: 3;
-        content-align: left middle; color: $warning; text-style: bold;
-    }
+    /* Marks where the device keys end and the app's own Macros control begins. One row
+       of the buttons' three, offset down onto their middle line, so it reads as a mark
+       between the two groups rather than a border spanning them. */
+    #row-top-divider { height: 1; margin: 1 1 0 1; color: $primary; }
     """
 
     # Every remote hotkey is a catalogued action, built from the override map on
@@ -418,14 +445,14 @@ class RemoteScreen(Screen[None]):
     def compose(self) -> ComposeResult:
         # The device name lives in the header (see on_mount), not a separate row,
         # so the button set gets that row back.
-        yield Header()
+        yield RemoteHeader()
         with Container(id="remote"):
             with Horizontal(id="row-top"):
                 yield self._key_button(Key.MENU, "☰ Menu")
                 yield self._key_button(Key.HOME, "⌂ Home")
                 yield self._key_button(Key.BACK, "↩ Back")
+                yield Rule(orientation="vertical", id="row-top-divider")
                 yield self._macros_button()
-                yield Label("", id="recording-indicator")
             with Vertical(id="dpad"):
                 with Horizontal(id="dpad-up"):
                     yield self._key_button(Key.UP, "▲")
@@ -489,8 +516,9 @@ class RemoteScreen(Screen[None]):
         return button
 
     def _macros_button(self) -> Button:
-        # The fourth top-row control: opens the macros list, and doubles as the
-        # end-recording control while a recording is in progress (see
+        # The fourth top-row control, sitting past the divider because it configures
+        # the app rather than sending a key: it opens the macros list, and doubles as
+        # the end-recording control while a recording is in progress (see
         # `_apply_recording_ui`), which is what keeps recording free of extra rows.
         button = Button("Macros", id="macros")
         button.can_focus = False
@@ -700,23 +728,11 @@ class RemoteScreen(Screen[None]):
         else:
             append = recording.mode is RecordMode.APPEND_UNTIL_STOP
             button.label = "■ Stop" if append else "■ Cancel"
-            indicator.update(self._recording_hint())
+            indicator.update(RECORDING_TEXT)
             indicator.display = True
         # `label` repaints but is layout=False, so the button would otherwise keep its
         # mount-time width and clip the longer label (see `_label_custom`).
         button.refresh(layout=True)
-
-    def _recording_hint(self) -> str:
-        """The indicator text, naming the key that currently cancels a recording.
-
-        Deliberately short: the top row's four buttons leave about 25 columns of the
-        supported 80, so naming the mode here as well as on the button (■ Stop vs
-        ■ Cancel) clips the hint.
-        """
-        cancel = display_label(
-            effective_key("global.go_back", self.app.shortcut_overrides)
-        )
-        return f"● REC · {cancel} cancels"
 
     def action_edit_mode(self) -> None:
         # Toggle edit-mode: `e` arms it, `e` again disarms it. While armed, the next

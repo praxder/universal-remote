@@ -109,35 +109,53 @@ return type, and a macro returning a "ScriptResult" would be actively misleading
 ### 4. Recording adds zero rows: the fourth button changes role
 
 ```
-idle        [☰ Menu] [⌂ Home] [↩ Back] [ Macros ]
+            ⭘  Name: … • Type: … • IP: …                     ← header
 
-recording   [☰ Menu] [⌂ Home] [↩ Back] [ ■ Stop ]   ● REC · ESC cancels
-(append)
+idle        [☰ Menu] [⌂ Home] [↩ Back] │ [ Macros ]
 
-recording   [☰ Menu] [⌂ Home] [↩ Back] [ ■ Cancel ] ● REC · ESC cancels
-(capture one)
+            ⭘  Name: … • Type: … • IP: …          ● RECORDING
+recording
+(append)    [☰ Menu] [⌂ Home] [↩ Back] │ [ ■ Stop ]
+
+            ⭘  Name: … • Type: … • IP: …          ● RECORDING
+recording
+(capture 1) [☰ Menu] [⌂ Home] [↩ Back] │ [ ■ Cancel ]
 ```
 
-The two modes read the same in the indicator and differ on the button, because the
-four buttons leave only ~25 of the 80 columns: naming the mode in the indicator too
-(`one action ·`) clips the hint, and several of these glyphs are double-width.
+The two modes read the same in the indicator and differ on the button: the indicator
+reports state (a recording is running), the button is the thing you press.
 
-The recording indicator is a label inside the existing `#row-top`, and the Stop control
-*is* the Macros button relabelled.
+The Stop control *is* the Macros button relabelled, and the divider before it is a
+vertical `Rule` one row tall, offset down onto the buttons' middle line so it reads as a
+mark between the two groups rather than a border spanning them.
 
-*Why:* the height budget above. A separate banner row plus a Stop button row lands on
-the baseline with no slack, so any later addition to the remote breaks the no-scroll
-test. Relabelling costs nothing vertically, and the top row is 48 of 80 columns so the
-indicator fits horizontally. It also reads well: the button you pressed to start is the
-button you press to stop.
+*Why the divider:* Menu, Home, and Back send a key to the TV; Macros configures the
+application. Without a break the fourth button reads as a fourth device key.
 
-*Alternative rejected:* the header subtitle. `Screen.sub_title` works and is watched,
-but `app.title` already holds `Name: … • Type: … • IP: …` at roughly 55 characters, so
-appending a subtitle overflows 80 columns and truncates.
+*Why relabelling rather than new rows:* the height budget above. A separate banner row
+plus a Stop button row lands on the baseline with no slack, so any later addition to the
+remote breaks the no-scroll test. Relabelling costs nothing vertically, and it reads
+well: the button you pressed to start is the button you press to stop.
 
-The `ESC` in the indicator is rendered from
-`display_label(effective_key("global.go_back", overrides))`, not hardcoded, because the
-user can rebind it.
+The indicator itself is a `Label` docked right inside `RemoteHeader`, a `Header`
+subclass. It takes the slot of `HeaderClockSpace` — the ten-column spacer Textual
+reserves for the optional clock, which this app never shows — hidden with
+`display: none`, so the indicator sits flush right and `HeaderTitle` keeps those columns
+while nothing is recording.
+
+*Why the header:* it already carries application state (the connected device), so a
+"recording" flag belongs beside it rather than among keys the user can press.
+
+*Alternative rejected:* the header subtitle. `Screen.sub_title` works and is watched, but
+`app.title` already holds `Name: … • Type: … • IP: …` at roughly 55 characters, so
+appending a subtitle overflows 80 columns and truncates. A docked sibling widget avoids
+that: it is laid out first and the title takes what is left.
+
+*Trade-off accepted:* the indicator eats columns the title could use, and `HeaderTitle`
+ellipsizes rather than wrapping. `● REC · ESC cancels` (nineteen columns) clipped the IP
+address at 80 columns, so the indicator is the eleven-column `● RECORDING` and no longer
+names the cancelling key. Escape-cancels stays discoverable from the `■ Stop` / `■ Cancel`
+button and from Escape's back-a-page role everywhere else in the app.
 
 ### 5. An in-memory draft carries edits across the round trip
 

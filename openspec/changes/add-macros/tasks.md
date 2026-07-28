@@ -194,3 +194,28 @@ The chain has six links and one of them silently eats data. Complete it end to e
 - [x] 11.3 Update the README's macro-editing paragraph so Delete reads as a confirmed
       action, naming the Cancel default and that cancelling keeps the unsaved edits.
 - [x] 11.4 Preflight: formatter, lint, full suite.
+
+## 12. Set the Macros control apart and move the indicator to the header
+
+Two visual corrections: the Macros button reads as a fourth device key, and the
+recording indicator sits among buttons though it reports application state.
+
+- [x] 12.1 Write a test that `#row-top`'s children are Menu, Home, Back, a divider, then
+      Macros, then add a vertical `Rule` (`#row-top-divider`) between Back and the Macros
+      button, one row tall and offset down onto the buttons' middle line so it reads as a
+      mark between the two groups rather than a border spanning them.
+- [x] 12.2 Write a test that the recording indicator is a descendant of the header, then
+      add a `RemoteHeader(Header)` subclass owning a right-docked `#recording-indicator`
+      label, hide `HeaderClockSpace` so the indicator takes the clock's slot, and yield
+      `RemoteHeader` from `RemoteScreen.compose` in place of `Header`. Delete the
+      `#recording-indicator` rule from `RemoteScreen.DEFAULT_CSS` — a screen rule would
+      keep matching the moved label and fight the header's own.
+- [x] 12.3 Shorten the indicator to `● RECORDING` and drop the cancel-key hint with its
+      two `TestCancelHint` tests: at 80 columns the longer text ellipsizes the device's
+      name, type, and IP in the same bar (design decision 4). Remove the now-unused
+      `display_label`/`effective_key` imports from `remote_screen.py`.
+- [x] 12.4 Verify visually at 80 columns with a long device name, in the recording state,
+      that the device text is not clipped and the indicator is red and flush right.
+- [x] 12.5 Update the README's recording paragraph for the divider and the header
+      indicator.
+- [x] 12.6 Preflight: formatter, lint, full suite.

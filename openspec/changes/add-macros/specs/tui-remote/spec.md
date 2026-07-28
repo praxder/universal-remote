@@ -1,9 +1,9 @@
 ## MODIFIED Requirements
 
 ### Requirement: On-screen remote surface
-The Use Remote mode SHALL present a remote resembling a physical remote with a menu key, a D-pad (up, down, left, right), OK, Back, Home, volume up, volume down, mute, channel up and channel down, the media-transport keys play, pause, play/pause, rewind, and fast-forward and stop, a number pad for the digits 0 through 9, and a row of five custom buttons. The remote's top row SHALL additionally present a Macros control as a fourth button to the right of the menu, Home, and Back buttons; activating it SHALL open the macros list (see the macros capability). The Macros control SHALL be reachable by mouse, and MAY be given a keyboard shortcut via the keyboard-shortcuts capability, which activates it identically to a click. Every button MUST be clickable with the mouse. The rewind and fast-forward buttons SHALL use scan-style icons. The remote's buttons SHALL be bordered and sized for comfortable reading, laid out to resemble a physical remote (centered groups, the D-pad as a cross). The five custom buttons SHALL use the same bordered button style as the rest of the remote and SHALL sit in their own centered row. The remote SHALL NOT show an always-visible docked text field; text entry SHALL be reached on demand through a modal opened by the Text action. The remote SHALL size to its content; on a terminal too short to show the full set it SHALL scroll so every button stays reachable rather than clipping.
+The Use Remote mode SHALL present a remote resembling a physical remote with a menu key, a D-pad (up, down, left, right), OK, Back, Home, volume up, volume down, mute, channel up and channel down, the media-transport keys play, pause, play/pause, rewind, and fast-forward and stop, a number pad for the digits 0 through 9, and a row of five custom buttons. The remote's top row SHALL additionally present a Macros control as a fourth button to the right of the menu, Home, and Back buttons, separated from them by a vertical divider marking where the keys sent to the device end and the application's own control begins; activating it SHALL open the macros list (see the macros capability). The Macros control SHALL be reachable by mouse, and MAY be given a keyboard shortcut via the keyboard-shortcuts capability, which activates it identically to a click. Every button MUST be clickable with the mouse. The rewind and fast-forward buttons SHALL use scan-style icons. The remote's buttons SHALL be bordered and sized for comfortable reading, laid out to resemble a physical remote (centered groups, the D-pad as a cross). The five custom buttons SHALL use the same bordered button style as the rest of the remote and SHALL sit in their own centered row. The remote SHALL NOT show an always-visible docked text field; text entry SHALL be reached on demand through a modal opened by the Text action. The remote SHALL size to its content; on a terminal too short to show the full set it SHALL scroll so every button stays reachable rather than clipping.
 
-While a macro recording is in progress, the remote SHALL show a recording indicator in its top row, and the Macros button SHALL become the control that ends the recording — labelled to stop the recording when the recording captures interactions until stopped, and to cancel when the recording captures a single interaction. The indicator SHALL also name the key that cancels the recording, rendered from that action's current key rather than a fixed key name, so it stays accurate when the user has rebound it. Entering the recording state SHALL NOT add any row to the remote, so a remote that fits the supported baseline height without scrolling still fits while recording.
+While a macro recording is in progress, the application SHALL show a recording indicator on the right-hand side of the header bar that names the connected device, and the Macros button SHALL become the control that ends the recording — labelled to stop the recording when the recording captures interactions until stopped, and to cancel when the recording captures a single interaction. The indicator SHALL be short enough that the device's name, type, and IP address remain fully readable beside it at the supported baseline width. Entering the recording state SHALL NOT add any row to the remote, so a remote that fits the supported baseline height without scrolling still fits while recording.
 
 #### Scenario: Remote renders the button set
 - **WHEN** the user opens Use Remote for a device
@@ -13,6 +13,7 @@ While a macro recording is in progress, the remote SHALL show a recording indica
 #### Scenario: Top row offers a Macros control
 - **WHEN** the user opens Use Remote for a device
 - **THEN** the top row shows a Macros button to the right of the menu, Home, and Back buttons
+- **AND** a vertical divider sits between the Back button and the Macros button
 
 #### Scenario: Macros control opens the macros list
 - **WHEN** the user clicks the Macros button
@@ -28,11 +29,7 @@ While a macro recording is in progress, the remote SHALL show a recording indica
 
 #### Scenario: Recording shows an indicator and an end control
 - **WHEN** a macro recording is in progress on the remote
-- **THEN** the top row shows a recording indicator and the Macros button is replaced by the control that ends that recording
-
-#### Scenario: The cancel hint reflects the current key
-- **WHEN** the user has rebound the Go Back action and a macro recording is in progress
-- **THEN** the recording indicator names the rebound key rather than the default one
+- **THEN** the header bar shows a recording indicator on its right-hand side, still showing the device's name, type, and IP address, and the Macros button is replaced by the control that ends that recording
 
 #### Scenario: Recording adds no rows to the remote
 - **WHEN** a macro recording is in progress on a terminal at the supported baseline height
