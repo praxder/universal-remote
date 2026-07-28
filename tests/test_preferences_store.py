@@ -86,16 +86,47 @@ class TestPreferencesStorePersistence:
 
         assert loaded.custom_buttons == {}
 
-    def test_given_theme_shortcuts_and_custom_buttons_when_reloaded_then_all_round_trip(
+    def test_given_macros_when_reloaded_then_they_round_trip(self, tmp_path):
+        path = tmp_path / "settings.json"
+        macros = {
+            "next_number": 2,
+            "items": {
+                "abc": {"name": "Login", "steps": [{"type": "key", "key": "OK"}]}
+            },
+        }
+        preferences = Preferences(macros=macros)
+
+        PreferencesStore(path=path).save(preferences)
+
+        assert PreferencesStore(path=path).load() == preferences
+
+    def test_given_an_old_file_without_macros_when_loaded_then_they_are_empty(
         self, tmp_path
     ):
-        # Saving one preference must not overwrite the others: theme, shortcuts, and
-        # custom-button titles coexist in the one settings file.
+        path = tmp_path / "settings.json"
+        path.write_text('{"theme": "nord"}')
+
+        assert PreferencesStore(path=path).load().macros == {}
+
+    def test_given_a_non_object_macro_registry_when_loaded_then_it_reads_as_empty(
+        self, tmp_path
+    ):
+        path = tmp_path / "settings.json"
+        path.write_text('{"macros": ["not", "an", "object"]}')
+
+        assert PreferencesStore(path=path).load().macros == {}
+
+    def test_given_theme_shortcuts_custom_buttons_and_macros_when_reloaded_then_all_round_trip(
+        self, tmp_path
+    ):
+        # Saving one preference must not overwrite the others: theme, shortcuts,
+        # custom-button titles, and macros coexist in the one settings file.
         path = tmp_path / "settings.json"
         preferences = Preferences(
             theme="gruvbox",
             shortcuts={"remote.vol_up": "="},
             custom_buttons={"global": {"1": {"title": "Reboot"}}},
+            macros={"next_number": 2, "items": {"abc": {"name": "Login", "steps": []}}},
         )
 
         PreferencesStore(path=path).save(preferences)

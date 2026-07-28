@@ -86,13 +86,14 @@ resolves it and reports "That macro no longer exists" rather than crashing.
 ```
 ActionType.runner: Callable[[dict, ActionContext], Awaitable[ActionResult]]
 
-ActionContext(remote_ip, session, notify, macros, custom_buttons, device_id, platform)
+ActionContext(app, remote_ip, session, macros, custom_buttons, device_id, platform)
 ```
 
-`run_script` reads only `remote_ip`. `run_macro` needs the live `session` (to send keys
-and text), `notify` (the abort notification), `macros` (to resolve the id), and
-`custom_buttons` + `device_id` + `platform` (unused today, but a future step type that
-resolves a button would need them).
+`run_script` reads only `remote_ip`. `run_macro` needs the `app` (to push its playback
+modal — a module-level runner has no other route to `push_screen_wait` — and to raise
+the abort notification), the live `session` (to send keys and text), `macros` (to
+resolve the id), and `custom_buttons` + `device_id` + `platform` (unused today, but a
+future step type that resolves a button would need them).
 
 *Why:* macro playback fundamentally needs the session, and an IP string cannot carry it.
 There is exactly one `run_action` call site (`remote_screen.py:509`), so the widening is
@@ -113,9 +114,13 @@ idle        [☰ Menu] [⌂ Home] [↩ Back] [ Macros ]
 recording   [☰ Menu] [⌂ Home] [↩ Back] [ ■ Stop ]   ● REC · ESC cancels
 (append)
 
-recording   [☰ Menu] [⌂ Home] [↩ Back] [ ■ Cancel ] ● REC · one action · ESC cancels
+recording   [☰ Menu] [⌂ Home] [↩ Back] [ ■ Cancel ] ● REC · ESC cancels
 (capture one)
 ```
+
+The two modes read the same in the indicator and differ on the button, because the
+four buttons leave only ~25 of the 80 columns: naming the mode in the indicator too
+(`one action ·`) clips the hint, and several of these glyphs are double-width.
 
 The recording indicator is a label inside the existing `#row-top`, and the Stop control
 *is* the Macros button relabelled.

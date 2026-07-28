@@ -175,11 +175,62 @@ environment to the connected device's IP address.
 > and the 30-second timeout is a reliability guard against a hung script, not a
 > security control. Only attach scripts you understand and trust.
 
+### Macros — record a sequence once, replay it forever
+
+Logging into a streaming app, walking down to a buried settings screen, running the
+same test sequence — a **macro** records that run of keys once, names it, and replays
+it on demand.
+
+**Record one.** The top row's fourth button, **Macros**, opens the list of saved
+macros. **Create Macro** closes the list, hands you back the live remote, and starts
+recording: the Macros button becomes **■ Stop** and a `● REC` indicator appears
+beside it (recording adds no rows, so the remote still fits the same terminal).
+Everything you then do is captured in order — a key you click, a key you send by its
+shortcut, text you send through the `t` pop-up, and a custom button whose action
+runs. Press **■ Stop** to save the macro as `Macro 1`, `Macro 2`, … (the numbering
+never reuses a deleted name), or **Esc** to throw the recording away. A key the TV
+doesn't support and a send that failed are *not* recorded, so a macro only ever holds
+steps that really happened.
+
+**Edit one.** Enter on a macro in the list opens it. The name is editable, the steps
+are listed in order (`Key: HOME`, `Text: "…"`, `Pause: 500ms`, or a captured action's
+own name), and with a step selected you can move it **Up** or **Down**, **Remove**
+it, record one more step after it (**+ Step**, which returns you to the live remote
+for exactly one interaction), or insert a wait after it (**+ Pause**, in
+milliseconds — Enter on an existing pause step reopens the prompt to change it).
+Every edit is a draft: **Save** writes it, **Close** throws away everything you
+changed, and **Delete** removes the macro. Edits made before **+ Step** survive the
+trip out to the remote and back.
+
+**Play one.** Give a custom button the **Run Macro** action (**Action Type** → **Run
+Macro** → pick a macro) and activating that button plays it. The button stores the
+macro's identity, not a copy, so renaming or editing the macro changes what the
+button does. Playback opens a progress window (`Step 3 of 12`) with **Cancel**; the
+remote is frozen behind it so nothing of yours can interleave with the macro's own
+keys. **Cancel** or **Esc** stops it where it is. A step that fails — a key the TV
+lacks, an unreachable device, a script that exits non-zero — **aborts the run**: the
+later steps don't run, and one error names the macro, the step it stopped at, and
+why. A macro's later steps assume its earlier ones landed, so stopping at a legible
+failure beats sending the rest into whatever state the TV is actually in.
+
+**On purpose, macros don't:**
+
+- **nest.** A macro cannot contain another macro; recording refuses to capture a Run
+  Macro button and says so.
+- **loop or branch.** A macro is a flat, linear list of steps.
+- **track a retuned button.** A captured custom-button step is a frozen snapshot of
+  the action as it was when recorded, so reconfiguring that button later doesn't
+  change the macro. What the step list shows is what will run.
+- **record your timing.** The gaps between your presses aren't captured; add
+  **+ Pause** steps where a wait matters.
+- **undo a partial run.** Keys already sent stay sent.
+
 Every key above is a **default you can change**, and the on-screen-only buttons
 (menu, channel, volume, mute, and the media-transport keys) can be **given** a
 keyboard shortcut — see [Keyboard Shortcuts](#settings) in Settings. The five
 custom buttons can be given shortcuts too (**Activate Custom Button 1**–**5**),
-each firing the matching button exactly as a click would. The D-pad directions
+each firing the matching button exactly as a click would, and so can **Macros**,
+which opens the macros list just as clicking it does. The D-pad directions
 (arrows and `h` `j` `k` `l`) are reserved for navigation and stay fixed.
 
 ### Settings

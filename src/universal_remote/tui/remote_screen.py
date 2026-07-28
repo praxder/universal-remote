@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import TYPE_CHECKING, Callable
 
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -20,11 +22,24 @@ from textual.widgets import (
 
 from ..errors import TextUnsupportedError, UnsupportedKeyError
 from ..keys import Key
+from ..macros.models import Macro, action_step, insert_after, key_step, text_step
+from ..macros.registry import add, create, delete, get
 from .actions import (
+    RUN_MACRO,
+    ActionContext,
     ActionTypeListModal,
     action_type,
     present_result,
     run_action,
+)
+from .macros_screen import (
+    ADD_STEP,
+    CREATE_MACRO,
+    DELETE_MACRO,
+    OPEN_MACRO,
+    SAVE_MACRO,
+    MacroDetailModal,
+    MacrosListModal,
 )
 from .custom_buttons import (
     ButtonScope,
@@ -37,7 +52,7 @@ from .custom_buttons import (
     set_action,
     set_title,
 )
-from .shortcuts import Scope, rebuild_shortcuts
+from .shortcuts import Scope, display_label, effective_key, rebuild_shortcuts
 
 if TYPE_CHECKING:
     from ..capabilities import Capabilities
@@ -45,13 +60,39 @@ if TYPE_CHECKING:
     from ..session import Session
 
 
-class TextEntryModal(ModalScreen[None]):
+class RecordMode(Enum):
+    """How a macro recording ends.
+
+    `APPEND_UNTIL_STOP` runs until the user stops it (recording a whole macro);
+    `CAPTURE_ONE` ends itself after a single interaction (adding one step to a draft).
+    """
+
+    APPEND_UNTIL_STOP = "append_until_stop"
+    CAPTURE_ONE = "capture_one"
+
+
+@dataclass
+class Recording:
+    """A recording in progress: its mode, what it captured, and where it returns.
+
+    `on_done` receives the captured steps, or None when the recording was cancelled,
+    so whatever started the recording decides what each outcome means.
+    """
+
+    mode: RecordMode
+    on_done: Callable[[list[dict] | None], None]
+    steps: list[dict] = field(default_factory=list)
+
+
+class TextEntryModal(ModalScreen[str | None]):
     """On-demand text entry: type then Enter sends once and dismisses; Escape cancels.
 
     Owns the send path so the remote surface no longer reserves a docked field.
     Escape is bound here so it dismisses the modal rather than reaching the remote's
     Go Back (which would close the session). Transient outcomes — a failed send, or
     an ADB path that fell back — surface as app-level toasts that outlive the modal.
+    Dismisses with the text that actually reached the device, or None when nothing
+    did, so a recording captures only a send that landed.
     """
 
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
@@ -81,31 +122,33 @@ class TextEntryModal(ModalScreen[None]):
         self.query_one("#text-entry-input", Input).focus()
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
-        if event.value:
-            await self._send(event.value)
-        self.dismiss()
+        sent = await self._send(event.value) if event.value else False
+        self.dismiss(event.value if sent else None)
 
-    async def _send(self, text: str) -> None:
+    async def _send(self, text: str) -> bool:
+        """Send `text`, reporting whether the device actually received it."""
         try:
             await self._session.send_text(text)
         except TextUnsupportedError:
             self.app.notify(
                 "Text entry is not supported on this device", severity="warning"
             )
+            return False
         except Exception:
             # A failed text send (device timeout, dropped connection) must not take
             # down the remote — report it and return, like the key-send path.
             self.app.notify(
                 "Text entry failed — the device may be unreachable", severity="warning"
             )
-        else:
-            # An opted-in ADB send that fell back to Remote v2 flags itself; say so
-            # rather than leaving the user wondering why setup made no change.
-            if getattr(self._session, "adb_text_unavailable", False):
-                self.app.notify("ADB text unavailable — sent over the standard path")
+            return False
+        # An opted-in ADB send that fell back to Remote v2 flags itself; say so
+        # rather than leaving the user wondering why setup made no change.
+        if getattr(self._session, "adb_text_unavailable", False):
+            self.app.notify("ADB text unavailable — sent over the standard path")
+        return True
 
     def action_cancel(self) -> None:
-        self.dismiss()
+        self.dismiss(None)
 
 
 class ButtonConfigModal(ModalScreen[bool]):
@@ -334,6 +377,14 @@ class RemoteScreen(Screen[None]):
     /* Fill the grid cell (no side margin) so the digit is not clipped: a grid
        cell minus the button's own margin left zero content width. */
     #numpad Button { margin: 0; width: 100%; }
+    /* The recording indicator shares the existing top row, so entering the recording
+       state costs no rows and a remote that fits the baseline still fits. Its height
+       matches the bordered buttons so the text sits on their middle line; it is
+       hidden until a recording starts. */
+    #recording-indicator {
+        display: none; width: auto; height: 3;
+        content-align: left middle; color: $warning; text-style: bold;
+    }
     """
 
     # Every remote hotkey is a catalogued action, built from the override map on
@@ -360,6 +411,9 @@ class RemoteScreen(Screen[None]):
         # When armed by the edit-mode key, the next custom-button activation opens its
         # config instead of running its action, then clears. See `action_edit_mode`.
         self._edit_mode = False
+        # The macro recording in progress, or None. While set, every interaction the
+        # remote performs is captured as a step and the Macros button ends it.
+        self._recording: Recording | None = None
 
     def compose(self) -> ComposeResult:
         # The device name lives in the header (see on_mount), not a separate row,
@@ -370,6 +424,8 @@ class RemoteScreen(Screen[None]):
                 yield self._key_button(Key.MENU, "☰ Menu")
                 yield self._key_button(Key.HOME, "⌂ Home")
                 yield self._key_button(Key.BACK, "↩ Back")
+                yield self._macros_button()
+                yield Label("", id="recording-indicator")
             with Vertical(id="dpad"):
                 with Horizontal(id="dpad-up"):
                     yield self._key_button(Key.UP, "▲")
@@ -432,6 +488,14 @@ class RemoteScreen(Screen[None]):
         button.can_focus = False  # keyboard drives bindings; mouse drives clicks
         return button
 
+    def _macros_button(self) -> Button:
+        # The fourth top-row control: opens the macros list, and doubles as the
+        # end-recording control while a recording is in progress (see
+        # `_apply_recording_ui`), which is what keeps recording free of extra rows.
+        button = Button("Macros", id="macros")
+        button.can_focus = False
+        return button
+
     def _custom_button(self, index: int) -> Button:
         # Mouse-click only in Phase 1: no hotkey binds them, and leaving them
         # unfocusable keeps Enter mapped to OK rather than pressing a focused button.
@@ -459,6 +523,8 @@ class RemoteScreen(Screen[None]):
             await self._send(Key[button_id.removeprefix("key-").upper()])
         elif button_id.startswith("custom-"):
             self._activate_custom(int(button_id.removeprefix("custom-")))
+        elif button_id == "macros":
+            self._macros_control()
 
     def _activate_custom(self, index: int) -> None:
         # One dispatch shared by a click and the keyboard shortcut, so both behave
@@ -476,11 +542,181 @@ class RemoteScreen(Screen[None]):
         )
         if action:
             self._run_action(action)
+            self._capture_action(action)
         else:
             self._configure_custom(index)
 
+    def _capture_action(self, action: dict) -> None:
+        """Capture a dispatched custom-button action, refusing a nested macro.
+
+        Captured when dispatched rather than when it finishes — a custom action runs
+        in the background, so its outcome is not known yet. A Run Macro action is
+        refused outright: the snapshot would invoke a macro from inside a macro and
+        could recurse forever, so record time says no rather than leaving the user a
+        step that looks valid and always fails.
+        """
+        if self._recording is None:
+            return
+        if action.get("type") == RUN_MACRO:
+            self.app.notify(
+                "Nested macros are not supported — that step was not recorded.",
+                severity="warning",
+            )
+            return
+        self._capture(action_step(action))
+
     def action_activate_custom(self, index: int) -> None:
         self._activate_custom(index)
+
+    def action_macros(self) -> None:
+        # The catalogued Macros action: identical to clicking the Macros button.
+        self._macros_control()
+
+    def _macros_control(self) -> None:
+        """Open the macros list, or end the recording in progress.
+
+        While recording, this control *is* the Stop (append) or Cancel (capture-one)
+        button, so a click or the Macros shortcut ends the recording: Stop keeps what
+        was captured, Cancel keeps nothing.
+        """
+        recording = self._recording
+        if recording is None:
+            self._open_macros_list()
+        elif recording.mode is RecordMode.APPEND_UNTIL_STOP:
+            self._finish_recording(recording.steps)
+        else:
+            self._finish_recording(None)
+
+    def _open_macros_list(self, selected_id: str | None = None) -> None:
+        """Show the saved macros, highlighting `selected_id` when given."""
+        self.app.push_screen(
+            MacrosListModal(self.app.macros, selected_id), self._macros_list_closed
+        )
+
+    def _macros_list_closed(self, outcome: tuple[str, str | None] | None) -> None:
+        """Act on the macros list's choice; None means it was closed unchanged."""
+        if outcome is None:
+            return
+        choice, macro_id = outcome
+        if choice == CREATE_MACRO:
+            self._start_recording(
+                RecordMode.APPEND_UNTIL_STOP, self._new_macro_recorded
+            )
+        elif choice == OPEN_MACRO and macro_id:
+            macro = get(self.app.macros, macro_id)
+            if macro is not None:
+                self._open_macro_detail(macro)
+
+    def _new_macro_recorded(self, steps: list[dict] | None) -> None:
+        """Save an append-mode recording, then reopen the list on its outcome."""
+        if steps is None:  # cancelled: nothing saved
+            self._open_macros_list()
+            return
+        if not steps:
+            self.app.notify("Nothing was recorded, so no macro was created.")
+            self._open_macros_list()
+            return
+        macro = create(self.app.macros, steps)
+        self.app.persist_preferences()
+        self._open_macros_list(macro.id)
+
+    def _open_macro_detail(self, draft: Macro, selected: int = 0) -> None:
+        """Edit `draft` — a macro loaded from the registry, or one carried back from
+        a capture-one recording with its unsaved edits still on it."""
+        self.app.push_screen(
+            MacroDetailModal(draft, selected), self._macro_detail_closed
+        )
+
+    def _macro_detail_closed(self, outcome: tuple[str, Macro, int] | None) -> None:
+        """Persist, delete, or record one step, per the detail modal's choice.
+
+        None means Close, which discards every edit the draft held — the detail modal
+        never writes, so simply dropping the draft is what makes that true.
+        """
+        if outcome is None:
+            self._open_macros_list()
+            return
+        choice, draft, index = outcome
+        if choice == SAVE_MACRO:
+            add(self.app.macros, draft)
+            self.app.persist_preferences()
+            self._open_macros_list(draft.id)
+        elif choice == DELETE_MACRO:
+            delete(self.app.macros, draft.id)
+            self.app.persist_preferences()
+            self._open_macros_list()
+        elif choice == ADD_STEP:
+            self._start_recording(
+                RecordMode.CAPTURE_ONE,
+                lambda steps: self._step_captured(draft, index, steps),
+            )
+
+    def _step_captured(
+        self, draft: Macro, index: int, steps: list[dict] | None
+    ) -> None:
+        """Reopen the detail modal, inserting a captured step after `index`.
+
+        A cancelled capture returns the draft exactly as it was, so a rename or a
+        reorder made before Add Step survives either outcome.
+        """
+        selected = index
+        if steps:
+            selected = insert_after(draft.steps, index, steps[0])
+        self._open_macro_detail(draft, max(selected, 0))
+
+    def _start_recording(
+        self, mode: RecordMode, on_done: Callable[[list[dict] | None], None]
+    ) -> None:
+        """Begin capturing interactions; `on_done` receives the outcome."""
+        self._recording = Recording(mode=mode, on_done=on_done)
+        self._apply_recording_ui()
+
+    def _finish_recording(self, steps: list[dict] | None) -> None:
+        """End the recording and hand `steps` (or None, for cancelled) to its owner."""
+        recording = self._recording
+        if recording is None:
+            return
+        self._recording = None
+        self._apply_recording_ui()
+        recording.on_done(steps)
+
+    def _capture(self, step: dict) -> None:
+        """Append `step` to the recording, ending a capture-one recording with it."""
+        recording = self._recording
+        if recording is None:
+            return
+        recording.steps.append(step)
+        if recording.mode is RecordMode.CAPTURE_ONE:
+            self._finish_recording(recording.steps)
+
+    def _apply_recording_ui(self) -> None:
+        """Point the Macros button and the indicator at the current recording state."""
+        button = self.query_one("#macros", Button)
+        indicator = self.query_one("#recording-indicator", Label)
+        recording = self._recording
+        if recording is None:
+            button.label = "Macros"
+            indicator.display = False
+        else:
+            append = recording.mode is RecordMode.APPEND_UNTIL_STOP
+            button.label = "■ Stop" if append else "■ Cancel"
+            indicator.update(self._recording_hint())
+            indicator.display = True
+        # `label` repaints but is layout=False, so the button would otherwise keep its
+        # mount-time width and clip the longer label (see `_label_custom`).
+        button.refresh(layout=True)
+
+    def _recording_hint(self) -> str:
+        """The indicator text, naming the key that currently cancels a recording.
+
+        Deliberately short: the top row's four buttons leave about 25 columns of the
+        supported 80, so naming the mode here as well as on the button (■ Stop vs
+        ■ Cancel) clips the hint.
+        """
+        cancel = display_label(
+            effective_key("global.go_back", self.app.shortcut_overrides)
+        )
+        return f"● REC · {cancel} cancels"
 
     def action_edit_mode(self) -> None:
         # Toggle edit-mode: `e` arms it, `e` again disarms it. While armed, the next
@@ -506,8 +742,31 @@ class RemoteScreen(Screen[None]):
         self.run_worker(self._execute(action))
 
     async def _execute(self, action: dict) -> None:
-        result = await run_action(action, self._device.ip)
+        result = await run_action(action, self._action_context())
+        entry = action_type(action.get("type"))
+        if entry is not None and entry.reports_own_outcome:
+            # The action already told the user how it went — macro playback names a
+            # failing step in its own error, and a cancelled run is not an error at
+            # all. `present_result` would toast any not-ok result as "Script failed".
+            return
         present_result(self.app, result, show_results=bool(action.get("show_results")))
+
+    def _action_context(self) -> ActionContext:
+        """The execution context every catalog action is run with.
+
+        Gathers the live session and the active device alongside the saved macros and
+        custom buttons, so a runner reads what its own type needs without the remote
+        knowing which type that is.
+        """
+        return ActionContext(
+            app=self.app,
+            remote_ip=self._device.ip,
+            session=self._session,
+            macros=self.app.macros,
+            custom_buttons=self.app.custom_buttons,
+            device_id=self._device.id,
+            platform=self._device.platform,
+        )
 
     def _configure_custom(self, index: int) -> None:
         def _relabel(saved: bool | None) -> None:
@@ -539,6 +798,10 @@ class RemoteScreen(Screen[None]):
                 f"{key.name} failed — the device may be unreachable",
                 severity="warning",
             )
+        else:
+            # Captured only after a successful send, so a key the adapter does not
+            # support and a send that failed both record nothing.
+            self._capture(key_step(key.name))
 
     def action_text_mode(self) -> None:
         # Text moved off the docked field into an on-demand modal; when the adapter
@@ -548,10 +811,19 @@ class RemoteScreen(Screen[None]):
                 "Text entry is not supported on this device", severity="warning"
             )
             return
-        self.app.push_screen(TextEntryModal(self._session))
+        self.app.push_screen(TextEntryModal(self._session), self._text_sent)
+
+    def _text_sent(self, text: str | None) -> None:
+        """Capture a text send that reached the device; None means none did."""
+        if text:
+            self._capture(text_step(text))
 
     async def action_go_back(self) -> None:
-        # The remote's Go Back closes the live session before popping the screen;
-        # every other screen's Go Back just pops.
+        # While a recording is in progress, Go Back cancels it and the remote stays
+        # open with its session connected. Otherwise the remote's Go Back closes the
+        # live session before popping the screen; every other screen's just pops.
+        if self._recording is not None:
+            self._finish_recording(None)
+            return
         await self._session.close()
         self.app.pop_screen()
