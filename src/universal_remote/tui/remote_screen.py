@@ -56,6 +56,8 @@ from .custom_buttons import (
 from .shortcuts import Scope, rebuild_shortcuts
 
 if TYPE_CHECKING:
+    from textual.timer import Timer
+
     from ..capabilities import Capabilities
     from ..devices.models import Device
     from ..session import Session
@@ -90,6 +92,49 @@ class Recording:
 # ellipsizes that at the supported 80-column width.
 RECORDING_TEXT = "● RECORDING"
 
+# The indicator's pulse: `text_opacity` stops, cycled in order, one step per interval.
+# Fading the opacity keeps the text red the whole way, where cycling colors would not,
+# and the floor stays high enough that the dim end still reads as red rather than as
+# the header's background showing through.
+PULSE_OPACITIES = (1.0, 0.85, 0.7, 0.55, 0.45, 0.55, 0.7, 0.85)
+PULSE_STEP_SECONDS = 0.12
+
+
+class RecordingIndicator(Label):
+    """`● RECORDING`, fading in and out while a recording is in progress.
+
+    The fade is stepped by a timer rather than by Textual's animation system: a
+    never-ending animation leaves the animator permanently busy, and `Pilot.press`
+    waits for it to finish, so an animated pulse hangs every test that presses a key
+    while recording.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("", id="recording-indicator")
+        self._pulse: Timer | None = None
+        self._step = 0
+
+    def start_pulse(self) -> None:
+        """Show the indicator and fade it in and out until stopped."""
+        if self._pulse is not None:
+            return
+        self.update(RECORDING_TEXT)
+        self.display = True
+        self._step = 0
+        self._pulse = self.set_interval(PULSE_STEP_SECONDS, self._fade)
+
+    def stop_pulse(self) -> None:
+        """Hide the indicator and end the fade, leaving it fully opaque."""
+        if self._pulse is not None:
+            self._pulse.stop()
+            self._pulse = None
+        self.styles.text_opacity = 1.0
+        self.display = False
+
+    def _fade(self) -> None:
+        self._step = (self._step + 1) % len(PULSE_OPACITIES)
+        self.styles.text_opacity = PULSE_OPACITIES[self._step]
+
 
 class RemoteHeader(Header):
     """The header bar, plus a recording indicator on its right side.
@@ -112,7 +157,7 @@ class RemoteHeader(Header):
 
     def compose(self) -> ComposeResult:
         yield from super().compose()
-        yield Label("", id="recording-indicator")
+        yield RecordingIndicator()
 
 
 class TextEntryModal(ModalScreen[str | None]):
@@ -720,16 +765,15 @@ class RemoteScreen(Screen[None]):
     def _apply_recording_ui(self) -> None:
         """Point the Macros button and the indicator at the current recording state."""
         button = self.query_one("#macros", Button)
-        indicator = self.query_one("#recording-indicator", Label)
+        indicator = self.query_one("#recording-indicator", RecordingIndicator)
         recording = self._recording
         if recording is None:
             button.label = "Macros"
-            indicator.display = False
+            indicator.stop_pulse()
         else:
             append = recording.mode is RecordMode.APPEND_UNTIL_STOP
             button.label = "■ Stop" if append else "■ Cancel"
-            indicator.update(RECORDING_TEXT)
-            indicator.display = True
+            indicator.start_pulse()
         # `label` repaints but is layout=False, so the button would otherwise keep its
         # mount-time width and clip the longer label (see `_label_custom`).
         button.refresh(layout=True)

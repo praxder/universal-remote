@@ -250,3 +250,21 @@ decision 14).
 - [x] 13.7 Update the README's macro-editing paragraph and its "record your timing" bullet
       for the default gap.
 - [x] 13.8 Preflight: formatter, lint, full suite.
+
+## 14. The recording indicator pulses
+
+Eleven static columns in a bar that always holds text read as part of the device line, so
+the indicator fades out and back in while a recording runs (design decision 4).
+
+- [x] 14.1 Write tests that while a recording runs the indicator's `text_opacity` drops
+      below `1.0` and its `color` is unchanged, and that ending the recording restores
+      `1.0` and leaves it there. Then promote the header's `Label` to a
+      `RecordingIndicator(Label)` owning `start_pulse`/`stop_pulse`, stepping a fixed
+      opacity ramp on a `set_interval` timer, and call them from `_apply_recording_ui`.
+- [x] 14.2 Step the ramp on a timer rather than chaining `styles.animate` legs: a pulse
+      that never completes hangs `Pilot.press`, which awaits `animator.wait_until_complete()`
+      after every key (design decision 4).
+- [x] 14.3 Verify visually mid-fade that the dim end of the ramp still reads red and the
+      device's name, type, and IP are unaffected.
+- [x] 14.4 Update the README's recording paragraph for the pulse.
+- [x] 14.5 Preflight: formatter, lint, full suite.

@@ -5,6 +5,8 @@ The Use Remote mode SHALL present a remote resembling a physical remote with a m
 
 While a macro recording is in progress, the application SHALL show a recording indicator on the right-hand side of the header bar that names the connected device, and the Macros button SHALL become the control that ends the recording — labelled to stop the recording when the recording captures interactions until stopped, and to cancel when the recording captures a single interaction. The indicator SHALL be short enough that the device's name, type, and IP address remain fully readable beside it at the supported baseline width. Entering the recording state SHALL NOT add any row to the remote, so a remote that fits the supported baseline height without scrolling still fits while recording.
 
+The indicator SHALL pulse for as long as the recording runs, fading out and back in on a repeating cycle so the recording state draws the eye. The pulse SHALL vary the indicator's intensity only: the indicator SHALL stay red at every point in the cycle, and its text SHALL NOT change, so the pulse never reflows the header. The pulse SHALL stop when the recording ends, and the indicator SHALL be left at full intensity so a later recording starts its pulse from the same point.
+
 #### Scenario: Remote renders the button set
 - **WHEN** the user opens Use Remote for a device
 - **THEN** the menu key, D-pad, OK, Back, Home, volume, mute, channel up/down, the media-transport buttons (play, pause, play/pause, rewind, fast-forward, stop), the number pad 0–9, and the row of five custom buttons are shown
@@ -30,6 +32,14 @@ While a macro recording is in progress, the application SHALL show a recording i
 #### Scenario: Recording shows an indicator and an end control
 - **WHEN** a macro recording is in progress on the remote
 - **THEN** the header bar shows a recording indicator on its right-hand side, still showing the device's name, type, and IP address, and the Macros button is replaced by the control that ends that recording
+
+#### Scenario: Recording indicator pulses while recording
+- **WHEN** a macro recording is in progress on the remote
+- **THEN** the indicator fades out and back in on a repeating cycle, staying red throughout and keeping the same text
+
+#### Scenario: Pulse stops when the recording ends
+- **WHEN** a recording in progress ends
+- **THEN** the indicator stops pulsing and is left at full intensity
 
 #### Scenario: Recording adds no rows to the remote
 - **WHEN** a macro recording is in progress on a terminal at the supported baseline height

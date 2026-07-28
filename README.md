@@ -185,8 +185,9 @@ it on demand.
 because it opens an app screen rather than sending a key to the TV — opens the list of
 saved macros. **Create Macro** closes the list, hands you back the live remote, and
 starts recording: the Macros button becomes **■ Stop** and a red `● RECORDING` appears
-on the right of the header bar, beside the device you are connected to (recording adds
-no rows, so the remote still fits the same terminal).
+on the right of the header bar, beside the device you are connected to, fading in and
+out for as long as the recording runs (recording adds no rows, so the remote still fits
+the same terminal).
 Everything you then do is captured in order — a key you click, a key you send by its
 shortcut, text you send through the `t` pop-up, and a custom button whose action
 runs. Press **■ Stop** to save the macro as `Macro 1`, `Macro 2`, … (the numbering

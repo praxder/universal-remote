@@ -12,11 +12,19 @@ from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
 from universal_remote.tui.custom_buttons import ButtonScope, set_action
 from universal_remote.tui.macros_screen import MacrosListModal
-from universal_remote.tui.remote_screen import RecordMode, RemoteScreen
+from universal_remote.tui.remote_screen import (
+    RecordingIndicator,
+    RecordMode,
+    RemoteScreen,
+)
 
 # The supported baseline the full button set fits without scrolling; the recording
 # state must not cost a row, so it is asserted at exactly this size.
 _FIT_SIZE = (80, 45)
+
+# Long enough for the indicator's pulse to step a few times, short enough to keep the
+# test quick — the fade steps several times a second.
+_PULSE_SETTLE = 0.4
 
 _SCRIPT_ACTION = {
     "type": "run_script",
@@ -61,6 +69,10 @@ async def _record(pilot, screen, mode=RecordMode.APPEND_UNTIL_STOP) -> list:
 
 def _indicator(screen) -> str:
     return str(screen.query_one("#recording-indicator", Label).content)
+
+
+def _indicator_widget(screen) -> RecordingIndicator:
+    return screen.query_one("#recording-indicator", RecordingIndicator)
 
 
 def _messages(app) -> list[str]:
@@ -208,6 +220,72 @@ class TestRecordingState:
                 header = app.screen.query_one(Header)
                 assert header.query_one("#recording-indicator", Label) is not None
                 assert "RECORDING" in _indicator(app.screen)
+
+        asyncio.run(scenario())
+
+    def test_given_a_recording_then_the_indicator_fades_below_full_opacity(
+        self, tmp_path
+    ):
+        # The indicator pulses so the recording state catches the eye; a full pulse
+        # cycle takes about a second, so a fraction of one is enough to leave 1.0.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _record(pilot, app.screen)
+
+                await asyncio.sleep(_PULSE_SETTLE)
+                await pilot.pause()
+
+                assert _indicator_widget(app.screen).styles.text_opacity < 1.0
+
+        asyncio.run(scenario())
+
+    def test_given_the_indicator_fading_then_its_color_is_unchanged(self, tmp_path):
+        # The pulse fades opacity only: a recording indicator that cycled through
+        # other colors would stop reading as red.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _record(pilot, app.screen)
+                indicator = _indicator_widget(app.screen)
+                color = indicator.styles.color
+
+                await asyncio.sleep(_PULSE_SETTLE)
+                await pilot.pause()
+
+                assert indicator.styles.color == color
+
+        asyncio.run(scenario())
+
+    def test_given_a_fading_indicator_when_the_recording_ends_then_the_fade_stops(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _record(pilot, app.screen)
+                await asyncio.sleep(_PULSE_SETTLE)
+
+                app.screen._finish_recording(None)
+                await pilot.pause()
+
+                indicator = _indicator_widget(app.screen)
+                assert indicator.styles.text_opacity == 1.0
+                await asyncio.sleep(_PULSE_SETTLE)
+                await pilot.pause()
+                assert indicator.styles.text_opacity == 1.0
 
         asyncio.run(scenario())
 

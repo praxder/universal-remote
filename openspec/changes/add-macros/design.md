@@ -158,6 +158,32 @@ address at 80 columns, so the indicator is the eleven-column `● RECORDING` and
 names the cancelling key. Escape-cancels stays discoverable from the `■ Stop` / `■ Cancel`
 button and from Escape's back-a-page role everywhere else in the app.
 
+*The indicator pulses.* Eleven static columns in a bar that always holds text read as
+part of the device line; a slow fade out and back in is the one property no other part
+of the header has, so the recording state is legible at a glance without a second row or
+a wider indicator.
+
+The fade animates `text_opacity` through a fixed ramp — `1.0, 0.85, 0.7, 0.55, 0.45` and
+back — one stop every 120ms, so a cycle takes about a second.
+
+*Why opacity, not color:* the user asked for a flashing indicator that stays red.
+`text_opacity` blends the text toward the header's background, so every stop is a dimmer
+red; cycling the `color` rule instead would take the indicator through hues that no
+longer read as "recording". The floor is `0.45` rather than something nearer zero for the
+same reason — below that the text blends into the header instead of dimming.
+
+*Why a `set_interval` timer, not Textual's animation system:* `styles.animate` does not
+repeat, so a pulse built on it has to chain a new leg from each leg's `on_complete` — an
+animation that never completes. `App._press_keys` awaits `animator.wait_until_complete()`
+after every key it sends, so `Pilot.press` would never return and every test that presses
+a key while recording would hang. Stepping a ramp on a timer leaves the animator idle.
+The cost is a stepped fade rather than a continuous one, which at five stops and a
+terminal's color depth is not visible.
+
+*Why the ramp resets on stop:* `stop_pulse` restores `text_opacity` to `1.0` before
+hiding the label, so the indicator is never left dim — a capture-one recording that ends
+and restarts (`+ Step`) begins its next pulse fully bright.
+
 ### 5. An in-memory draft carries edits across the round trip
 
 Both Create Macro and Add Step leave a modal, land on the live remote, and come back.
