@@ -3,8 +3,8 @@
 A local, terminal-based universal TV remote — pretty, mouse-clickable, and fully
 keyboard-drivable. It discovers TVs on your network, handles each platform's
 pairing, and gives you a complete on-screen remote (d-pad, media transport,
-number pad, volume, channel, on-demand text entry, and relabel-able custom
-buttons) for **Samsung Tizen, LG WebOS,
+number pad, volume, channel, on-demand text entry, relabel-able custom buttons,
+and recordable macros) for **Samsung Tizen, LG WebOS,
 Apple TV, Roku, Fire TV, and Android TV / Google TV** — all from one app.
 Everything runs on your LAN; nothing leaves your network. The architecture is
 platform-agnostic, so supporting a new TV platform is one new adapter module.
@@ -133,9 +133,12 @@ Then the remote appears. Drive it by mouse or keyboard:
 
 Menu, channel up/down, volume, mute, the media-transport keys (play, pause,
 play/pause, rewind, fast-forward, stop), the number pad, and power are on-screen
-buttons. Buttons the connected TV doesn't support are shown disabled — Apple TV
-has no mute, Roku has no discrete play/pause/stop or number pad, Fire TV has no
-channel keys, and so on.
+buttons. Buttons the connected TV doesn't support are shown disabled — the
+pictured Roku has no menu key, no number pad, and only a single play/pause toggle
+in place of discrete play, pause, and stop; Apple TV has no mute; Fire TV has no
+channel keys; and so on. The top row's fourth button, **Macros**, is set off by a
+divider because it opens an app screen instead of sending a key to the TV — see
+**Macros** below.
 
 Text entry is reached on demand: `t` opens a pop-up to type into rather than a
 field parked at the bottom of the remote. A row of **five custom buttons** sits
@@ -148,24 +151,26 @@ action.
 
 ![Configure a custom button](docs/screenshots/configure-custom-button.png)
 
-**Give a button an action.** In that same config pop-up, open **Action Type** and
-pick **Run Custom Script** to attach a shell script to the button. Choose **Script
-File** to point at a script on disk (it runs through the shell, so it needs no
-shebang or `chmod +x`, and a leading `~` is expanded), or **Inline Script** to type
-the script right there. A **Results** toggle decides what a run shows: **Don't Show** stays quiet on
-success and only raises an error notification if the script fails, while **Show**
-always opens a scrollable window with the exit code and the full output. A button's
-title and action are stored together at the same scope. Once a button has an action,
+**Give a button an action.** In that same config pop-up, **Action Type** offers two
+kinds of action: **Run Custom Script**, which attaches a shell script to the button,
+and **Run Macro**, which plays a recorded macro (see **Macros** below). Pick
+**Run Custom Script**, then choose **Script File** to point at a script on disk (it
+runs through the shell, so it needs no shebang or `chmod +x`, and a leading `~` is
+expanded), or **Inline Script** to type the script right there. A **Results** toggle
+decides what a run shows: **Don't Show** stays quiet on success and only raises an
+error notification if the script fails, while **Show** always opens a scrollable
+window with the exit code and the full output. A button's title and action are stored
+together at the same scope. Once a button has an action,
 **clicking it runs the script** instead of opening the config; to reconfigure it,
-press **`e`** (shown as **Edit** in the bottom bar) to arm edit-mode and then activate
-the button (by clicking it or pressing its shortcut) — that opens the config once,
-after which edit-mode clears. Press **`e`** again to leave edit-mode without changing
-anything. While edit-mode is armed the custom buttons highlight so you can tell it is
-on. Reopening a configured button's action shows its saved source, script, and
-Results settings filled in, so you pick up where you left off.
-Scripts run in the background so the remote never freezes, bounded by a fixed
-30-second timeout that kills a hung script. `REMOTE_IP` is set in the script's
-environment to the connected device's IP address.
+press **`e`** (shown as **Edit** in the bottom bar) to arm edit-mode and then
+activate the button (by clicking it or pressing its shortcut) — that opens the config
+once, after which edit-mode clears. Press **`e`** again to leave edit-mode without
+changing anything. While edit-mode is armed the custom buttons highlight so you can
+tell it is on. Reopening a configured button's action shows its saved source, script,
+and Results settings filled in, so you pick up where you left off. Scripts run in the
+background so the remote never freezes, bounded by a fixed 30-second timeout that
+kills a hung script. `REMOTE_IP` is set in the script's environment to the connected
+device's IP address.
 
 ![Configure a Run Custom Script action](docs/screenshots/run-custom-script.png)
 
@@ -182,51 +187,56 @@ same test sequence — a **macro** records that run of keys once, names it, and 
 it on demand.
 
 **Record one.** The top row's fourth button, **Macros** — set off by a divider,
-because it opens an app screen rather than sending a key to the TV — opens the list of
-saved macros. **Create Macro** first explains what is about to happen — you are going
-back to the remote and everything you do there is recorded — with **Cancel** to back out
-and a **Don't show this again** box for once you know the drill. **OK** hands you back the
-live remote and
-starts recording: the Macros button becomes **■ Stop** and a red `● RECORDING` appears
-on the right of the header bar, beside the device you are connected to, fading in and
-out for as long as the recording runs (recording adds no rows, so the remote still fits
-the same terminal).
-Everything you then do is captured in order — a key you click, a key you send by its
-shortcut, text you send through the `t` pop-up, and a custom button whose action
-runs. Press **■ Stop** to save the macro as `Macro 1`, `Macro 2`, … (the numbering
-never reuses a deleted name), or **Esc** to throw the recording away. A key the TV
-doesn't support and a send that failed are *not* recorded, so a macro only ever holds
-steps that really happened.
+because it opens an app screen rather than sending a key to the TV — opens the list
+of saved macros. **Create Macro** first explains what is about to happen — you are
+going back to the remote and everything you do there is recorded — with **Cancel** to
+back out and a **Don't show this again** box for once you know the drill. **OK**
+hands you back the live remote and starts recording: the Macros button becomes
+**■ Stop** and a red `● RECORDING` appears on the right of the header bar, beside the
+device you are connected to, fading in and out for as long as the recording runs
+(recording adds no rows, so the remote still fits the same terminal). Everything you
+then do is captured in order — a key you click, a key you send by its shortcut, text
+you send through the `t` pop-up, and a custom button whose action runs. Press
+**■ Stop** to save the macro as `Macro 1`, `Macro 2`, … (the numbering never reuses a
+deleted name), or **Esc** to throw the recording away. A key the TV doesn't support
+and a send that failed are *not* recorded, so a macro only ever holds steps that
+really happened.
+
+![The macros list](docs/screenshots/macros-list.png)
 
 **Edit one.** Enter on a macro in the list opens it. The name is editable, the steps
 are listed in order (`Key: HOME`, `Text: "…"`, `Pause: 500ms`, or a captured action's
 own name), and with a step selected you can move it **Up** or **Down**, **Remove**
 it, record one more step after it (**+ Step**, which returns you to the live remote
-for exactly one interaction), or insert a wait after it (**+ Pause**, in
-milliseconds — Enter on an existing pause step reopens the prompt to change it).
-Below the steps, **Default pause between steps (ms)** is the gap this macro leaves
-between one step and the next — 500ms to begin with, and its own value per macro, so
-pacing a slow app's macro doesn't slow every other one down. A **+ Pause** step waits
-its duration *on top of* that gap, for the places one screen takes noticeably longer.
-Every edit is a draft: **Save** writes it, **Run** closes the editor and plays the
-macro as it is *saved* (so save first if you want to try what you just changed),
-**Close** throws away everything you
-changed, and **Delete** removes the macro after you confirm — the prompt names the
-macro and starts on **Cancel**, and cancelling drops you back on the editor with your
-unsaved edits intact. Edits made before **+ Step** survive the trip out to the remote
-and back.
+for exactly one interaction), or insert a wait after it (**+ Pause**, in milliseconds
+— Enter on an existing pause step reopens the prompt to change it). Below the steps,
+**Default pause between steps (ms)** is the gap this macro leaves between one step
+and the next — 500ms to begin with, and its own value per macro, so pacing a slow
+app's macro doesn't slow every other one down. A **+ Pause** step waits its duration
+*on top of* that gap, for the places one screen takes noticeably longer. Every edit
+is a draft: **Save** writes it, **Run** closes the editor and plays the macro as it
+is *saved* (so save first if you want to try what you just changed), **Close** throws
+away everything you changed, and **Delete** removes the macro after you confirm — the
+prompt names the macro and starts on **Cancel**, and cancelling drops you back on the
+editor with your unsaved edits intact. Edits made before **+ Step** survive the trip
+out to the remote and back.
+
+![Editing a macro](docs/screenshots/macro-editor.png)
 
 **Play one.** **Run** in the editor plays the macro you have open. For a macro you
-reach for often, give a custom button the **Run Macro** action (**Action Type** → **Run
-Macro** → pick a macro) and activating that button plays it. The button stores the
-macro's identity, not a copy, so renaming or editing the macro changes what the
+reach for often, give a custom button the **Run Macro** action (**Action Type** →
+**Run Macro** → pick a macro) and activating that button plays it. The button stores
+the macro's identity, not a copy, so renaming or editing the macro changes what the
 button does. Playback opens a progress window naming the step it is on
 (`Step 3 of 12 (Text: "hello")`) with **Cancel**; the remote is frozen behind it so
-nothing of yours can interleave with the macro's own keys. **Cancel** or **Esc** stops it where it is. A step that fails — a key the TV
-lacks, an unreachable device, a script that exits non-zero — **aborts the run**: the
-later steps don't run, and one error names the macro, the step it stopped at, and
-why. A macro's later steps assume its earlier ones landed, so stopping at a legible
-failure beats sending the rest into whatever state the TV is actually in.
+nothing of yours can interleave with the macro's own keys. **Cancel** or **Esc**
+stops it where it is. A step that fails — a key the TV lacks, an unreachable device,
+a script that exits non-zero — **aborts the run**: the later steps don't run, and one
+error names the macro, the step it stopped at, and why. A macro's later steps assume
+its earlier ones landed, so stopping at a legible failure beats sending the rest into
+whatever state the TV is actually in.
+
+![Playing a macro](docs/screenshots/macro-playback.png)
 
 **On purpose, macros don't:**
 
@@ -308,8 +318,9 @@ The Keyboard Shortcuts screen itself:
 - **Secrets stay local.** Devices and pairing credentials live in
   `~/.config/universal-remote/devices.json` (or `$XDG_CONFIG_HOME`), written
   owner-only (`0600`) since the file holds credentials. App preferences (the
-  saved theme, custom keyboard shortcuts, and custom-button titles and actions)
-  live beside it in `settings.json`, created on first change.
+  saved theme, custom keyboard shortcuts, custom-button titles and actions, and
+  your recorded macros) live beside it in `settings.json`, created on first
+  change.
 
 ## Known limitations & future work
 
