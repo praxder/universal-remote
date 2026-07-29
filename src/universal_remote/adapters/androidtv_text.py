@@ -14,12 +14,18 @@ supply either value, so there is nothing to reuse. Every private member the app 
 — the protocol object, the inbound hook, and the send path — lives here, so a library
 upgrade breaks in one obvious, tested place rather than across the adapter.
 
-Known limit: the device reports a field gaining focus but never reports losing it, so
-state seen once is believed for the rest of the session. Text sent after the user
-navigates away carries a stale counter and the device drops it silently.
+A send is confirmed by the device's own echo. The device reports a field gaining focus
+but never reports losing it, so tracked state cannot be trusted to still be current: an
+edit built from a stale counter is discarded in silence, which would otherwise be
+reported to the user as a success. Every accepted edit produces a fresh field-state
+report within about 90ms while a discarded one produces nothing at all, so waiting for
+that report turns silent discards into an honest failure — on stale state, and on any
+device whose input method this recipe has not been verified against.
 """
 
 from __future__ import annotations
+
+import asyncio
 
 from androidtvremote2 import remotemessage_pb2 as pb
 from google.protobuf.message import DecodeError
@@ -28,6 +34,11 @@ from ..errors import TextUnsupportedError
 
 NO_FIELD_MESSAGE = "No text field is focused on this Android TV"
 EMPTY_TEXT_MESSAGE = "Text cannot be empty"
+NO_ACK_MESSAGE = "The Android TV discarded the text; its text field may have moved"
+
+# Seconds to wait for the device to echo an accepted edit. Observed echoes arrive in
+# 30–90ms; the margin is generous because it is only ever spent on a failing send.
+_ACK_TIMEOUT = 1.0
 
 
 def _reported_field(message: pb.RemoteMessage) -> pb.RemoteTextFieldStatus | None:
@@ -47,11 +58,14 @@ def _reported_field(message: pb.RemoteMessage) -> pb.RemoteTextFieldStatus | Non
 class AndroidTvText:
     """Sends Remote v2 text built from the device's most recent text-field report."""
 
-    def __init__(self, protocol) -> None:
+    def __init__(self, protocol, *, ack_timeout: float = _ACK_TIMEOUT) -> None:
         self._protocol = protocol
         self._counter: int | None = None  # None until the device reports a field
         self._editor_counter: int | None = None
         self._value = ""
+        self._ack_timeout = ack_timeout
+        # Set on every inbound field-state report, so a send can await its echo.
+        self._reported = asyncio.Event()
         self._observe_inbound()
 
     @property
@@ -59,8 +73,8 @@ class AndroidTvText:
         """Whether the device has reported a focused text field to send into."""
         return self._counter is not None
 
-    def send(self, text: str) -> None:
-        """Append `text` to the focused field; raises rather than sending nothing.
+    async def send(self, text: str) -> None:
+        """Append `text` to the focused field, waiting for the device to confirm it.
 
         With no field focused the device reports no counter, so any edit would be
         discarded silently — failing here says so instead. Empty text is refused as
@@ -71,7 +85,21 @@ class AndroidTvText:
             raise TextUnsupportedError(EMPTY_TEXT_MESSAGE)
         if self._counter is None:
             raise TextUnsupportedError(NO_FIELD_MESSAGE)
+        self._reported.clear()
         self._protocol._send_message(self._batch_edit(text))
+        await self._await_echo()
+
+    async def _await_echo(self) -> None:
+        """Wait for the device's report of the edit; its absence means it was dropped.
+
+        Any fresh report is the acknowledgement rather than one whose contents match
+        what was sent, because a field may transform what it stores — a masked entry
+        echoes no readable value — while a discarded edit draws no report at all.
+        """
+        try:
+            await asyncio.wait_for(self._reported.wait(), self._ack_timeout)
+        except asyncio.TimeoutError:
+            raise TextUnsupportedError(NO_ACK_MESSAGE) from None
 
     def _batch_edit(self, text: str) -> pb.RemoteMessage:
         """The edit the device accepts: live field counter, resulting cursor span."""
@@ -138,6 +166,7 @@ class AndroidTvText:
             # first accepted edit and by 1 on later ones, so no local step is right.
             self._counter = status.counter_field
             self._value = status.value
+            self._reported.set()
 
 
 def install_text(remote) -> AndroidTvText:

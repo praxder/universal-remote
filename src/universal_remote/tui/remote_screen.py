@@ -207,9 +207,12 @@ class TextEntryModal(ModalScreen[str | None]):
         """Send `text`, reporting whether the device actually received it."""
         try:
             await self._session.send_text(text)
-        except TextUnsupportedError:
+        except TextUnsupportedError as exc:
+            # Prefer the adapter's own reason: that no text field is focused on the TV
+            # is something the user can act on, which a generic line does not convey.
             self.app.notify(
-                "Text entry is not supported on this device", severity="warning"
+                str(exc) or "Text entry is not supported on this device",
+                severity="warning",
             )
             return False
         except Exception:

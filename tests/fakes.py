@@ -442,7 +442,7 @@ class FakeRemoteProtocol:
     is exercised against the library's real protobuf types.
     """
 
-    def __init__(self, ime_counter: int = 0) -> None:
+    def __init__(self, ime_counter: int = 0, echo: bool = True) -> None:
         # The library keeps this fresh from inbound batch edits; the seam reads it.
         self.ime_counter = ime_counter
         self.sent: list[pb.RemoteMessage] = []
@@ -451,6 +451,11 @@ class FakeRemoteProtocol:
         self.handled: list[bytes] = []
         # When set, sending raises it — stands in for a torn-down transport.
         self.send_error: Exception | None = None
+        # Whether an accepted edit is reported back the way the device reports one.
+        # False stands in for a device that discards the edit in silence.
+        self.echo = echo
+        self._echo_counter = 0
+        self._echo_value = ""
 
     def _handle_message(self, raw_msg: bytes) -> None:
         self.handled.append(raw_msg)
@@ -461,9 +466,28 @@ class FakeRemoteProtocol:
         if self.send_error is not None:
             raise self.send_error
         self.sent.append(msg)
+        if self.echo and msg.HasField("remote_ime_batch_edit"):
+            self._echo(msg.remote_ime_batch_edit)
+
+    def _echo(self, edit: pb.RemoteImeBatchEdit) -> None:
+        """Report the edit back the way the device reports one it accepted."""
+        inserted = edit.edit_info[0].text_field_status.value if edit.edit_info else ""
+        # The counter advances by an unpredictable step, so never by exactly one.
+        self.receive(
+            ime_show_request(self._echo_counter + 3, self._echo_value + inserted)
+        )
 
     def receive(self, message: pb.RemoteMessage) -> None:
         """Deliver `message` inbound exactly as the transport would."""
+        status = None
+        if message.remote_ime_key_inject.HasField("text_field_status"):
+            status = message.remote_ime_key_inject.text_field_status
+        elif message.remote_ime_show_request.HasField("remote_text_field_status"):
+            status = message.remote_ime_show_request.remote_text_field_status
+        if status is not None:
+            # Track what the device would now hold, so a later echo appends to it.
+            self._echo_counter = status.counter_field
+            self._echo_value = status.value
         self._handle_message(message.SerializeToString())
 
 

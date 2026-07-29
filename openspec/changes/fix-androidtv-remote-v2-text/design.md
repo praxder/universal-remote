@@ -82,6 +82,18 @@ The cursor span is current length plus inserted length, so appending correctly r
 
 Sending it produced an empty inbound batch edit that reset both counters to zero and tore down the IME session. It is a TV-to-client message. Recorded here because it reads like a reasonable way to ask the TV to open its keyboard, and it is actively destructive.
 
+### Confirm every send with the device's own echo
+
+The device reports a field gaining focus but never reports losing it, so tracked state cannot be assumed current. Once the user navigates away, an edit carries a counter the device no longer recognises and is discarded with no response at all — which the app would otherwise report as a success, the exact failure this change set out to remove.
+
+Every accepted edit produces a fresh field-state report within about 90ms, and a discarded one produces nothing. That asymmetry is the oracle every hardware trial here relied on, so the implementation uses it too: send, wait for a report, and raise text-unsupported if none arrives. This also covers vendors this recipe has not been verified against, so an unverified device fails honestly instead of silently.
+
+Any fresh report counts as the acknowledgement, rather than one whose contents match what was sent: a field may transform what it stores, and a masked entry echoes no readable value, while a discarded edit draws no report at all.
+
+*Alternative — retry with an incremented counter when no echo arrives:* rejected. Dropped edits are inert so a retry loop would be safe, but it guesses at a value the device already volunteers on the key-inject report.
+
+Cost: a text send becomes a round trip rather than fire-and-forget. Measured at 30–90ms on the verified device, against a one-second ceiling that is only ever spent on a send that failed.
+
 ### Report text as unsupported when no field is focused
 
 With nothing focused the TV reports no text-field status, so there is no counter to send and any edit is discarded silently. The session raises the existing text-unsupported error instead, which the remote surface already presents. This replaces the old "ADB text unavailable" status with a condition that is both accurate and actionable.

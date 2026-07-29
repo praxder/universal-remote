@@ -47,7 +47,7 @@ Not an implementation task: the live `androidtv-adapter` spec's Purpose line sti
 - [x] 7.1 Run `ruff format` and `ruff check`, fixing what they report
 - [x] 7.2 Run the full `pytest` suite and confirm it is green
 - [x] 7.3 Verify on real hardware that text lands in the Google TV launcher search box with the device's developer mode and wireless debugging switched **off**, and that two consecutive sends both land
-- [ ] 7.4 Verify that sending text with no field focused surfaces a text-unsupported status rather than appearing to succeed
+- [x] 7.4 Verify that sending text with no field focused surfaces a text-unsupported status rather than appearing to succeed
 - [ ] 7.5 Verify Fire TV text still works, confirming the narrowed helper did not disturb it
 - [x] 7.6 Run `openspec validate fix-androidtv-remote-v2-text --strict` and confirm it passes
 
@@ -60,3 +60,12 @@ Hardware verification found text landing on the launcher search box but silently
 - [x] 8.3 Correct the design's field table, its app-text-field non-goal, and the spec delta, which all recorded the inbound counter as correct
 - [x] 8.4 Verify on real hardware that text lands in an app's own text field, and that consecutive sends append
 - [x] 8.5 Re-verify the launcher search box for regression
+
+## 9. Confirm sends with the device's echo (found during 7.4 verification)
+
+Verifying 7.4 exposed a second silent-success path: the device never reports a field losing focus, so text sent after the user navigates away carried a stale counter, was discarded without response, and was reported as delivered. The device's field-state report after an accepted edit is used as an acknowledgement instead.
+
+- [x] 9.1 Write failing tests that a send the device does not report raises text-unsupported, that the edit was still put on the wire, and that a reported send succeeds
+- [x] 9.2 Make the seam's send await the device's report, with an injectable timeout so tests do not sit out the real one
+- [x] 9.3 Add the confirmation requirement and its scenario to the spec delta, and the decision and its cost to the design
+- [ ] 9.4 Verify on hardware that a send lands while a field is focused and reports text-unsupported after navigating away from it

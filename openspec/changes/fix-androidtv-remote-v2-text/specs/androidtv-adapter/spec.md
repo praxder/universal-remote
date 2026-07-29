@@ -13,6 +13,8 @@ The adapter SHALL NOT send the device's field-state report back to the device, b
 
 When no text field is focused the device reports no field state, so the adapter SHALL report text as unsupported rather than sending an edit the device would silently discard. The adapter SHALL also report text as unsupported when a send otherwise fails, rather than silently discarding the text.
 
+Because the device reports a text field gaining focus but never reports losing it, the adapter SHALL treat a send as delivered only once the device reports the resulting field state, and SHALL report text as unsupported when no such report arrives. Without that confirmation an edit built from state the device has since moved on from would be discarded in silence and reported to the user as a success.
+
 #### Scenario: Text unsupported reported
 - **WHEN** a text send fails
 - **THEN** the session reports text-unsupported so the caller can inform the user
@@ -36,6 +38,11 @@ When no text field is focused the device reports no field state, so the adapter 
 - **WHEN** two text sends are made in succession to the same focused field
 - **THEN** the second send's cursor span accounts for the text the first send added
 - **AND** the field ends up containing both sends' text in order
+
+#### Scenario: A discarded edit is reported rather than appearing to succeed
+- **WHEN** text is sent and the device does not report the resulting field state
+- **THEN** the session reports text-unsupported
+- **AND** the caller is not told the text was delivered
 
 #### Scenario: No focused text field reports text unsupported
 - **WHEN** text is sent and the device has reported no focused text field

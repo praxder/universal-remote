@@ -133,7 +133,7 @@ class AndroidTvSession(BaseSession):
 
     async def _dispatch_text(self, text: str) -> None:
         try:
-            self._text.send(text)  # synchronous, like the library's own send path
+            await self._text.send(text)  # waits for the device to confirm the edit
         except TextUnsupportedError:
             raise  # already says why, e.g. that no text field is focused
         except Exception as exc:
