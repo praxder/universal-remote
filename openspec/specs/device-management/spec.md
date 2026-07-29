@@ -23,11 +23,6 @@ The system SHALL persist saved devices and their pairing credentials to a local 
 - **WHEN** a device with a reconnection identifier is saved and later loaded
 - **THEN** the loaded device carries the same identifier value
 
-#### Scenario: ADB text opt-in round-trips
-- **WHEN** an Android TV device opted into ADB text is saved and later loaded
-- **THEN** the loaded device is still opted into ADB text
-- **AND** a stored entry with no ADB opt-in field loads with the opt-in treated as off
-
 #### Scenario: Missing identifier tolerated on load
 - **WHEN** the store file contains a device entry with no reconnection identifier
 - **THEN** the device loads successfully with its identifier treated as absent
