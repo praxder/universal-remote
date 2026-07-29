@@ -2,6 +2,77 @@
 
 <!-- version list -->
 
+## v1.4.0 (2026-07-29)
+
+### Bug Fixes
+
+- **tui**: Bound Android TV connect and handle unsupported-platform devices
+  ([`3c9d8a6`](https://github.com/praxder/universal-remote/commit/3c9d8a60b6ee431d5d180d02b2e19324d5151fc0))
+
+- **tui**: Make delete buttons use default styling
+  ([`33feccf`](https://github.com/praxder/universal-remote/commit/33feccf59cd6e2d2de73b67234c5696bccefb030))
+
+- **tui**: Reject lone-modifier keyboard shortcuts
+  ([`e50aa4a`](https://github.com/praxder/universal-remote/commit/e50aa4ae0a844f9625489913012214d4a638c57d))
+
+- **tui**: Stop the docked settings bar from swallowing menu clicks
+  ([`4f1a864`](https://github.com/praxder/universal-remote/commit/4f1a8642bcbf8bc70daf17673d43b23ffc127865))
+
+### Chores
+
+- **openspec**: Archive reject-lone-modifier-shortcuts and sync specs
+  ([`2973455`](https://github.com/praxder/universal-remote/commit/2973455a214153cb22ba9b93865cff43fc6823a8))
+
+### Documentation
+
+- **macros**: Promote macros spec deltas and archive the change
+  ([`ae5f3b1`](https://github.com/praxder/universal-remote/commit/ae5f3b11dc8665dcb18600143523a017db6f2cd9))
+
+- **macros**: Updated docs and screenshots for macros
+  ([`4d7fd94`](https://github.com/praxder/universal-remote/commit/4d7fd942ffc3bd0b815157a61ef2607c778c5548))
+
+- **openspec**: Abort macro playback on a failed step
+  ([`a7b8b8f`](https://github.com/praxder/universal-remote/commit/a7b8b8ffb3fa837e578dd86b1f96d5d9a29aadef))
+
+- **openspec**: Propose macros capability
+  ([`aadf3b1`](https://github.com/praxder/universal-remote/commit/aadf3b16a50f9dcb3813d08ffaa849fea61e8293))
+
+- **openspec**: Propose rejecting lone-modifier shortcuts
+  ([`1f2b95f`](https://github.com/praxder/universal-remote/commit/1f2b95f286f7e351ab58638adb5422c945c9a264))
+
+- **openspec**: Reconcile specs with implementation and fill Purpose stubs
+  ([`cd2b9d1`](https://github.com/praxder/universal-remote/commit/cd2b9d1d27db355f7ba58a0732f0378fd124b147))
+
+### Features
+
+- **tui**: Confirm before deleting a macro
+  ([`55cc648`](https://github.com/praxder/universal-remote/commit/55cc64816abb6c8ebaa1dc056029c9a7d7bbd6dd))
+
+- **tui**: Explain the recording state before it starts
+  ([`b31e466`](https://github.com/praxder/universal-remote/commit/b31e466c77b10004f14a257672dd89f394681cee))
+
+- **tui**: Give the macro detail modal room to breathe
+  ([`ea75e17`](https://github.com/praxder/universal-remote/commit/ea75e171f693d7f074d75c27fe98b97759b115f8))
+
+- **tui**: Mark Macros as an app control, not a key
+  ([`d52159a`](https://github.com/praxder/universal-remote/commit/d52159a51239bdd099f3dc0f26976aa1ff5c46df))
+
+- **tui**: Name the step in the playback progress line
+  ([`ad082b3`](https://github.com/praxder/universal-remote/commit/ad082b31223c47ab89c67609981b853190d28a52))
+
+- **tui**: Pace each macro with its own default pause
+  ([`e2b4f47`](https://github.com/praxder/universal-remote/commit/e2b4f47f311ae035cbf28418f4f60cbeccaa2bf4))
+
+- **tui**: Pulse the recording indicator while a macro records
+  ([`e834611`](https://github.com/praxder/universal-remote/commit/e834611945067789691e9b680f8d69683baa8be2))
+
+- **tui**: Record and replay macros
+  ([`6ffc81d`](https://github.com/praxder/universal-remote/commit/6ffc81df15feab35a1de022ca6b84018c4f82564))
+
+- **tui**: Run a macro from its detail modal
+  ([`35b9f41`](https://github.com/praxder/universal-remote/commit/35b9f41914d27f5785ae184e09de075e7fee4d85))
+
+
 ## v1.3.0 (2026-07-24)
 
 ### Bug Fixes
