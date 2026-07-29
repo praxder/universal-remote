@@ -178,7 +178,7 @@ The chain has six links and one of them silently eats data. Complete it end to e
       footer cannot fit. Consider doing this alongside 4.1 rather than last, since the
       catalog test will fail as soon as the count changes.
 - [x] 10.3 Preflight: run the formatter, fix all lint findings, and run the full suite.
-- [ ] 10.4 Verify against the specs by hand on a real device — record a macro, edit it,
+- [x] 10.4 Verify against the specs by hand on a real device — record a macro, edit it,
       assign it to a custom button, play it, and cancel a play mid-run.
 
 ## 11. Confirm before deleting a macro
