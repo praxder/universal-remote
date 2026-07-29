@@ -68,4 +68,4 @@ Verifying 7.4 exposed a second silent-success path: the device never reports a f
 - [x] 9.1 Write failing tests that a send the device does not report raises text-unsupported, that the edit was still put on the wire, and that a reported send succeeds
 - [x] 9.2 Make the seam's send await the device's report, with an injectable timeout so tests do not sit out the real one
 - [x] 9.3 Add the confirmation requirement and its scenario to the spec delta, and the decision and its cost to the design
-- [ ] 9.4 Verify on hardware that a send lands while a field is focused and reports text-unsupported after navigating away from it
+- [x] 9.4 Verify on hardware that a send lands while a field is focused and reports text-unsupported after navigating away from it

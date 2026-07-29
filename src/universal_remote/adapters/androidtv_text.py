@@ -34,7 +34,9 @@ from ..errors import TextUnsupportedError
 
 NO_FIELD_MESSAGE = "No text field is focused on this Android TV"
 EMPTY_TEXT_MESSAGE = "Text cannot be empty"
-NO_ACK_MESSAGE = "The Android TV discarded the text; its text field may have moved"
+NO_ACK_MESSAGE = (
+    "The Android TV discarded the text — refocus the text field, then retry"
+)
 
 # Seconds to wait for the device to echo an accepted edit. Observed echoes arrive in
 # 30–90ms; the margin is generous because it is only ever spent on a failing send.
