@@ -219,10 +219,6 @@ class TextEntryModal(ModalScreen[str | None]):
                 "Text entry failed — the device may be unreachable", severity="warning"
             )
             return False
-        # An opted-in ADB send that fell back to Remote v2 flags itself; say so
-        # rather than leaving the user wondering why setup made no change.
-        if getattr(self._session, "adb_text_unavailable", False):
-            self.app.notify("ADB text unavailable — sent over the standard path")
         return True
 
     def action_cancel(self) -> None:

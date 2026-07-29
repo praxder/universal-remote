@@ -5,48 +5,13 @@ from __future__ import annotations
 import asyncio
 from ipaddress import ip_address
 
+from androidtvremote2 import remotemessage_pb2 as pb
 from pyatv.const import Protocol
 
-from universal_remote.adapters.adb_text import AdbResult, AdbText
 from universal_remote.capabilities import Capabilities
 from universal_remote.errors import PairingCancelledError
 from universal_remote.keys import Key
 from universal_remote.session import BaseSession
-
-# A realistic `adb mdns services` listing: the device answers on both the
-# tls-connect and tls-pairing services, so a resolver must pick the connect row.
-FAKE_MDNS_SERVICES = (
-    "List of discovered mdns services\n"
-    "adb-99000-abcdef\t_adb-tls-connect._tcp.\t10.0.0.5:37451\n"
-    "adb-99000-abcdef\t_adb-tls-pairing._tcp.\t10.0.0.5:42133\n"
-    "adb-11111-zzzzzz\t_adb-tls-connect._tcp.\t10.0.0.9:40100\n"
-)
-
-
-class FakeAdbRunner:
-    """Stands in for an `AdbRunner`; records argv and returns canned results.
-
-    `mdns_output` answers `adb mdns services`; `fail` holds the leading argument of
-    commands that should exit non-zero (e.g. "connect" for an unreachable device,
-    "pair" for a rejected pairing), so a test drives fallback paths without a real TV.
-    """
-
-    def __init__(self, mdns_output: str = "", fail: set[str] | None = None) -> None:
-        self.calls: list[list[str]] = []
-        self._mdns_output = mdns_output
-        self._fail = fail or set()
-
-    async def __call__(self, args: list[str]) -> AdbResult:
-        self.calls.append(args)
-        if args[:2] == ["mdns", "services"]:
-            return AdbResult(0, self._mdns_output)
-        returncode = 1 if args and args[0] in self._fail else 0
-        return AdbResult(returncode, "")
-
-
-def fake_adb_text(mdns_output: str = "", fail: set[str] | None = None) -> AdbText:
-    """An `AdbText` bound to a `FakeAdbRunner`, exposed for adapter-level tests."""
-    return AdbText(FakeAdbRunner(mdns_output=mdns_output, fail=fail))
 
 
 class FakeSession(BaseSession):
@@ -63,9 +28,6 @@ class FakeSession(BaseSession):
         # The text-entry counterpart: when set, sending text raises it, standing in
         # for an unexpected device-side text failure the remote must survive.
         self.text_dispatch_error: Exception | None = None
-        # Mirrors AndroidTvSession's fallback flag: a test sets it True to stand in
-        # for a text send that fell back off the ADB path so the remote's status shows.
-        self.adb_text_unavailable = False
 
     async def _dispatch_key(self, key: Key) -> None:
         if self.dispatch_error is not None:
@@ -426,13 +388,93 @@ class FakePyatv:
         return self.atv
 
 
+def ime_show_request(counter: int, value: str) -> pb.RemoteMessage:
+    """The device's field-state report, sent after every edit from any source."""
+    message = pb.RemoteMessage()
+    status = message.remote_ime_show_request.remote_text_field_status
+    status.counter_field = counter
+    status.value = value
+    status.start = len(value)
+    status.end = len(value)
+    return message
+
+
+def ime_key_inject(
+    counter: int,
+    value: str,
+    app_counter: int = 1,
+    package: str = "com.example.app",
+) -> pb.RemoteMessage:
+    """The device's report when a text field gains focus.
+
+    Carries both the field's state and the focused editor's own counter
+    (`app_info.counter`), which is the value an edit's `ime_counter` must match.
+    """
+    message = pb.RemoteMessage()
+    inject = message.remote_ime_key_inject
+    inject.app_info.app_package = package
+    inject.app_info.counter = app_counter
+    status = inject.text_field_status
+    status.counter_field = counter
+    status.value = value
+    status.start = len(value)
+    status.end = len(value)
+    return message
+
+
+def foreground_app(package: str, app_counter: int = 1) -> pb.RemoteMessage:
+    """A key-inject carrying only the foreground app — no text field is focused.
+
+    What the device sends in an app whose text field cannot be focused over Remote
+    v2 (YouTube's search box), so field state must not be inferred from this.
+    """
+    message = pb.RemoteMessage()
+    message.remote_ime_key_inject.app_info.app_package = package
+    message.remote_ime_key_inject.app_info.counter = app_counter
+    return message
+
+
+class FakeRemoteProtocol:
+    """Stands in for `androidtvremote2`'s `RemoteProtocol`, the text seam's contact point.
+
+    Records outbound messages and delivers inbound ones the way the real transport
+    does — serialized bytes through `_handle_message` — so a seam that taps that hook
+    is exercised against the library's real protobuf types.
+    """
+
+    def __init__(self, ime_counter: int = 0) -> None:
+        # The library keeps this fresh from inbound batch edits; the seam reads it.
+        self.ime_counter = ime_counter
+        self.sent: list[pb.RemoteMessage] = []
+        # Raw bytes the library's own handler received, so a tap that swallows
+        # inbound messages (breaking ping replies and key state) is caught.
+        self.handled: list[bytes] = []
+        # When set, sending raises it — stands in for a torn-down transport.
+        self.send_error: Exception | None = None
+
+    def _handle_message(self, raw_msg: bytes) -> None:
+        self.handled.append(raw_msg)
+
+    def _send_message(
+        self, msg: pb.RemoteMessage, should_debug_log: bool = True
+    ) -> None:
+        if self.send_error is not None:
+            raise self.send_error
+        self.sent.append(msg)
+
+    def receive(self, message: pb.RemoteMessage) -> None:
+        """Deliver `message` inbound exactly as the transport would."""
+        self._handle_message(message.SerializeToString())
+
+
 class FakeAndroidTvRemote:
     """Stands in for `androidtvremote2.AndroidTVRemote`; drives pairing and records sends.
 
     `async_generate_cert_if_missing` writes cert and key files to the constructed
     paths exactly as the real library does, so the adapter's pair flow reads them
-    back to build the credential. Key and text sends are synchronous, matching the
-    library, and `disconnect` is idempotent.
+    back to build the credential. Key sends are synchronous, matching the library,
+    and `disconnect` is idempotent. The protocol object appears only once connected,
+    as it does in the library, so the text seam cannot be installed before then.
     """
 
     def __init__(
@@ -442,7 +484,6 @@ class FakeAndroidTvRemote:
         keyfile: str,
         host: str,
         connect_error: Exception | None = None,
-        reject_text: bool = False,
     ) -> None:
         self.client_name = client_name
         self.certfile = certfile
@@ -454,12 +495,10 @@ class FakeAndroidTvRemote:
         self.connected = False
         self.disconnected = False
         self.sent_keys: list[str] = []
-        self.sent_text: list[str] = []
+        self._remote_message_protocol: FakeRemoteProtocol | None = None
         # When set, async_connect raises it — an unreachable, refused, timed-out,
         # or unauthorized device (the real library's CannotConnect/InvalidAuth).
         self.connect_error = connect_error
-        # When True, send_text raises — stands in for an unfocused IME.
-        self.reject_text = reject_text
 
     async def async_generate_cert_if_missing(self) -> bool:
         # Multi-line PEM shape (like the real library), so a credential packed from
@@ -485,14 +524,10 @@ class FakeAndroidTvRemote:
         if self.connect_error is not None:
             raise self.connect_error
         self.connected = True
+        self._remote_message_protocol = FakeRemoteProtocol()
 
     def send_key_command(self, key_code, direction=3) -> None:
         self.sent_keys.append(key_code)
-
-    def send_text(self, text: str) -> None:
-        if self.reject_text:
-            raise RuntimeError("no focused IME")
-        self.sent_text.append(text)
 
     def disconnect(self) -> None:
         self.disconnected = True
@@ -504,13 +539,8 @@ class FakeAndroidTvRemoteFactory:
     Pairing and connect each construct one remote; `remotes[-1]` is the latest.
     """
 
-    def __init__(
-        self,
-        connect_error: Exception | None = None,
-        reject_text: bool = False,
-    ) -> None:
+    def __init__(self, connect_error: Exception | None = None) -> None:
         self.connect_error = connect_error
-        self.reject_text = reject_text
         self.remotes: list[FakeAndroidTvRemote] = []
 
     def __call__(
@@ -522,7 +552,6 @@ class FakeAndroidTvRemoteFactory:
             keyfile,
             host,
             connect_error=self.connect_error,
-            reject_text=self.reject_text,
         )
         self.remotes.append(remote)
         return remote
@@ -543,19 +572,10 @@ class FakeAdapter:
         pair_identifier: str | None = None,
         requires_pairing: bool = True,
         reachability_port: int | None = None,
-        adb_pair_result: bool = True,
-        supports_adb_text: bool = False,
     ) -> None:
         self.platform = platform
         self.display_name = display_name or platform
         self.requires_pairing = requires_pairing
-        # Whether this adapter offers the ADB text path (only Android TV does in
-        # production); gates the Add/Edit text-input toggle. Off by default so
-        # non-ADB device-form tests see no toggle.
-        self.supports_adb_text = supports_adb_text
-        # Scriptable ADB-text pairing; `adb_pair_calls` records the (address, code).
-        self.adb_pair_result = adb_pair_result
-        self.adb_pair_calls: list[tuple[str, str]] = []
         # None mirrors an adapter that declares no port (device stays unknown).
         self.reachability_port = reachability_port
         self._capabilities = capabilities or Capabilities(
@@ -599,10 +619,6 @@ class FakeAdapter:
         self.sessions.append(session)
         return session
 
-    async def pair_adb(self, address: str, code: str) -> bool:
-        self.adb_pair_calls.append((address, code))
-        return self.adb_pair_result
-
 
 class FakeDiscoverAdapter:
     """An adapter double that discovers canned devices, optionally gated mid-scan.
@@ -618,14 +634,11 @@ class FakeDiscoverAdapter:
         display_name: str | None = None,
         devices: list | None = None,
         gate: asyncio.Event | None = None,
-        supports_adb_text: bool = False,
     ) -> None:
         self.platform = platform
         self.display_name = display_name or platform
         self._devices = devices or []
         self.gate = gate
-        # Whether adding this type offers the ADB text path (gates the post-add hint).
-        self.supports_adb_text = supports_adb_text
 
     async def discover(self, timeout: float) -> list:
         if self.gate is not None:

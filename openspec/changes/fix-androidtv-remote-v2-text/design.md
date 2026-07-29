@@ -6,14 +6,18 @@ Protocol tracing against a Chromecast/Google TV (remote service 6.9.906821247, A
 
 | Batch-edit field | Value the TV accepts | What `send_text` sends |
 | --- | --- | --- |
-| `ime_counter` | the counter from the inbound batch edit | same — correct |
+| `ime_counter` | the **live** `app_info.counter` of the focused editor | the inbound batch edit's ime counter — wrong |
 | `field_counter` | the **live** counter from the TV's text-field status | the inbound batch edit's field counter — wrong |
 | `edit_info.text_field_status.start` / `.end` | current field length + inserted length | `len(text) - 1`, ignoring current contents — wrong |
 | `edit_info.insert` | `1` | same — correct |
 
-The inbound batch edit's own field counter stayed at `1` permanently and is not the per-edit counter. The counter the TV wants arrives on its text-field status, which reaches the client two ways: on the IME key-inject message when a field gains focus, and on the **IME show-request message after every edit from any source** — including edits made with the physical remote. `androidtvremote2` logs that show-request as `Unhandled:` and drops it.
+The inbound batch edit is a fixed `{ime_counter: 1, field_counter: 1}` greeting, not live state — both of its counters were `1` on every surface traced, on the launcher and inside an app alike. Neither is the per-edit value.
 
-So the two wrong values cannot be corrected by patching the outgoing message alone. The client must first consume a message the library ignores. That is the whole shape of this change.
+Both live values arrive on messages the library drops. The field counter rides on the TV's text-field status, which reaches the client two ways: on the IME key-inject message when a field gains focus, and on the **IME show-request message after every edit from any source** — including edits made with the physical remote. The editor's own counter rides on `app_info.counter` on that same key-inject message. `androidtvremote2` logs the show-request as `Unhandled:` and reads only the app package off the key-inject.
+
+So the three wrong values cannot be corrected by patching the outgoing message alone. The client must first consume messages the library ignores. That is the whole shape of this change.
+
+The greeting's `ime_counter` of `1` happens to be correct on the launcher search box, whose editor counter is also `1`. That coincidence is why the first version of this change worked there and silently failed everywhere else.
 
 Evidence, probe, and full trace set: session scratchpad `FINDINGS.md` and `ime_probe.py` with `run_A`…`run_L`.
 
@@ -28,7 +32,7 @@ Evidence, probe, and full trace set: session scratchpad `FINDINGS.md` and `ime_p
 
 **Non-Goals:**
 
-- Making text work in third-party app text fields. YouTube's search field cannot be focused at all while a Remote v2 client is connected — the TV reports the foreground app but never a text-field status — so no client-side change reaches it, and the ADB path did not reach it either.
+- Making text work in text fields that the TV never reports. YouTube's search field cannot be focused at all while a Remote v2 client is connected — the TV reports the foreground app but never a text-field status — so no client-side change reaches it, and the ADB path did not reach it either. Fields the TV *does* report are in scope and do work: an app's own field (`org.rightnow.kids.tv.androidtv`, an email input) was verified accepting text once the editor counter was read correctly.
 - Fixing `androidtvremote2` upstream. Worth doing with the traces as evidence, but this change must not wait on a release.
 - Surfacing the field read-back described below.
 - Any Fire TV behaviour change.
@@ -50,6 +54,21 @@ The implementation needs the protocol object hanging off `AndroidTVRemote`, a wa
 Rationale: the coupling is real and cannot be avoided, so the useful move is to make it one small, obvious, tested surface that breaks loudly in one place on a library upgrade — rather than spreading private attribute access through the adapter and session.
 
 *Alternative — put it inline in `androidtv.py`:* rejected. Mixes protocol archaeology with adapter wiring and makes the private-API surface hard to see when upgrading the dependency.
+
+### Take the IME counter from the focused editor, not the inbound batch edit
+
+The TV matches an edit's `ime_counter` against the focused editor's own counter, reported as `app_info.counter` on the key-inject message. Isolated trials on one device, one variant per fresh connection, judged by the TV's echo:
+
+| Surface | `app_info.counter` | sent `1` | sent `2` | sent `20` |
+| --- | --- | --- | --- | --- |
+| Launcher search (`katniss`, `launcherx`) | 1 | accepted ×5 | — | — |
+| App email field (`…kids.tv.androidtv`) | 2 | **dropped** ×2 | accepted ×7 | **dropped** |
+
+This rules out the alternatives: not the inbound greeting (a constant `1` on both surfaces), not a fixed offset (the two surfaces need opposite offsets), and not "any sufficiently large value" — `20` was dropped on the same field where `2` was accepted, so it is an equality match. A later session on that field reported `app_info.counter` as `20` and accepted `20`, which a `+1` rule would have failed.
+
+*Alternative — send, wait for the echo, retry with an incremented counter:* rejected. Dropped edits are inert so a retry loop is safe, but it makes every send wait on a round trip and guesses at a value the TV already volunteers.
+
+When no key-inject has been seen, the library's tracked value is used. That is the greeting's `1`, which is correct for the launcher — so the fallback preserves the surface that already worked rather than refusing to send.
 
 ### Re-read the field counter on every send; never increment it
 

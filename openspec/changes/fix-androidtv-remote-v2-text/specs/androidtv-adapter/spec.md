@@ -5,6 +5,8 @@ The Android TV adapter SHALL send text to the device over the Remote v2 input-me
 
 The adapter SHALL build each text edit from the device's most recently reported text-field state: the edit's field counter SHALL be the counter the device reports on that state and SHALL be re-read for every send rather than derived by incrementing a previous value, and the edit's cursor span SHALL be the position resulting from the send — the field's current contents plus the text being sent — so that consecutive sends append rather than overwrite.
 
+The edit's input-method counter SHALL be the focused editor's own counter, which the device reports alongside the foreground application, rather than the counter the device carries on its inbound batch edit — that value is a fixed greeting rather than live state, and matches the editor's counter only on the device's own launcher. It SHALL likewise be re-read for every send, so moving to another application's text field does not reuse a stale value.
+
 The adapter SHALL keep that state current by observing the device's own reports of its focused text field, which the device sends whenever the field changes from any source, including edits made with the physical remote.
 
 The adapter SHALL NOT send the device's field-state report back to the device, because doing so causes the device to discard the input-method session.
@@ -24,6 +26,11 @@ When no text field is focused the device reports no field state, so the adapter 
 - **WHEN** the device reports a new text-field state and text is then sent
 - **THEN** the edit carries the field counter from that latest report
 - **AND** the adapter does not increment a previously used counter to derive it
+
+#### Scenario: Input-method counter is taken from the focused editor
+- **WHEN** the device reports a focused editor whose counter differs from the one on its inbound batch edit, and text is then sent
+- **THEN** the edit carries the focused editor's reported counter
+- **AND** text sent into an application's own text field is accepted rather than silently discarded
 
 #### Scenario: Consecutive sends append
 - **WHEN** two text sends are made in succession to the same focused field

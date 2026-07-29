@@ -327,8 +327,10 @@ The Keyboard Shortcuts screen itself:
 **Platform quirks**
 
 - **Text entry is best-effort on every platform.** Samsung `SendInputString`, LG
-  `insertText`, and ADB `input text` support all vary by app and firmware; a
-  failed send reports "not supported" rather than silently dropping input.
+  `insertText`, Android TV's Remote v2 input method, and ADB `input text` support
+  all vary by app and firmware; a failed send reports "not supported" rather than
+  silently dropping input. Android TV in particular needs a text field already
+  focused on the TV — with nothing focused it reports "not supported" instead.
 - **Power-on is best-effort.** A TV that's off is woken with a Wake-on-LAN magic
   packet to its stored MAC, which requires the TV's "Wake on LAN / Network
   Standby" setting to be enabled (off by default on many sets). Power-**off** is
@@ -337,9 +339,6 @@ The Keyboard Shortcuts screen itself:
   lacks it); Roku exposes only a single play/pause toggle with no number pad or
   menu key; Fire TV has no channel keys (no tuner).
 - **Fire TV needs ADB debugging** enabled on the TV before it can be controlled.
-- **Android TV ADB text path** (an opt-in that fixes typing under the "use your
-  phone's keyboard" overlay) needs the external `adb` binary and can't send
-  non-ASCII characters.
 
 **Distribution**
 
