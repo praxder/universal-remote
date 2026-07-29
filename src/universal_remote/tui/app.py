@@ -164,6 +164,13 @@ class UniversalRemoteApp(App[None]):
         # on mount and read by the remote to label its custom buttons. Resolution lives
         # in `tui.custom_buttons`.
         self.custom_buttons: dict = {}
+        # The saved macro registry (`next_number` plus `items` keyed by macro id),
+        # populated from the saved preferences on mount. Read by the macros modals and
+        # by macro playback; the registry operations live in `macros.registry`.
+        self.macros: dict = {}
+        # True once the user has asked not to see the pre-recording hint again; read by
+        # the remote before it presents the hint on Create Macro.
+        self.hide_recording_hint = False
         # Set true only once our own mount handler has run, so the safety net can
         # tell a post-mount error (stay open) from a startup/compose/mount failure
         # (fall through). See `_handle_exception`.
@@ -199,12 +206,19 @@ class UniversalRemoteApp(App[None]):
         self.persist_preferences()
 
     def persist_preferences(self) -> None:
-        """Write the current theme, shortcuts, and custom buttons together, best-effort."""
+        """Write every preference together, best-effort.
+
+        Each field must be named here: this rebuilds `Preferences` from keyword
+        arguments and `watch_theme` calls it on every theme change, so omitting one
+        (say `macros=`) would silently erase it whenever the theme changed.
+        """
         self.preferences.save(
             Preferences(
                 theme=self.theme,
                 shortcuts=dict(self.shortcut_overrides),
                 custom_buttons=self.custom_buttons,
+                macros=self.macros,
+                hide_recording_hint=self.hide_recording_hint,
             )
         )
 
@@ -237,6 +251,9 @@ class UniversalRemoteApp(App[None]):
         self.shortcut_overrides.update(kept)
         # Load saved custom-button titles the same way, before any remote is opened.
         self.custom_buttons.update(preferences.custom_buttons)
+        # Load the saved macro registry, before the macros list can be opened.
+        self.macros.update(preferences.macros)
+        self.hide_recording_hint = preferences.hide_recording_hint
         # Ignore a saved theme that is no longer registered (e.g. removed by a
         # Textual upgrade) so `_validate_theme` cannot raise; the default stands.
         if preferences.theme in self.available_themes:

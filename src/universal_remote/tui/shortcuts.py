@@ -128,6 +128,10 @@ CATALOG: list[Action] = [
     Action("remote.text", "Text", Scope.REMOTE, "t", "text_mode"),
     # Remote — activate a custom button (same effect as clicking it); no default key.
     *(_custom_activation(index) for index in range(1, 6)),
+    # Remote — open the macros list, exactly as clicking the Macros button does. No
+    # default key and kept out of the footer: the 80-column footer has no room for a
+    # further hint, so the button carries the affordance (as Go Back already does).
+    Action("remote.macros", "Macros", Scope.REMOTE, "", "macros", show=False),
     # Remote — toggle edit-mode: press `e` to arm it (the next custom-button
     # activation opens its config instead of running its action) and `e` again to
     # disarm it. Reserved so `e` can't be reassigned. Shown in the footer as the short

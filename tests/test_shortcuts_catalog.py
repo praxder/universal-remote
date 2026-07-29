@@ -30,6 +30,10 @@ _TWELVE_CLICK_ONLY = {
 # click, not device keys, and start with no shortcut.
 _FIVE_CUSTOM = {f"remote.custom_{index}" for index in range(1, 6)}
 
+# The Macros action: rebindable, opens the macros list rather than sending a key, and
+# starts with no shortcut.
+_MACROS = {"remote.macros"}
+
 
 def _by_id():
     return {action.id: action for action in CATALOG}
@@ -59,15 +63,26 @@ class TestRebindableCatalog:
         assert go_back.default_key == "escape"
         assert go_back.editable
 
-    def test_given_the_catalog_when_read_then_there_are_31_rebindable_remote_actions(
+    def test_given_the_catalog_when_read_then_there_are_32_rebindable_remote_actions(
         self,
     ):
         rebindable_remote = [
             a for a in CATALOG if a.scope is Scope.REMOTE and a.editable
         ]
 
-        # 26 device actions + 5 custom-button activation actions.
-        assert len(rebindable_remote) == 31
+        # 26 device actions + 5 custom-button activation actions + the Macros action.
+        assert len(rebindable_remote) == 32
+
+    def test_given_the_catalog_when_read_then_macros_has_no_default_key_or_hint(self):
+        # The Macros action opens the macros list like clicking the button. It starts
+        # unbound and stays out of the footer — a further hint does not fit the
+        # supported 80-column width.
+        macros = _by_id()["remote.macros"]
+
+        assert macros.scope is Scope.REMOTE
+        assert macros.editable
+        assert macros.default_key == ""
+        assert macros.show is False
 
     def test_given_the_catalog_when_read_then_each_entry_has_id_label_scope_and_default(
         self,
@@ -85,7 +100,7 @@ class TestRebindableCatalog:
             assert by_id[action_id].default_key == ""
 
     def test_given_the_other_rebindable_actions_when_read_then_each_has_a_default(self):
-        no_default = _TWELVE_CLICK_ONLY | _FIVE_CUSTOM
+        no_default = _TWELVE_CLICK_ONLY | _FIVE_CUSTOM | _MACROS
         for action in CATALOG:
             if action.editable and action.id not in no_default:
                 assert action.default_key != ""
@@ -165,8 +180,9 @@ class TestReservedCatalog:
     def test_given_the_remote_device_actions_when_read_then_each_maps_to_a_real_key(
         self,
     ):
-        # Text entry, the custom-button activations, and edit-mode are not device keys.
-        non_key = {"remote.text", "remote.edit_mode", *_FIVE_CUSTOM}
+        # Text entry, the custom-button activations, edit-mode, and Macros are not
+        # device keys.
+        non_key = {"remote.text", "remote.edit_mode", *_FIVE_CUSTOM, *_MACROS}
         for action in CATALOG:
             if action.scope is Scope.REMOTE and action.id not in non_key:
                 name = action.id.rsplit(".", 1)[-1].upper()

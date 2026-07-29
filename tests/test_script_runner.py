@@ -2,7 +2,20 @@ import asyncio
 import os
 import stat
 
-from universal_remote.tui.actions import ScriptResult, run_script
+from universal_remote.tui.actions import ActionContext, ActionResult, run_script
+
+
+def _context(remote_ip: str) -> ActionContext:
+    """A context carrying the one field Run Custom Script reads: the device IP."""
+    return ActionContext(
+        app=None,
+        remote_ip=remote_ip,
+        session=None,
+        macros={},
+        custom_buttons={},
+        device_id="dev-1",
+        platform="fake-tv",
+    )
 
 
 def _inline(script: str) -> dict:
@@ -15,25 +28,27 @@ def _file(path: str) -> dict:
 
 class TestRunScriptOutcome:
     def test_given_a_successful_inline_script_when_run_then_it_reports_success(self):
-        result = asyncio.run(run_script(_inline("exit 0"), "10.0.0.5"))
+        result = asyncio.run(run_script(_inline("exit 0"), _context("10.0.0.5")))
 
-        assert isinstance(result, ScriptResult)
+        assert isinstance(result, ActionResult)
         assert result.ok is True
         assert result.exit_code == 0
 
     def test_given_a_nonzero_inline_script_when_run_then_it_reports_the_exit_code(self):
-        result = asyncio.run(run_script(_inline("exit 7"), "10.0.0.5"))
+        result = asyncio.run(run_script(_inline("exit 7"), _context("10.0.0.5")))
 
         assert result.ok is False
         assert result.exit_code == 7
 
     def test_given_stdout_when_run_then_it_is_captured(self):
-        result = asyncio.run(run_script(_inline("printf hello"), "10.0.0.5"))
+        result = asyncio.run(run_script(_inline("printf hello"), _context("10.0.0.5")))
 
         assert result.stdout == "hello"
 
     def test_given_stderr_when_run_then_it_is_captured(self):
-        result = asyncio.run(run_script(_inline("printf oops 1>&2"), "10.0.0.5"))
+        result = asyncio.run(
+            run_script(_inline("printf oops 1>&2"), _context("10.0.0.5"))
+        )
 
         assert result.stderr == "oops"
 
@@ -41,7 +56,9 @@ class TestRunScriptOutcome:
 class TestRemoteIp:
     def test_given_a_device_ip_when_run_then_remote_ip_is_in_the_environment(self):
         # The script echoes its own REMOTE_IP; the runner must have injected it.
-        result = asyncio.run(run_script(_inline('printf "%s" "$REMOTE_IP"'), "1.2.3.4"))
+        result = asyncio.run(
+            run_script(_inline('printf "%s" "$REMOTE_IP"'), _context("1.2.3.4"))
+        )
 
         assert result.stdout == "1.2.3.4"
 
@@ -50,7 +67,9 @@ class TestRemoteIp:
         # empty, proving REMOTE_IP is added but nothing else is fabricated.
         os.environ.pop("UR_SHOULD_NOT_EXIST", None)
         result = asyncio.run(
-            run_script(_inline('printf "%s" "$UR_SHOULD_NOT_EXIST"'), "1.2.3.4")
+            run_script(
+                _inline('printf "%s" "$UR_SHOULD_NOT_EXIST"'), _context("1.2.3.4")
+            )
         )
 
         assert result.stdout == ""
@@ -59,7 +78,9 @@ class TestRemoteIp:
 class TestTimeout:
     def test_given_a_hung_script_when_the_timeout_elapses_then_it_fails(self):
         # A tiny timeout stands in for the fixed 30s guard so the test stays fast.
-        result = asyncio.run(run_script(_inline("sleep 30"), "10.0.0.5", timeout=0.2))
+        result = asyncio.run(
+            run_script(_inline("sleep 30"), _context("10.0.0.5"), timeout=0.2)
+        )
 
         assert result.ok is False
         assert "timed out" in result.message.lower()
@@ -70,7 +91,8 @@ class TestTimeout:
         # The kill-and-reap path returns promptly rather than waiting out the sleep.
         async def scenario():
             return await asyncio.wait_for(
-                run_script(_inline("sleep 30"), "10.0.0.5", timeout=0.2), timeout=5
+                run_script(_inline("sleep 30"), _context("10.0.0.5"), timeout=0.2),
+                timeout=5,
             )
 
         result = asyncio.run(scenario())  # must not raise asyncio.TimeoutError
@@ -80,7 +102,9 @@ class TestTimeout:
 
 class TestUnstartableScript:
     def test_given_a_missing_file_path_when_run_then_it_fails_without_raising(self):
-        result = asyncio.run(run_script(_file("/no/such/script/here"), "10.0.0.5"))
+        result = asyncio.run(
+            run_script(_file("/no/such/script/here"), _context("10.0.0.5"))
+        )
 
         assert result.ok is False
         assert result.message  # a human-readable failure reason, not an exception
@@ -91,7 +115,7 @@ class TestUnstartableScript:
         script.write_text('#!/bin/sh\nprintf "%s" "$REMOTE_IP"\n')
         script.chmod(script.stat().st_mode | stat.S_IEXEC)
 
-        result = asyncio.run(run_script(_file(str(script)), "9.9.9.9"))
+        result = asyncio.run(run_script(_file(str(script)), _context("9.9.9.9")))
 
         assert result.ok is True
         assert result.stdout == "9.9.9.9"
@@ -105,7 +129,7 @@ class TestUnstartableScript:
         script = tmp_path / "plain.sh"
         script.write_text('printf "%s" "$REMOTE_IP"\n')
 
-        result = asyncio.run(run_script(_file(str(script)), "5.5.5.5"))
+        result = asyncio.run(run_script(_file(str(script)), _context("5.5.5.5")))
 
         assert result.ok is True
         assert result.stdout == "5.5.5.5"
@@ -117,7 +141,7 @@ class TestUnstartableScript:
         monkeypatch.setenv("HOME", str(tmp_path))
         (tmp_path / "tilde.sh").write_text("printf ok\n")
 
-        result = asyncio.run(run_script(_file("~/tilde.sh"), "1.1.1.1"))
+        result = asyncio.run(run_script(_file("~/tilde.sh"), _context("1.1.1.1")))
 
         assert result.ok is True
         assert result.stdout == "ok"
