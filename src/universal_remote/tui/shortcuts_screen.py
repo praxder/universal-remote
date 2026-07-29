@@ -208,6 +208,13 @@ class CaptureModal(ModalScreen[str | None]):
         # bindings.
         event.stop()
         event.prevent_default()
+        # A modifier pressed on its own arrives as its own press event (`left_alt`, …)
+        # before any combination — the terminal reports presses only, never releases,
+        # so we cannot wait to see if a base key follows. Swallow it silently: Alt+A
+        # still assigns via the following `alt+a` event, and a lone modifier simply
+        # leaves the modal waiting rather than firing a spurious error mid-combo.
+        if is_bare_modifier(event.key):
+            return
         self._assign(event.key)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -222,12 +229,6 @@ class CaptureModal(ModalScreen[str | None]):
             if is_reserved(key):
                 self.app.notify(
                     f"{display_label(key)} is reserved and can't be assigned.",
-                    severity="error",
-                )
-                return
-            if is_bare_modifier(key):
-                self.app.notify(
-                    f"{display_label(key)} can't be assigned on its own.",
                     severity="error",
                 )
                 return

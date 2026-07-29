@@ -1,7 +1,7 @@
 # lg-webos-adapter Specification
 
 ## Purpose
-TBD - created by syncing change add-lg-webos-adapter. Update Purpose after archive.
+Control LG WebOS TVs, pairing by a client-key obtained through the TV's on-screen prompt, behind the generic remote-control seam.
 ## Requirements
 ### Requirement: LG WebOS adapter registration
 The system SHALL provide an adapter for the LG WebOS platform, registered under a stable platform identifier so devices of that platform resolve to it.

@@ -1,7 +1,7 @@
 # device-reachability Specification
 
 ## Purpose
-TBD - created by syncing change add-device-reachability-indicators. Update Purpose after archive.
+Report a saved device's network reachability with a non-invasive, bounded TCP probe of its adapter's declared control port, without pairing, connecting, or any device side effect.
 ## Requirements
 ### Requirement: Reachability status model
 The system SHALL represent a saved device's network reachability as exactly one of three states: reachable, unreachable, or unknown. The state SHALL be derivable for any saved device without the user having connected to it.

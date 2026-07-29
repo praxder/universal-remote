@@ -17,7 +17,7 @@ def default_settings_path() -> Path:
 
 @dataclass(frozen=True)
 class Preferences:
-    """App-level user preferences: theme, custom shortcuts, and custom-button titles."""
+    """App preferences: theme, custom shortcuts, custom-button titles, and macros."""
 
     theme: str | None = None
     # Action id -> key; only shortcuts that differ from a catalog default are stored.
@@ -25,6 +25,14 @@ class Preferences:
     # Layered custom-button titles keyed by scope (device / type / global); empty when
     # the user has configured none. Resolution lives in `tui.custom_buttons`.
     custom_buttons: dict = field(default_factory=dict)
+    # The saved macro registry: `next_number` (the default-name counter) plus `items`
+    # keyed by macro id. Empty when the user has recorded none; the registry
+    # operations live in `macros.registry`.
+    macros: dict = field(default_factory=dict)
+    # True once the user has asked not to see the pre-recording hint again. Stored as
+    # suppression rather than as "show" so a missing or malformed value defaults to
+    # showing it — a fresh install must meet the hint.
+    hide_recording_hint: bool = False
 
 
 class PreferencesStore:
@@ -47,10 +55,17 @@ class PreferencesStore:
         custom_buttons = raw.get("custom_buttons")
         if not isinstance(custom_buttons, dict):
             custom_buttons = {}
+        macros = raw.get("macros")
+        if not isinstance(macros, dict):
+            macros = {}
         return Preferences(
             theme=raw.get("theme"),
             shortcuts=shortcuts,
             custom_buttons=custom_buttons,
+            macros=macros,
+            # `is True` is the type guard: anything else — missing, a string, a number —
+            # loads as not suppressed rather than hiding a hint the user never dismissed.
+            hide_recording_hint=raw.get("hide_recording_hint") is True,
         )
 
     def save(self, preferences: Preferences) -> None:
@@ -68,6 +83,8 @@ class PreferencesStore:
                         "theme": preferences.theme,
                         "shortcuts": preferences.shortcuts,
                         "custom_buttons": preferences.custom_buttons,
+                        "macros": preferences.macros,
+                        "hide_recording_hint": preferences.hide_recording_hint,
                     },
                     indent=2,
                 )

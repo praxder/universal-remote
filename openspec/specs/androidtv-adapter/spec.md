@@ -1,7 +1,7 @@
 # androidtv-adapter Specification
 
 ## Purpose
-TBD - created by syncing change add-androidtv-adapter. Update Purpose after archive.
+Control Android TV / Google TV devices over the Remote v2 protocol — with an optional per-device ADB text path — behind the generic remote-control seam.
 ## Requirements
 ### Requirement: Android TV adapter registration
 The system SHALL provide an adapter for the Android TV / Google TV platform, registered under a stable platform identifier so devices of that platform resolve to it.

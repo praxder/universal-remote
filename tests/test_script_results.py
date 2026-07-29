@@ -4,13 +4,13 @@ from textual.app import App
 from textual.containers import VerticalScroll
 
 from universal_remote.tui.actions import (
-    ScriptResult,
+    ActionResult,
     ScriptResultModal,
     present_result,
 )
 
-_OK = ScriptResult(True, 0, "all good\n", "", "Succeeded")
-_FAIL = ScriptResult(False, 2, "", "boom\n", "Exited with code 2")
+_OK = ActionResult(True, 0, "all good\n", "", "Succeeded")
+_FAIL = ActionResult(False, 2, "", "boom\n", "Exited with code 2")
 
 
 class _Host(App[None]):
@@ -112,7 +112,7 @@ class TestResultModalStructure:
 
     def test_given_the_result_modal_when_shown_then_the_full_output_is_present(self):
         long_output = "line\n" * 200
-        result = ScriptResult(True, 0, long_output, "", "Succeeded")
+        result = ActionResult(True, 0, long_output, "", "Succeeded")
 
         async def scenario():
             app = _Host()

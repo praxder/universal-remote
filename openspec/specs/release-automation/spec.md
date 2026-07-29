@@ -1,7 +1,7 @@
 # release-automation Specification
 
 ## Purpose
-TBD - created by syncing change add-homebrew-distribution. Update Purpose after archive.
+Publish releases automatically on merge to main — deriving the semantic version and notes from conventional commits, building and smoke-testing the macOS arm64 binary, and bumping the Homebrew tap formula.
 ## Requirements
 ### Requirement: Release triggered by merge to main
 

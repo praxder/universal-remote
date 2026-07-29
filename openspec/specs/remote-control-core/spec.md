@@ -1,7 +1,7 @@
 # remote-control-core Specification
 
 ## Purpose
-TBD - created by archiving change scaffold-samsung-remote. Update Purpose after archive.
+Define the platform-agnostic remote-control contract: a generic key vocabulary, adapter capability declaration and registry, a pairing lifecycle distinct from connecting, and bounded sessions that report failure distinctly.
 ## Requirements
 ### Requirement: Generic key vocabulary
 The system SHALL define a platform-agnostic set of remote keys that all callers use, independent of any TV brand. The vocabulary MUST cover directional navigation (up, down, left, right), select/OK, back, home, volume up, volume down, mute, a menu key, channel up and channel down, the media-transport keys play, pause, play/pause, rewind, fast-forward, and stop, and the number keys 0 through 9. An adapter MAY declare any subset of this vocabulary; keys an adapter does not declare are simply unsupported on that platform.

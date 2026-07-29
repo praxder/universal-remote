@@ -1,7 +1,7 @@
 # tui-settings Specification
 
 ## Purpose
-TBD - created by syncing change add-settings-page. Update Purpose after archive.
+The Settings screen reached from the home menu: the theme picker, the Keyboard Shortcuts entry, third-party-licenses and repository links, and a read-only version label.
 ## Requirements
 ### Requirement: Settings screen with a banner
 The application SHALL provide a Settings screen reached from the home menu. The screen SHALL present a "Settings" ASCII-art banner styled consistently with the other screens' banners (accent-colored, same banner treatment). The user MUST be able to return from the Settings screen to the home menu. Every interactive row on the screen MUST be reachable both by keyboard and by mouse, consistent with the rest of the application.
@@ -25,7 +25,7 @@ The Settings screen SHALL present a Theme row that, when activated, opens the sa
 - **WHEN** the user selects a theme from the picker
 - **THEN** the application's theme changes immediately
 
-### Requirement: Key Bindings placeholder row
+### Requirement: Keyboard Shortcuts row
 The Settings screen SHALL present a Keyboard Shortcuts row that, when activated, opens the Keyboard Shortcuts screen (see the keyboard-shortcuts capability). The row MUST be reachable by keyboard and by mouse, consistent with the other Settings rows, and SHALL no longer be disabled or labeled as unavailable.
 
 #### Scenario: Keyboard Shortcuts row opens the screen

@@ -11,6 +11,7 @@ material outlives the operation on disk.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import tempfile
@@ -41,6 +42,7 @@ DISCOVERY_SERVICE = "_androidtvremote2._tcp.local."
 
 _CERTFILE = "cert.pem"
 _KEYFILE = "key.pem"
+_CONNECT_TIMEOUT = 10  # seconds to reach the TV before treating it as unreachable
 
 # Generic key -> Android TV Remote v2 keycode name, accepted by send_key_command.
 # Names are the fully-prefixed KEYCODE_* members of the library's RemoteKeyCode enum.
@@ -195,10 +197,12 @@ class AndroidTvAdapter:
         remote_factory: RemoteFactory = AndroidTVRemote,
         browse: MdnsBrowser = browse_mdns,
         adb_text_factory: AdbTextFactory = find_adb_text,
+        connect_timeout: float = _CONNECT_TIMEOUT,
     ) -> None:
         self._remote_factory = remote_factory
         self._browse = browse
         self._adb_text_factory = adb_text_factory
+        self._connect_timeout = connect_timeout
 
     def capabilities(self) -> Capabilities:
         return _CAPABILITIES
@@ -250,7 +254,9 @@ class AndroidTvAdapter:
                 keyfile=keyfile,
                 host=device.ip,
             )
-            await remote.async_connect()
+            # The library's connect takes no timeout, so bound it here; both a
+            # transport failure and a timeout surface as ConnectionFailedError.
+            await asyncio.wait_for(remote.async_connect(), self._connect_timeout)
         except Exception as exc:
             cert_dir.cleanup()
             raise ConnectionFailedError(f"Could not connect to {device.name}") from exc

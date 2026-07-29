@@ -464,6 +464,41 @@ class TestCommandPalette:
 
         asyncio.run(scenario())
 
+    def test_given_a_lone_modifier_when_pressed_then_it_is_ignored(self, tmp_path):
+        # A modifier arrives as its own press event before any combo; the modal must
+        # swallow it silently — no assignment, no error toast — and keep waiting, so a
+        # legitimate Alt+A is never interrupted by a spurious error.
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test(size=_SIZE) as pilot:
+                app.push_screen(ShortcutsScreen())
+                await pilot.pause()
+                await _open_modal(app, pilot, "remote.mute")
+                await pilot.press("left_alt")  # a modifier pressed on its own
+                await pilot.pause()
+                assert "remote.mute" not in app.shortcut_overrides
+                assert isinstance(app.screen, CaptureModal)  # still waiting for a key
+                assert not any(n.severity == "error" for n in app._notifications)
+
+        asyncio.run(scenario())
+
+    def test_given_a_modifier_plus_key_when_assigned_then_it_is_accepted(
+        self, tmp_path
+    ):
+        async def scenario():
+            app = _app(tmp_path)
+            async with app.run_test(size=_SIZE) as pilot:
+                app.push_screen(ShortcutsScreen())
+                await pilot.pause()
+                await _open_modal(app, pilot, "remote.vol_up")
+                await pilot.press("ctrl+b")  # a modifier combined with a base key
+                await pilot.pause()
+                assert app.shortcut_overrides["remote.vol_up"] == "ctrl+b"
+                table = app.screen.query_one(DataTable)
+                assert _cell(table, "remote.vol_up", 1) == "CTRL-B"
+
+        asyncio.run(scenario())
+
 
 class TestReservedOverrideMigration:
     def test_given_an_override_on_a_now_reserved_key_when_loaded_then_it_is_dropped(
@@ -490,3 +525,32 @@ class TestReservedOverrideMigration:
 
         # The cleaned map was written back, so the stale override stays gone next run.
         assert "remote.stop" not in prefs.load().shortcuts
+
+
+class TestBareModifierOverrideMigration:
+    def test_given_a_lone_modifier_override_when_loaded_then_it_is_dropped(
+        self, tmp_path
+    ):
+        # A broken guard once let a bare modifier (e.g. `left_alt`) be assigned and
+        # saved; it must be pruned on load and re-persisted, reverting the affected
+        # action to its default, while a free override survives.
+        prefs = PreferencesStore(path=tmp_path / "settings.json")
+        prefs.save(
+            Preferences(shortcuts={"remote.vol_up": "left_alt", "remote.mute": "m"})
+        )
+
+        async def scenario():
+            app = UniversalRemoteApp(
+                store=DeviceStore(path=tmp_path / "d.json"),
+                registry=AdapterRegistry(),
+                preferences=prefs,
+            )
+            async with app.run_test(size=_SIZE) as pilot:
+                await pilot.pause()
+                assert "remote.vol_up" not in app.shortcut_overrides
+                assert app.shortcut_overrides["remote.mute"] == "m"
+
+        asyncio.run(scenario())
+
+        # The cleaned map was written back, so the stale override stays gone next run.
+        assert "remote.vol_up" not in prefs.load().shortcuts

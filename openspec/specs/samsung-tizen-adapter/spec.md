@@ -1,7 +1,7 @@
 # samsung-tizen-adapter Specification
 
 ## Purpose
-TBD - created by archiving change scaffold-samsung-remote. Update Purpose after archive.
+Control Samsung Tizen TVs — pairing by a token from the TV's popup and discovering them via the AirPlay mDNS service — behind the generic remote-control seam.
 ## Requirements
 ### Requirement: Samsung Tizen adapter registration
 The system SHALL provide an adapter for the Samsung Tizen platform, registered under a stable platform identifier so devices of that platform resolve to it.

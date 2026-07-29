@@ -235,6 +235,26 @@ class TestAndroidTvConnect:
         with pytest.raises(ConnectionFailedError):
             run(adapter.connect(_device(credential=_paired_credential())))
 
+    def test_given_a_hanging_connect_when_the_timeout_elapses_then_connection_failed(
+        self,
+    ):
+        # A powered-off or partitioned TV neither answers nor refuses; without an
+        # application-level bound the connect would block on the OS TCP retry ceiling.
+        class HangingRemote:
+            def __init__(self, **_kwargs):
+                pass
+
+            async def async_connect(self):
+                await asyncio.Event().wait()  # never resolves
+
+            def disconnect(self):
+                pass
+
+        adapter = AndroidTvAdapter(remote_factory=HangingRemote, connect_timeout=0.01)
+
+        with pytest.raises(ConnectionFailedError):
+            run(adapter.connect(_device(credential=_paired_credential())))
+
     def test_given_a_session_when_closed_then_the_key_material_is_removed_from_disk(
         self,
     ):

@@ -7,6 +7,7 @@ from universal_remote.tui.shortcuts import (
     effective_key,
     is_bare_modifier,
     is_reserved,
+    without_bare_modifiers,
     without_reserved,
 )
 
@@ -28,6 +29,10 @@ _TWELVE_CLICK_ONLY = {
 # The five custom-button activation actions: rebindable Remote actions that mirror a
 # click, not device keys, and start with no shortcut.
 _FIVE_CUSTOM = {f"remote.custom_{index}" for index in range(1, 6)}
+
+# The Macros action: rebindable, opens the macros list rather than sending a key, and
+# starts with no shortcut.
+_MACROS = {"remote.macros"}
 
 
 def _by_id():
@@ -58,15 +63,26 @@ class TestRebindableCatalog:
         assert go_back.default_key == "escape"
         assert go_back.editable
 
-    def test_given_the_catalog_when_read_then_there_are_31_rebindable_remote_actions(
+    def test_given_the_catalog_when_read_then_there_are_32_rebindable_remote_actions(
         self,
     ):
         rebindable_remote = [
             a for a in CATALOG if a.scope is Scope.REMOTE and a.editable
         ]
 
-        # 26 device actions + 5 custom-button activation actions.
-        assert len(rebindable_remote) == 31
+        # 26 device actions + 5 custom-button activation actions + the Macros action.
+        assert len(rebindable_remote) == 32
+
+    def test_given_the_catalog_when_read_then_macros_has_no_default_key_or_hint(self):
+        # The Macros action opens the macros list like clicking the button. It starts
+        # unbound and stays out of the footer — a further hint does not fit the
+        # supported 80-column width.
+        macros = _by_id()["remote.macros"]
+
+        assert macros.scope is Scope.REMOTE
+        assert macros.editable
+        assert macros.default_key == ""
+        assert macros.show is False
 
     def test_given_the_catalog_when_read_then_each_entry_has_id_label_scope_and_default(
         self,
@@ -84,7 +100,7 @@ class TestRebindableCatalog:
             assert by_id[action_id].default_key == ""
 
     def test_given_the_other_rebindable_actions_when_read_then_each_has_a_default(self):
-        no_default = _TWELVE_CLICK_ONLY | _FIVE_CUSTOM
+        no_default = _TWELVE_CLICK_ONLY | _FIVE_CUSTOM | _MACROS
         for action in CATALOG:
             if action.editable and action.id not in no_default:
                 assert action.default_key != ""
@@ -164,8 +180,9 @@ class TestReservedCatalog:
     def test_given_the_remote_device_actions_when_read_then_each_maps_to_a_real_key(
         self,
     ):
-        # Text entry, the custom-button activations, and edit-mode are not device keys.
-        non_key = {"remote.text", "remote.edit_mode", *_FIVE_CUSTOM}
+        # Text entry, the custom-button activations, edit-mode, and Macros are not
+        # device keys.
+        non_key = {"remote.text", "remote.edit_mode", *_FIVE_CUSTOM, *_MACROS}
         for action in CATALOG:
             if action.scope is Scope.REMOTE and action.id not in non_key:
                 name = action.id.rsplit(".", 1)[-1].upper()
@@ -215,10 +232,18 @@ class TestConflictsAndReserved:
         assert is_reserved("v") is False
 
     def test_given_a_bare_modifier_when_checked_then_it_is_unassignable(self):
-        assert is_bare_modifier("shift") is True
-        assert is_bare_modifier("ctrl") is True
+        # A modifier pressed alone arrives under the keyboard protocol's own name
+        # (`left_alt`, `iso_level3_shift`, …), never the short `alt`; the check must
+        # match what the capture modal actually receives.
+        assert is_bare_modifier("left_alt") is True
+        assert is_bare_modifier("left_shift") is True
+        assert is_bare_modifier("iso_level3_shift") is True
+
+    def test_given_a_base_key_or_modifier_combo_when_checked_then_it_is_assignable(
+        self,
+    ):
         assert is_bare_modifier("d") is False
-        assert is_bare_modifier("ctrl+p") is False
+        assert is_bare_modifier("ctrl+b") is False
 
     def test_given_an_actions_own_default_when_checked_then_it_is_exempt(self):
         # OK legitimately defaults to `enter`, itself a reserved key.
@@ -249,6 +274,30 @@ class TestWithoutReserved:
         without_reserved(overrides)
 
         assert overrides == {"remote.stop": "e"}
+
+
+class TestWithoutBareModifiers:
+    def test_given_a_lone_modifier_override_when_pruned_then_it_is_dropped(self):
+        # A broken guard once let a bare modifier be assigned and saved; such an
+        # override binds an action to a modifier press and must be dropped.
+        overrides = {"remote.vol_up": "left_alt", "remote.mute": "="}
+
+        pruned = without_bare_modifiers(overrides)
+
+        assert "remote.vol_up" not in pruned
+        assert pruned["remote.mute"] == "="
+
+    def test_given_ordinary_and_combo_overrides_when_pruned_then_they_are_kept(self):
+        overrides = {"remote.vol_up": "=", "remote.mute": "ctrl+b"}
+
+        assert without_bare_modifiers(overrides) == overrides
+
+    def test_given_overrides_when_pruned_then_the_original_map_is_unchanged(self):
+        overrides = {"remote.vol_up": "left_alt"}
+
+        without_bare_modifiers(overrides)
+
+        assert overrides == {"remote.vol_up": "left_alt"}
 
 
 class TestDisplayLabel:

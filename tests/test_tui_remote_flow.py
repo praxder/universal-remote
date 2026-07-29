@@ -187,6 +187,60 @@ class TestUseRemoteVimNavigation:
         asyncio.run(scenario())
 
 
+class TestUseRemoteStalePlatformSelection:
+    def test_given_a_stale_platform_device_when_selected_then_a_tailored_toast_and_no_flow(
+        self, tmp_path
+    ):
+        # Selecting a saved device whose adapter is no longer registered must be
+        # handled at the seam with a tailored message — not fall through to the
+        # global error net (whose message would be the bare platform id).
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Old TV", platform="gone", ip="9.9.9.9", credential="tok"))
+
+        async def scenario():
+            app = _app(store)  # registry has fake-tv only, not "gone"
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                await pilot.press("enter")
+                await _settle(pilot)
+                # No pairing or connecting flow was entered; stayed on the picker.
+                assert isinstance(app.screen, UseRemoteScreen)
+                # Handled locally: the error net was not invoked...
+                assert app._exception is None
+                # ...and a tailored error toast named the device.
+                errors = [
+                    n.message for n in app._notifications if n.severity == "error"
+                ]
+                assert any("Old TV" in message for message in errors)
+
+        asyncio.run(scenario())
+
+    def test_given_a_stale_platform_device_when_chosen_by_digit_then_the_same_guard_applies(
+        self, tmp_path
+    ):
+        # Digit selection routes through the same option-selected handler as Enter,
+        # so the stale-platform guard must apply on that path too.
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Old TV", platform="gone", ip="9.9.9.9", credential="tok"))
+
+        async def scenario():
+            app = _app(store)  # registry has fake-tv only, not "gone"
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                await pilot.press("1")  # digit selects the 1st (only) device
+                await _settle(pilot)
+                assert isinstance(app.screen, UseRemoteScreen)
+                assert app._exception is None
+                errors = [
+                    n.message for n in app._notifications if n.severity == "error"
+                ]
+                assert any("Old TV" in message for message in errors)
+
+        asyncio.run(scenario())
+
+
 class TestUseRemoteConnect:
     def test_given_a_stored_credential_when_selected_then_it_connects_without_pairing(
         self, tmp_path
@@ -551,6 +605,43 @@ class TestUseRemoteReachability:
                 assert picker.highlighted == 1  # in-place update preserved the cursor
 
         asyncio.run(scenario())
+
+    def test_given_a_stale_platform_device_when_open_then_it_is_skipped_and_others_probe(
+        self, tmp_path, monkeypatch
+    ):
+        # A saved device may name a platform whose adapter is no longer registered
+        # (removed in an upgrade). The reachability probe is a routinely-flaky seam:
+        # it must skip that row silently and keep probing the devices after it,
+        # never raising to the global error net.
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Stale", platform="gone", ip="9.9.9.9"))
+        store.add(_dev(name="Live", platform="fake-tv", ip="1.1.1.1"))
+        probe = _FakeProbe({"1.1.1.1": Reachability.REACHABLE})
+        monkeypatch.setattr(remote_flow, "probe", probe)
+        adapter = FakeAdapter(platform="fake-tv", reachability_port=9999)
+
+        async def scenario():
+            app = _app(store, adapter=adapter)  # registers fake-tv only, not "gone"
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await _settle(pilot)
+                assert isinstance(app.screen, UseRemoteScreen)
+                assert app._exception is None  # nothing reached the global error net
+                picker = app.screen.query_one("#device-picker", OptionList)
+                prompts = [
+                    picker.get_option_at_index(i).prompt
+                    for i in range(picker.option_count)
+                ]
+            return prompts, probe.calls
+
+        prompts, calls = asyncio.run(scenario())
+        # The device after the stale one was still probed (loop continued past it),
+        # and the stale device was never probed.
+        probed_ips = {ip for ip, _ in calls}
+        assert probed_ips == {"1.1.1.1"}
+        # The live row resolved to green; the stale row stayed yellow (unknown),
+        # never turning into an error.
+        assert prompts == ["[yellow]●[/] 1. Stale", "[green]●[/] 2. Live"]
 
     def test_given_a_portless_adapter_when_open_then_the_row_stays_yellow(
         self, tmp_path, monkeypatch

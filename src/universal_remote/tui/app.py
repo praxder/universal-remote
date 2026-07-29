@@ -33,8 +33,10 @@ class UniversalRemoteApp(App[None]):
     #menu { width: 100%; height: auto; }
     #menu Button { width: 28; margin: 1 0; }
     /* Settings entry: a bottom-left button docked above the Footer (which docks
-       last, so it stays below this). Left-aligned; the centered #menu is untouched. */
-    #settings-bar { dock: bottom; height: auto; width: 100%; align-horizontal: left; }
+       last, so it stays below this). Width hugs the button (not 100%) so the bar
+       does not overlay the centered #menu content and swallow its mouse clicks on a
+       short terminal where the menu buttons reach the docked rows. */
+    #settings-bar { dock: bottom; height: auto; width: auto; }
     #settings-bar Button { width: auto; margin: 0 0 2 2; }
     /* focus: accent text on a slightly lighter fill instead of reversing fg/bg;
        keep the default `tall` top/bottom border so the height never changes */
@@ -162,6 +164,13 @@ class UniversalRemoteApp(App[None]):
         # on mount and read by the remote to label its custom buttons. Resolution lives
         # in `tui.custom_buttons`.
         self.custom_buttons: dict = {}
+        # The saved macro registry (`next_number` plus `items` keyed by macro id),
+        # populated from the saved preferences on mount. Read by the macros modals and
+        # by macro playback; the registry operations live in `macros.registry`.
+        self.macros: dict = {}
+        # True once the user has asked not to see the pre-recording hint again; read by
+        # the remote before it presents the hint on Create Macro.
+        self.hide_recording_hint = False
         # Set true only once our own mount handler has run, so the safety net can
         # tell a post-mount error (stay open) from a startup/compose/mount failure
         # (fall through). See `_handle_exception`.
@@ -197,12 +206,19 @@ class UniversalRemoteApp(App[None]):
         self.persist_preferences()
 
     def persist_preferences(self) -> None:
-        """Write the current theme, shortcuts, and custom buttons together, best-effort."""
+        """Write every preference together, best-effort.
+
+        Each field must be named here: this rebuilds `Preferences` from keyword
+        arguments and `watch_theme` calls it on every theme change, so omitting one
+        (say `macros=`) would silently erase it whenever the theme changed.
+        """
         self.preferences.save(
             Preferences(
                 theme=self.theme,
                 shortcuts=dict(self.shortcut_overrides),
                 custom_buttons=self.custom_buttons,
+                macros=self.macros,
+                hide_recording_hint=self.hide_recording_hint,
             )
         )
 
@@ -221,19 +237,23 @@ class UniversalRemoteApp(App[None]):
                 rebuild_shortcuts(screen, self.shortcut_overrides, scopes, hide=hide)
 
     def on_mount(self) -> None:
-        from .shortcuts import without_reserved
+        from .shortcuts import without_bare_modifiers, without_reserved
 
         preferences = self.preferences.load()
         # Load saved shortcuts into the override map before the menu is pushed, so
         # its bindings (and every later screen's) build from them. Drop any override
         # whose key has since become reserved (e.g. `e` bound to a device action before
-        # it was reserved for edit-mode): left in place it would shadow the reserved
-        # binding, so the action reverts to its default. `update` keeps any overrides
-        # set directly on the app (e.g. in tests) when none are saved.
-        kept = without_reserved(preferences.shortcuts)
+        # it was reserved for edit-mode) or is a lone modifier (assignable before the
+        # `is_bare_modifier` guard was fixed): left in place either would bind a fixed
+        # or modifier-only key, so the action reverts to its default. `update` keeps
+        # any overrides set directly on the app (e.g. in tests) when none are saved.
+        kept = without_bare_modifiers(without_reserved(preferences.shortcuts))
         self.shortcut_overrides.update(kept)
         # Load saved custom-button titles the same way, before any remote is opened.
         self.custom_buttons.update(preferences.custom_buttons)
+        # Load the saved macro registry, before the macros list can be opened.
+        self.macros.update(preferences.macros)
+        self.hide_recording_hint = preferences.hide_recording_hint
         # Ignore a saved theme that is no longer registered (e.g. removed by a
         # Textual upgrade) so `_validate_theme` cannot raise; the default stands.
         if preferences.theme in self.available_themes:
