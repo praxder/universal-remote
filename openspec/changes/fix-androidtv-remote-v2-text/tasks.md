@@ -48,7 +48,7 @@ Not an implementation task: the live `androidtv-adapter` spec's Purpose line sti
 - [x] 7.2 Run the full `pytest` suite and confirm it is green
 - [x] 7.3 Verify on real hardware that text lands in the Google TV launcher search box with the device's developer mode and wireless debugging switched **off**, and that two consecutive sends both land
 - [x] 7.4 Verify that sending text with no field focused surfaces a text-unsupported status rather than appearing to succeed
-- [ ] 7.5 Verify Fire TV text still works, confirming the narrowed helper did not disturb it
+- [x] 7.5 Verify Fire TV text still works, confirming the narrowed helper did not disturb it
 - [x] 7.6 Run `openspec validate fix-androidtv-remote-v2-text --strict` and confirm it passes
 
 ## 8. IME counter correction (found during 7.3 verification)
