@@ -421,57 +421,6 @@ The application's command palette (opened with Ctrl+P) SHALL expose the Theme, Q
 - **WHEN** the user opens the command palette
 - **THEN** no Screenshot command is listed
 
-### Requirement: Android TV text-input mode toggle
-
-The Add Device and Edit Device screens SHALL present a text-input-mode toggle **only when the device's type is Android TV**; for every other device type the toggle SHALL NOT appear, and the device list SHALL NOT offer any action to change a device's text-input mode. The toggle selects between standard Remote v2 text and ADB text.
-
-When the user switches the toggle to ADB, the application SHALL run the one-time ADB pairing, prompting for the pairing address and pairing code and pairing through the adapter. On success the device SHALL be recorded as opted into ADB text when the form is saved. On cancel or failure the toggle SHALL revert to standard and the device SHALL NOT be opted in. Switching the toggle back to standard SHALL clear the opt-in without pairing.
-
-#### Scenario: Toggle appears only for Android TV
-
-- **WHEN** the Add or Edit screen is shown for an Android TV device
-- **THEN** the text-input-mode toggle is visible
-- **AND WHEN** the screen is shown for a device of any other type
-- **THEN** the toggle is not shown
-
-#### Scenario: Switching to ADB pairs and opts in on save
-
-- **WHEN** the user switches the toggle to ADB, completes pairing with a valid address and code, and saves the form
-- **THEN** the application records the device as opted into ADB text and persists it
-
-#### Scenario: Failed or cancelled pairing reverts the toggle
-
-- **WHEN** the user switches the toggle to ADB but the pairing is cancelled or fails
-- **THEN** the toggle reverts to standard and the device is not opted into ADB text
-
-#### Scenario: Editing flips an existing device's mode
-
-- **WHEN** the user edits an Android TV device already opted into ADB text and switches the toggle back to standard, then saves
-- **THEN** the device is no longer opted into ADB text and no pairing is run
-
-### Requirement: Post-add ADB text hint for Android TV
-
-When an Android TV device is added directly from the discovery screen, the application SHALL show a one-time hint that text input can be routed over ADB if it has trouble in some apps, pointing the user to edit the device and switch its text-input mode. The hint SHALL NOT appear when a device of any other type is added.
-
-#### Scenario: Adding a discovered Android TV device shows the hint
-
-- **WHEN** the user selects and adds an Android TV device from the discovery screen
-- **THEN** the application shows a hint that text input can be switched to ADB, which the user dismisses
-
-#### Scenario: Adding a non-Android device shows no hint
-
-- **WHEN** the user selects and adds a device of any other type from the discovery screen
-- **THEN** no ADB text hint is shown
-
-### Requirement: ADB text unavailable is surfaced during use
-
-When a device is opted into ADB text and a text send falls back to Remote v2 because the ADB path was unavailable, the Use Remote surface SHALL show a one-line status explaining that ADB text was unavailable, rather than failing silently or blocking further use.
-
-#### Scenario: Fallback shows a status message
-
-- **WHEN** an opted-in device's text send falls back to Remote v2 because the ADB path was unavailable
-- **THEN** the remote shows a one-line status explaining that ADB text was unavailable
-
 ### Requirement: Remote screen status bar identifies the active device
 While Use Remote mode is showing the on-screen remote, the top status bar SHALL identify the active device as `Name: <name> • Type: <type> • IP: <ip>`, where `<name>` is the device's name, `<ip>` is its IP address, and `<type>` is the platform's human-readable label — the same label used for the device-type picker on the add/edit screen, not the raw platform identifier. The status bar SHALL NOT include any other prefix or text.
 
@@ -486,6 +435,8 @@ While Use Remote mode is showing the on-screen remote, the top status bar SHALL 
 ### Requirement: Text entry via a modal
 The remote's Text action SHALL open a text-entry modal rather than focusing a docked field. While the modal's input is focused, typed characters fill a buffer and Enter sends the buffered text as a single text action and closes the modal; Escape closes the modal without sending the buffered text and without sending the device's Back key. When text is unsupported by the active adapter, activating the Text action SHALL surface a clear message that text is not supported on this device and SHALL NOT open an editable input.
 
+When a text send is attempted and reported as unsupported, the status SHALL carry the reason the adapter gave — such as that no text field is focused on the device — rather than stating only that text is not supported, because the device-specific reason is what tells the user what to do about it. When the adapter gives no reason, the status SHALL fall back to stating that text is not supported on this device, so a send never fails without an explanation.
+
 #### Scenario: Compose then send
 - **WHEN** the text-entry modal is open and the user types characters and presses Enter
 - **THEN** the buffered text is sent to the device as a single text action and the modal closes
@@ -497,6 +448,14 @@ The remote's Text action SHALL open a text-entry modal rather than focusing a do
 #### Scenario: Text unsupported surfaces a message
 - **WHEN** the active adapter reports text as unsupported and the user activates the Text action
 - **THEN** a message explains text is not supported on this device and no editable text input is opened
+
+#### Scenario: A failed send explains why
+- **WHEN** the user sends text and the adapter reports it unsupported with a reason, such as no text field being focused on the device
+- **THEN** the status shows that reason rather than only that text is not supported
+
+#### Scenario: A failed send with no reason still explains itself
+- **WHEN** the user sends text and the adapter reports it unsupported without giving a reason
+- **THEN** the status states that text is not supported on this device
 
 ### Requirement: Custom buttons on the remote
 The remote SHALL present exactly five custom buttons in a dedicated row. Each button SHALL show its configured title resolved for the active device, or its default title `Custom N` (where `N` is the button's 1-based position) when no title is configured for that device. Each custom button MUST be clickable with the mouse. Clicking a custom button SHALL run its assigned action when one is resolved for the active device, and SHALL open the button's configuration modal when no action is assigned. A custom button MAY also be activated by an assigned keyboard shortcut (see the keyboard-shortcuts catalog), which SHALL behave identically to clicking that button — running its resolved action, or opening its configuration when none is assigned. To re-edit a button that has an assigned action, the user SHALL use a distinct edit gesture: pressing an edit-mode key SHALL arm edit-mode, and the next activation of a custom button — whether by clicking it or by pressing its keyboard shortcut — SHALL open that button's configuration modal instead of running its action, after which edit-mode SHALL clear. The edit-mode key SHALL toggle: pressing it while edit-mode is already armed SHALL disarm edit-mode without opening any configuration. While edit-mode is armed, the custom buttons SHALL show a visual indicator distinguishing the armed edit state from their normal run appearance, and that indicator SHALL clear together with edit-mode.

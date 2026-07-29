@@ -1,7 +1,7 @@
 # androidtv-adapter Specification
 
 ## Purpose
-Control Android TV / Google TV devices over the Remote v2 protocol — with an optional per-device ADB text path — behind the generic remote-control seam.
+Control Android TV / Google TV devices over the Remote v2 protocol — keys, pairing, and text alike, with no ADB — behind the generic remote-control seam.
 ## Requirements
 ### Requirement: Android TV adapter registration
 The system SHALL provide an adapter for the Android TV / Google TV platform, registered under a stable platform identifier so devices of that platform resolve to it.
@@ -60,11 +60,53 @@ The Android TV adapter SHALL translate each supported generic key into the corre
 - **THEN** the session reports the key as unsupported and does not send an arbitrary substitute
 
 ### Requirement: Best-effort text entry
-The Android TV adapter SHALL attempt to send text to the device as literal characters, and SHALL report text as unsupported when the attempt fails, rather than silently discarding the text.
+The Android TV adapter SHALL send text to the device over the Remote v2 input-method path as literal characters, without requiring developer mode, ADB, or wireless debugging.
+
+The adapter SHALL build each text edit from the device's most recently reported text-field state: the edit's field counter SHALL be the counter the device reports on that state and SHALL be re-read for every send rather than derived by incrementing a previous value, and the edit's cursor span SHALL be the position resulting from the send — the field's current contents plus the text being sent — so that consecutive sends append rather than overwrite.
+
+The edit's input-method counter SHALL be the focused editor's own counter, which the device reports alongside the foreground application, rather than the counter the device carries on its inbound batch edit — that value is a fixed greeting rather than live state, and matches the editor's counter only on the device's own launcher. It SHALL likewise be re-read for every send, so moving to another application's text field does not reuse a stale value.
+
+The adapter SHALL keep that state current by observing the device's own reports of its focused text field, which the device sends whenever the field changes from any source, including edits made with the physical remote.
+
+The adapter SHALL NOT send the device's field-state report back to the device, because doing so causes the device to discard the input-method session.
+
+When no text field is focused the device reports no field state, so the adapter SHALL report text as unsupported rather than sending an edit the device would silently discard. The adapter SHALL also report text as unsupported when a send otherwise fails, rather than silently discarding the text.
+
+Because the device reports a text field gaining focus but never reports losing it, the adapter SHALL treat a send as delivered only once the device reports the resulting field state, and SHALL report text as unsupported when no such report arrives. Without that confirmation an edit built from state the device has since moved on from would be discarded in silence and reported to the user as a success.
 
 #### Scenario: Text unsupported reported
 - **WHEN** a text send fails
 - **THEN** the session reports text-unsupported so the caller can inform the user
+
+#### Scenario: Text is sent over Remote v2 with no ADB
+- **WHEN** text is sent through a session to a device whose text field is focused
+- **THEN** the adapter sends it over the Remote v2 input-method path
+- **AND** it does not invoke `adb` or require developer mode or wireless debugging
+
+#### Scenario: Field counter is taken from the latest reported state
+- **WHEN** the device reports a new text-field state and text is then sent
+- **THEN** the edit carries the field counter from that latest report
+- **AND** the adapter does not increment a previously used counter to derive it
+
+#### Scenario: Input-method counter is taken from the focused editor
+- **WHEN** the device reports a focused editor whose counter differs from the one on its inbound batch edit, and text is then sent
+- **THEN** the edit carries the focused editor's reported counter
+- **AND** text sent into an application's own text field is accepted rather than silently discarded
+
+#### Scenario: Consecutive sends append
+- **WHEN** two text sends are made in succession to the same focused field
+- **THEN** the second send's cursor span accounts for the text the first send added
+- **AND** the field ends up containing both sends' text in order
+
+#### Scenario: A discarded edit is reported rather than appearing to succeed
+- **WHEN** text is sent and the device does not report the resulting field state
+- **THEN** the session reports text-unsupported
+- **AND** the caller is not told the text was delivered
+
+#### Scenario: No focused text field reports text unsupported
+- **WHEN** text is sent and the device has reported no focused text field
+- **THEN** the session reports text-unsupported
+- **AND** the adapter does not send an edit
 
 ### Requirement: Human-readable display name
 The Android TV adapter SHALL expose a human-readable display name, "Android TV", distinct from its platform identifier, so the UI can present the platform without encoding brand knowledge.
@@ -74,58 +116,3 @@ The Android TV adapter SHALL expose a human-readable display name, "Android TV",
 - **THEN** it is "Android TV"
 - **AND** the platform identifier remains "androidtv"
 
-### Requirement: Opt-in ADB text routing
-
-The Android TV adapter SHALL support an optional, per-device ADB text path. When a device is opted into ADB text, the adapter SHALL send text by invoking the system `adb` binary's `input text` command against that device rather than over Remote v2. When a device is not opted in, the adapter SHALL continue to send text over Remote v2. Text sent over the ADB path SHALL be escaped so that spaces and shell-special characters are preserved as typed.
-
-#### Scenario: Opted-in device sends text over ADB
-
-- **WHEN** a device opted into ADB text sends text through its session
-- **THEN** the adapter invokes the `adb` binary's `input text` command with the escaped text and does not use Remote v2 for that send
-
-#### Scenario: Non-opted-in device sends text over Remote v2
-
-- **WHEN** a device that is not opted into ADB text sends text through its session
-- **THEN** the adapter sends the text over Remote v2 as before
-
-#### Scenario: Text with spaces and special characters is preserved
-
-- **WHEN** an opted-in device sends text containing spaces or shell-special characters
-- **THEN** the escaped `input text` argument reproduces the intended string on the device
-
-### Requirement: ADB target resolution via mDNS
-
-Because a device's wireless-debugging connect port is ephemeral, the adapter SHALL resolve the device's current ADB address each session by querying mDNS and matching the entry by the device's IP address, then connect to the resolved address before sending text. Resolution SHALL NOT depend on any previously stored port.
-
-#### Scenario: Current address resolved before sending
-
-- **WHEN** an opted-in device sends text and its ADB address has not yet been resolved this session
-- **THEN** the adapter resolves the device's current address from mDNS by IP and connects to it before sending
-
-### Requirement: ADB text fallback when unavailable
-
-When a device is opted into ADB text but the ADB path is unavailable — the `adb` binary is missing, or the device cannot be reached over ADB (for example, wireless debugging is off) — the adapter SHALL fall back to sending the text over Remote v2 and SHALL signal that the ADB text path was unavailable, rather than silently discarding the text.
-
-#### Scenario: adb binary missing falls back to Remote v2
-
-- **WHEN** an opted-in device sends text and the `adb` binary cannot be found
-- **THEN** the adapter sends the text over Remote v2 and signals that the ADB text path was unavailable
-
-#### Scenario: Device unreachable over ADB falls back to Remote v2
-
-- **WHEN** an opted-in device sends text and the device cannot be reached over ADB
-- **THEN** the adapter sends the text over Remote v2 and signals that the ADB text path was unavailable
-
-### Requirement: One-time ADB wireless-debugging pairing
-
-The Android TV adapter SHALL support a one-time ADB pairing over wireless debugging, taking a pairing address and a pairing code and performing the pairing via the `adb` binary. This pairing is distinct from Remote v2 PIN pairing and establishes the trust the `adb` server persists for later connections. A failed pairing SHALL be reported rather than silently marking the device as opted in.
-
-#### Scenario: Successful ADB pairing
-
-- **WHEN** the adapter is given a valid pairing address and code and the `adb` pairing succeeds
-- **THEN** the adapter reports success so the device can be recorded as opted into ADB text
-
-#### Scenario: Failed ADB pairing is reported
-
-- **WHEN** the adapter is given a pairing address and code and the `adb` pairing fails
-- **THEN** the adapter reports the failure and the device is not marked as opted into ADB text
