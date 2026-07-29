@@ -327,10 +327,11 @@ The Keyboard Shortcuts screen itself:
 **Platform quirks**
 
 - **Text entry is best-effort on every platform.** Samsung `SendInputString`, LG
-  `insertText`, Android TV's Remote v2 input method, and ADB `input text` support
-  all vary by app and firmware; a failed send reports "not supported" rather than
-  silently dropping input. Android TV in particular needs a text field already
-  focused on the TV — with nothing focused it reports "not supported" instead.
+  `insertText`, Android TV's Remote v2 input method, and Fire TV's ADB `input
+  text` support all vary by app and firmware; a failed send reports "not
+  supported" rather than silently dropping input. Android TV in particular needs
+  a text field already focused on the TV — with nothing focused it reports "not
+  supported" instead.
 - **Power-on is best-effort.** A TV that's off is woken with a Wake-on-LAN magic
   packet to its stored MAC, which requires the TV's "Wake on LAN / Network
   Standby" setting to be enabled (off by default on many sets). Power-**off** is

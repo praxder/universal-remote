@@ -167,8 +167,8 @@ class TextEntryModal(ModalScreen[str | None]):
 
     Owns the send path so the remote surface no longer reserves a docked field.
     Escape is bound here so it dismisses the modal rather than reaching the remote's
-    Go Back (which would close the session). Transient outcomes — a failed send, or
-    an ADB path that fell back — surface as app-level toasts that outlive the modal.
+    Go Back (which would close the session). A transient outcome — a send the device
+    refused — surfaces as an app-level toast that outlives the modal.
     Dismisses with the text that actually reached the device, or None when nothing
     did, so a recording captures only a send that landed.
     """
