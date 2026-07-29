@@ -167,8 +167,8 @@ class TextEntryModal(ModalScreen[str | None]):
 
     Owns the send path so the remote surface no longer reserves a docked field.
     Escape is bound here so it dismisses the modal rather than reaching the remote's
-    Go Back (which would close the session). Transient outcomes — a failed send, or
-    an ADB path that fell back — surface as app-level toasts that outlive the modal.
+    Go Back (which would close the session). A transient outcome — a send the device
+    refused — surfaces as an app-level toast that outlives the modal.
     Dismisses with the text that actually reached the device, or None when nothing
     did, so a recording captures only a send that landed.
     """
@@ -207,9 +207,12 @@ class TextEntryModal(ModalScreen[str | None]):
         """Send `text`, reporting whether the device actually received it."""
         try:
             await self._session.send_text(text)
-        except TextUnsupportedError:
+        except TextUnsupportedError as exc:
+            # Prefer the adapter's own reason: that no text field is focused on the TV
+            # is something the user can act on, which a generic line does not convey.
             self.app.notify(
-                "Text entry is not supported on this device", severity="warning"
+                str(exc) or "Text entry is not supported on this device",
+                severity="warning",
             )
             return False
         except Exception:
@@ -219,10 +222,6 @@ class TextEntryModal(ModalScreen[str | None]):
                 "Text entry failed — the device may be unreachable", severity="warning"
             )
             return False
-        # An opted-in ADB send that fell back to Remote v2 flags itself; say so
-        # rather than leaving the user wondering why setup made no change.
-        if getattr(self._session, "adb_text_unavailable", False):
-            self.app.notify("ADB text unavailable — sent over the standard path")
         return True
 
     def action_cancel(self) -> None:

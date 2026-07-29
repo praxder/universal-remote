@@ -449,8 +449,10 @@ class MacroPlaybackModal(ModalScreen[ActionResult]):
     async def _send_text(self, text: str) -> str | None:
         try:
             await self._action_context.session.send_text(text)
-        except TextUnsupportedError:
-            return "this device does not support text entry"
+        except TextUnsupportedError as exc:
+            # The adapter's reason names the actual cause — commonly that no text
+            # field is focused on the TV — which the caller shows in the step message.
+            return str(exc) or "this device does not support text entry"
         except Exception:
             return "the device may be unreachable"
         return None
