@@ -91,13 +91,17 @@ No arbitrary-keycode path exists. Digits therefore go through `/v1/FireTV/keyboa
 
 Because the endpoint **replaces** the field's contents rather than appending (no append mode exists: `toAppend`, `append: true`, `mode: "append"`, `replace: false`, and `?action=append` are all ignored or rejected), sending a digit must read the current contents via `GET /v1/FireTV/keyboard` and write back the concatenation.
 
-### Use `/v1/FireTV/keyboard` for text, and check `state` before reporting success
+### Use `/v1/FireTV/keyboard` for text, and confirm a send by reading the field back
 
 `/v1/FireTV/text` exists as a route but rejects every input shape tried — roughly twenty field names across JSON body, query string, and `text/plain`, retested with a field focused and the on-screen keyboard up, with a `backspace` control returning 200 in the same run. It is a decoy. The working endpoint is `/v1/FireTV/keyboard`.
 
 Verified by reading the value back: it replaces field contents, `{"text":""}` clears, and spaces, punctuation, and Unicode including emoji round-trip byte-exact (`café ☕`), as does a 113-character string. This is strictly better than the ADB path, whose entire reason for `adapters/adb_text.py` was escaping spaces and `%` for `input text`, which cannot send Unicode at all.
 
-`GET /v1/FireTV/keyboard` reports `{"state":"hidden"}` when nothing is focused, and a POST in that state returns a hollow `200` while doing nothing. Text sends must therefore check `state` first and report text-unsupported when it is `hidden`.
+`GET /v1/FireTV/keyboard` reports `{"state":"hidden"}` when nothing is focused, and a POST in that state returns a hollow `200` while doing nothing. So the status is never evidence that a write landed.
+
+The reported state is not evidence either. A first implementation gated sends on `state == "text"` and failed on the commonest case there is: opening the device's search and typing straight from the remote reported no focused field, and text only started working once a character had been typed on the television itself. Re-probing found a third state this design had not recorded — a field that holds focus but has never been typed into reports `{"state":"visible","mode":"keyboard"}`, and only a field with contents reports `{"state":"text","text":"…"}`. Having been wrong once about the vocabulary being closed, the adapter no longer treats any single state name as the definition of writable.
+
+What is left is the field itself: write, then read the contents back and compare. That is truthful whatever the state is called, costs the same two round trips the pre-check did, and mirrors the echo confirmation the Android TV text path uses for the same reason. `hidden` is still checked on the read-back, ahead of the comparison, so an empty send cannot confirm itself against the empty contents an unfocused device reports.
 
 ### Drop the volume keys
 

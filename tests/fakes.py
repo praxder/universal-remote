@@ -214,6 +214,9 @@ class FakeFireTvTransport:
         # A URL fragment whose every request fails at the transport, standing in for
         # a service that stays gone however often it is re-woken.
         self.fail: str | None = None
+        # When True a write leaves the field untouched even though it is accepted,
+        # standing in for a field something else owns.
+        self.keep_keyboard = False
         self._failed = False
 
     async def __call__(self, request: Request) -> Response:
@@ -225,7 +228,19 @@ class FakeFireTvTransport:
             raise OSError("connection refused")
         if self.reject and self.reject in request.url:
             return Response(400, {"description": self.reject_reason})
+        if request.method == "POST" and request.url.endswith(KEYBOARD_PATH):
+            self._type(request.json or {})
         return Response(200, self._body(request))
+
+    def _type(self, body: dict[str, str]) -> None:
+        """Model the route: a write with no field focused is accepted and discarded.
+
+        Whatever the field's state was before, a write that lands leaves it reporting
+        the contents — which is what makes a read-back a truthful confirmation.
+        """
+        if self.keep_keyboard or self.keyboard.get("state") == "hidden":
+            return
+        self.keyboard = {"state": "text", "text": body.get("text", "")}
 
     def _body(self, request: Request) -> dict[str, str]:
         if request.method == "GET" and request.url.endswith(KEYBOARD_PATH):

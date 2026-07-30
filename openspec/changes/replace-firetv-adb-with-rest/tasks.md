@@ -66,5 +66,6 @@
 - [x] 9.1 Run formatters and linters and fix all findings
 - [x] 9.2 Run the full test suite and fix all failures
 - [x] 9.3 Pair against a real Fire TV with ADB debugging **off** and confirm the PIN flow completes
-- [ ] 9.4 Confirm on hardware: d-pad, OK, back, home, menu, play, pause, text entry, and a digit
-- [ ] 9.5 Confirm FAST_FORWARD and REWIND scrub during playback, and note any player where they do not
+- [x] 9.4 Confirm on hardware: d-pad, OK, back, home, menu, play, and pause
+- [x] 9.5 Confirm FAST_FORWARD and REWIND scrub during playback, and note any player where they do not
+- [x] 9.6 Confirm on hardware that text and a digit land in a field that holds focus but has not been typed into — the case the state gate wrongly refused

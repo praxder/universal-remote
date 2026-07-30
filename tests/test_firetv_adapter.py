@@ -100,6 +100,14 @@ def _sent(transport: FakeFireTvTransport) -> list[dict | None]:
     return [request.json for request in transport.requests]
 
 
+def _written(transport: FakeFireTvTransport) -> dict | None:
+    """The body of the last write, past any read the confirmation added after it."""
+    writes = [
+        request.json for request in transport.requests if request.method == "POST"
+    ]
+    return writes[-1] if writes else None
+
+
 async def _session(transport: FakeFireTvTransport) -> FireTvSession:
     """A connected session, with the connect handshake's requests discarded."""
     session = await _adapter(transport).connect(_device())
@@ -460,7 +468,11 @@ class TestFireTvSessionRecovery:
 
 
 class TestFireTvText:
-    def test_given_text_when_sent_then_the_focused_field_is_read_before_writing(self):
+    def test_given_text_when_sent_then_the_field_is_read_back_to_confirm_the_write(
+        self,
+    ):
+        # The route answers 200 even when it typed nothing, so the field's contents are
+        # the only truthful confirmation that the text landed.
         transport = FakeFireTvTransport()
 
         async def scenario():
@@ -470,9 +482,25 @@ class TestFireTvText:
         run(scenario())
 
         assert [(request.method, request.url) for request in transport.requests] == [
-            ("GET", f"{_CONTROL}{KEYBOARD_PATH}"),
             ("POST", f"{_CONTROL}{KEYBOARD_PATH}"),
+            ("GET", f"{_CONTROL}{KEYBOARD_PATH}"),
         ]
+
+    def test_given_a_focused_but_empty_field_when_text_is_sent_then_it_lands(self):
+        # A field that has focus but has never been typed into reports "visible", not
+        # "text" — gating on the state name reported no focused field for the most
+        # common case there is: opening search and typing straight from the remote.
+        transport = FakeFireTvTransport(
+            keyboard={"state": "visible", "mode": "keyboard"}
+        )
+
+        async def scenario():
+            session = await _session(transport)
+            await session.send_text("hi")
+
+        run(scenario())
+
+        assert transport.keyboard == {"state": "text", "text": "hi"}
 
     def test_given_a_focused_field_when_text_is_sent_then_it_is_set_unescaped(self):
         # The route takes the characters as they are — no shell escaping, unlike the
@@ -485,7 +513,7 @@ class TestFireTvText:
 
         run(scenario())
 
-        assert transport.requests[-1].json == {"text": "a b&c 50%s"}
+        assert _written(transport) == {"text": "a b&c 50%s"}
 
     def test_given_non_ascii_text_when_sent_then_it_is_transmitted_unchanged(self):
         transport = FakeFireTvTransport()
@@ -496,12 +524,41 @@ class TestFireTvText:
 
         run(scenario())
 
-        assert transport.requests[-1].json == {"text": "café ☕"}
+        assert _written(transport) == {"text": "café ☕"}
 
     def test_given_no_focused_field_when_text_is_sent_then_text_unsupported_is_reported(
         self,
     ):
+        # A write with nothing focused is accepted and discarded, so the read-back is
+        # what catches it — the status never does.
         transport = FakeFireTvTransport(keyboard={"state": "hidden"})
+
+        async def scenario():
+            session = await _session(transport)
+            with pytest.raises(TextUnsupportedError, match="No text field is focused"):
+                await session.send_text("hi")
+
+        run(scenario())
+
+    def test_given_no_focused_field_when_empty_text_is_sent_then_it_is_not_confirmed(
+        self,
+    ):
+        # A device with nothing focused reports no contents, which empty text would
+        # otherwise match — confirming a send that typed nothing anywhere.
+        transport = FakeFireTvTransport(keyboard={"state": "hidden"})
+
+        async def scenario():
+            session = await _session(transport)
+            with pytest.raises(TextUnsupportedError, match="No text field is focused"):
+                await session.send_text("")
+
+        run(scenario())
+
+    def test_given_the_field_holds_other_text_when_confirming_then_the_send_fails(self):
+        # Something else owns the field, so the text the caller asked for is not there;
+        # reporting success would claim an edit the device never made.
+        transport = FakeFireTvTransport(keyboard={"state": "text", "text": "elsewhere"})
+        transport.keep_keyboard = True
 
         async def scenario():
             session = await _session(transport)
@@ -509,10 +566,6 @@ class TestFireTvText:
                 await session.send_text("hi")
 
         run(scenario())
-
-        # A write with nothing focused returns a hollow 200 and types nothing, so it
-        # must not be attempted at all.
-        assert [request.method for request in transport.requests] == ["GET"]
 
 
 class TestFireTvDigits:
@@ -527,11 +580,12 @@ class TestFireTvDigits:
 
         run(scenario())
 
-        assert _urls(transport) == [
-            f"{_CONTROL}{KEYBOARD_PATH}",
-            f"{_CONTROL}{KEYBOARD_PATH}",
+        assert [request.method for request in transport.requests] == [
+            "GET",  # what the field already holds
+            "POST",  # the concatenation
+            "GET",  # confirmation that it landed
         ]
-        assert transport.requests[-1].json == {"text": "53"}
+        assert transport.keyboard == {"state": "text", "text": "53"}
 
     def test_given_no_focused_field_when_a_digit_is_sent_then_text_unsupported(self):
         # Digits have no keycode path, so they are only sendable into a text field.
@@ -543,8 +597,6 @@ class TestFireTvDigits:
                 await session.send_key(Key.NUM_3)
 
         run(scenario())
-
-        assert [request.method for request in transport.requests] == ["GET"]
 
 
 class TestFireTvDiscovery:

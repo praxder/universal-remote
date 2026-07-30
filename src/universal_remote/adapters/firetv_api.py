@@ -42,9 +42,11 @@ PIN_VERIFY_PATH = "/v1/FireTV/pin/verify"
 API_KEY = "0987654321"
 USER_AGENT = "okhttp/4.10.0"
 
-# What a keyboard read reports when a text field holds focus; anything else (in
-# practice "hidden") means a write would be accepted and then discarded.
-KEYBOARD_STATE_TEXT = "text"
+# What a keyboard read reports when nothing is focused. The other reported states —
+# "text" for a field holding contents, "visible" with a `mode` for one that has focus
+# but has never been typed into — are not an exhaustive list, so no code should treat
+# any single state as the definition of writable (see FireTvSession's confirmation).
+KEYBOARD_STATE_HIDDEN = "hidden"
 
 WAKE_TIMEOUT = 10.0  # seconds to wait for the control port after a wake
 _WAKE_POLL_INTERVAL = 0.25  # seconds between control-port probes

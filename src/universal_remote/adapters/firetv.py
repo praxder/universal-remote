@@ -26,7 +26,7 @@ from ..keys import Key
 from ..session import BaseSession
 from .firetv_api import (
     DIAL_PORT,
-    KEYBOARD_STATE_TEXT,
+    KEYBOARD_STATE_HIDDEN,
     WAKE_TIMEOUT,
     AiohttpTransport,
     CommandRejectedError,
@@ -46,6 +46,7 @@ PLATFORM = "firetv"
 CLIENT_NAME = "Universal Remote"  # the label the television shows when pairing
 PAIR_PROMPT = "Enter the PIN shown on your Fire TV"
 NO_FIELD_MESSAGE = "No text field is focused on this Fire TV"
+DISCARDED_MESSAGE = "The Fire TV discarded the text — refocus the field, then retry"
 # The Amazon mDNS service; the friendly name is in the TXT "n" key, since the
 # instance name is a device code (e.g. "AFTMM").
 DISCOVERY_SERVICE = "_amzn-wplay._tcp.local."
@@ -117,10 +118,8 @@ class FireTvSession(BaseSession):
             await self._retrying(lambda: self._api.send_action(FIRETV_ACTIONS[key]))
 
     async def _dispatch_text(self, text: str) -> None:
-        # A write with nothing focused returns a hollow 200 and types nothing, so the
-        # field's state is read first and a missing field reported rather than faked.
-        await self._retrying(self._focused_text)
         await self._retrying(lambda: self._api.set_keyboard_text(text))
+        await self._confirm(text)
 
     async def _type_digit(self, digit: str) -> None:
         """Type one digit by writing the field's contents back with it appended.
@@ -128,14 +127,25 @@ class FireTvSession(BaseSession):
         The keyboard route replaces the field rather than appending to it, and offers
         no append mode, so the current contents have to be read first.
         """
-        current = await self._retrying(self._focused_text)
+        _state, current = await self._retrying(self._api.keyboard_state)
         await self._retrying(lambda: self._api.set_keyboard_text(current + digit))
+        await self._confirm(current + digit)
 
-    async def _focused_text(self) -> str:
-        state, text = await self._api.keyboard_state()
-        if state != KEYBOARD_STATE_TEXT:
+    async def _confirm(self, expected: str) -> None:
+        """Read the field back, since a write that typed nothing also answers 200.
+
+        The reported state cannot carry this: a field with focus that has never been
+        typed into reports `visible` rather than `text`, so trusting the state name
+        refuses the commonest case — opening search and typing from the remote. What
+        the field actually holds is the one honest signal.
+        """
+        state, text = await self._retrying(self._api.keyboard_state)
+        # Checked before the contents, so an empty send cannot confirm itself against
+        # the empty contents a device with nothing focused reports.
+        if state == KEYBOARD_STATE_HIDDEN:
             raise TextUnsupportedError(NO_FIELD_MESSAGE)
-        return text
+        if text != expected:
+            raise TextUnsupportedError(DISCARDED_MESSAGE)
 
     async def _retrying(self, send: Callable[[], Awaitable[_Result]]) -> _Result:
         """Send one request, re-waking and retrying it once if the service has gone.

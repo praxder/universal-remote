@@ -54,11 +54,20 @@ The Fire TV adapter SHALL dispatch keys as individual requests to the device's r
 - **THEN** the device rejects it and the adapter reports the failure
 
 ### Requirement: Text entry through the device keyboard
-The Fire TV adapter SHALL enter text by setting the contents of the device's focused text field, without requiring the caller to escape any character, and SHALL support characters outside the ASCII range. It SHALL report text as unsupported when no text field is focused, rather than reporting success for text the device discarded.
+The Fire TV adapter SHALL enter text by setting the contents of the device's focused text field, without requiring the caller to escape any character, and SHALL support characters outside the ASCII range. It SHALL report text as unsupported when no text field is focused, rather than reporting success for text the device discarded. Because the device reports success for a write it discarded, the adapter SHALL confirm a send by reading the field's contents back, and SHALL NOT decide whether a field can be written to from the device's reported keyboard state alone.
 
 #### Scenario: Text entered into a focused field
 - **WHEN** text is sent over a session while the device has a focused text field
 - **THEN** the field contains that text
+
+#### Scenario: A field that has never been typed into still accepts text
+- **WHEN** text is sent to a text field that holds focus but that nothing has yet been typed into, such as the device's search field immediately after it opens
+- **THEN** the field contains that text
+- **AND** the send is reported as successful
+
+#### Scenario: Success is confirmed from the field, not the reply
+- **WHEN** the device answers a text write with a success status but the field does not contain the text
+- **THEN** the session reports text-unsupported rather than treating the status as success
 
 #### Scenario: Characters needing no caller escaping
 - **WHEN** text containing spaces, punctuation, or non-ASCII characters is sent
