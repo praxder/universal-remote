@@ -885,6 +885,11 @@ class RemoteScreen(Screen[None]):
             self.app.notify(
                 f"{key.name} is not supported on this device", severity="warning"
             )
+        except TextUnsupportedError as exc:
+            # Some keys are typed rather than sent as a keycode — a Fire TV digit goes
+            # into the focused text field — so their failure reason is a text one, and
+            # the device is reachable. The adapter's reason names the actual cause.
+            self.app.notify(str(exc) or "that key is not supported", severity="warning")
         except Exception:
             # A single failed key press (device timeout, dropped connection) must
             # not take down the remote — report it and stay on-screen.

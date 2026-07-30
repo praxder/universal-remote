@@ -442,6 +442,11 @@ class MacroPlaybackModal(ModalScreen[ActionResult]):
             await self._action_context.session.send_key(key)
         except UnsupportedKeyError:
             return "this device does not support that key"
+        except TextUnsupportedError as exc:
+            # Some keys are typed rather than sent as a keycode — a Fire TV digit goes
+            # into the focused text field — so the reason names a text failure, not an
+            # unreachable device.
+            return str(exc) or "this device does not support that key"
         except Exception:
             return "the device may be unreachable"
         return None

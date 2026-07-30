@@ -8,6 +8,12 @@ from ipaddress import ip_address
 from androidtvremote2 import remotemessage_pb2 as pb
 from pyatv.const import Protocol
 
+from universal_remote.adapters.firetv_api import (
+    KEYBOARD_PATH,
+    PIN_VERIFY_PATH,
+    Request,
+    Response,
+)
 from universal_remote.capabilities import Capabilities
 from universal_remote.errors import PairingCancelledError
 from universal_remote.keys import Key
@@ -172,73 +178,59 @@ class FakeRoku:
         self.sent_text.append(text)
 
 
-class FakeAdbSigner:
-    """Stands in for `PythonRSASigner`; records the key material it was built from.
+async def firetv_port_open(_ip: str, _port: int, _timeout: float) -> bool:
+    """Fire TV control-port probe stand-in: it accepts at once, so no wake polling."""
+    return True
 
-    A fresh pair builds it with a public key (so the TV can whitelist it); a
-    connect replay builds it with the private key only, so a test can tell the
-    two flows apart by whether `pub` is present.
+
+class FakeFireTvTransport:
+    """Stands in for the Fire TV HTTP transport; records requests, answers by route.
+
+    Every request is recorded, so a test can assert the URL, headers, and body the
+    API built. Routes answer 200 with what the device returns: a keyboard read
+    reports the focused field's state and contents, and a PIN verify reports the
+    pairing token in its `description`.
     """
-
-    def __init__(self, pub: str | None = None, priv: str | None = None) -> None:
-        self.pub = pub
-        self.priv = priv
-
-
-def fake_keygen() -> tuple[str, str]:
-    """Deterministic ADB keypair stand-in, returning (public, private) contents."""
-    return "fake-public-key", "fake-private-pem"
-
-
-# A `getevent -lp` listing with a d-pad-capable input node, so node discovery
-# finds one and the fast `sendevent` path is exercised by default.
-FAKE_GETEVENT_LP = """add device 1: /dev/input/event4
-  name:     "amzkeyboard"
-    KEY (0001): KEY_UP KEY_DOWN KEY_LEFT KEY_RIGHT KEY_ENTER KEY_SELECT KEY_BACK
-add device 2: /dev/input/event3
-  name:     "kcmouse"
-    KEY (0001): BTN_MOUSE
-"""
-
-
-class FakeAdbDevice:
-    """Stands in for `AdbDeviceTcpAsync`; records connects and dispatched commands."""
 
     def __init__(
         self,
-        host: str,
-        port: int = 5555,
-        getevent_lp: str = FAKE_GETEVENT_LP,
-        **_kwargs,
+        *,
+        keyboard: dict[str, str] | None = None,
+        token: str = "AB1CD2E",
     ) -> None:
-        self.host = host
-        self.port = port
-        # `getevent -lp` output used for input-node discovery at connect time.
-        self.getevent_lp = getevent_lp
-        # Each connect records the signer keys and auth timeout it was called with,
-        # so a test can distinguish pair-time (public key present) from connect-time.
-        self.connects: list[dict] = []
-        self.commands: list[str] = []
+        self.requests: list[Request] = []
+        # What a keyboard read reports; a "hidden" state stands in for a device with
+        # no text field focused.
+        self.keyboard = keyboard or {"state": "text", "text": ""}
+        self.token = token
         self.closed = False
-        # When set, the connect handshake raises it — stands in for an unreachable,
-        # refused, timed-out, or auth-rejected device.
-        self.connect_error: Exception | None = None
-        # When True, `input text` raises — stands in for an unfocused text field.
-        self.reject_text = False
+        # A URL fragment whose requests the device answers 400 — a rejected action.
+        self.reject: str | None = None
+        # A URL fragment whose first request fails at the transport, standing in for
+        # a remote service that stopped while the session was idle.
+        self.fail_once: str | None = None
+        # A URL fragment whose every request fails at the transport, standing in for
+        # a service that stays gone however often it is re-woken.
+        self.fail: str | None = None
+        self._failed = False
 
-    async def connect(self, rsa_keys=None, auth_timeout_s=None, **_kwargs) -> bool:
-        if self.connect_error is not None:
-            raise self.connect_error
-        self.connects.append({"rsa_keys": rsa_keys, "auth_timeout_s": auth_timeout_s})
-        return True
+    async def __call__(self, request: Request) -> Response:
+        self.requests.append(request)
+        if self.fail and self.fail in request.url:
+            raise OSError("connection refused")
+        if self.fail_once and self.fail_once in request.url and not self._failed:
+            self._failed = True
+            raise OSError("connection refused")
+        if self.reject and self.reject in request.url:
+            return Response(400, {})
+        return Response(200, self._body(request))
 
-    async def shell(self, command: str, **_kwargs) -> str:
-        if command == "getevent -lp":
-            return self.getevent_lp  # discovery probe, not a dispatched key
-        if self.reject_text and command.startswith("input text"):
-            raise RuntimeError("no focused text field")
-        self.commands.append(command)
-        return ""
+    def _body(self, request: Request) -> dict[str, str]:
+        if request.method == "GET" and request.url.endswith(KEYBOARD_PATH):
+            return dict(self.keyboard)
+        if request.url.endswith(PIN_VERIFY_PATH):
+            return {"description": self.token}
+        return {}
 
     async def close(self) -> None:
         self.closed = True

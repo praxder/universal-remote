@@ -23,12 +23,14 @@ None. This change replaces the transport behind an existing capability.
 ### Modified Capabilities
 
 - `firetv-adapter`: pairing becomes PIN-based rather than popup-based; the declared key set loses the volume keys, `PLAY_PAUSE`, and `STOP`; text entry and the low-latency dispatch requirements are restated against the REST transport instead of ADB input nodes.
+- `homebrew-distribution`: `adb-shell` leaves the list of dynamic-import dependencies the frozen bundle must carry, since the dependency is removed. The PyInstaller spec's `collect_all('adb_shell')` goes with it — left in place it would fail the build outright.
 
 ## Impact
 
 - `src/universal_remote/adapters/firetv.py` — rewritten against the REST API; `FireTvSession` no longer holds a persistent connection.
 - `src/universal_remote/adapters/adb_text.py` and `tests/test_adb_text.py` — removed.
 - `tests/test_firetv_adapter.py` — rewritten against an injected HTTP seam.
-- `pyproject.toml` — `adb-shell[async]` dependency removed.
+- `pyproject.toml` and `uv.lock` — `adb-shell[async]` dependency removed, along with the transitive packages it alone pulled in.
+- `universal-remote.spec` — the `collect_all('adb_shell')` bundling step removed; `THIRD_PARTY_LICENSES.md` regenerated from the new lock.
 - Users with a paired Fire TV must re-pair; the stored credential format changes from an RSA private-key PEM to a short opaque token.
 - The on-screen remote will disable the five dropped keys for Fire TV devices via the existing capability mechanism.

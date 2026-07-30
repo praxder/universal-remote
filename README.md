@@ -93,7 +93,7 @@ already saved are left out. Leave any time with `Esc`, even mid-scan.
 ![Automatic discovery](docs/screenshots/discovery.png)
 
 Discovery is best-effort — a TV that's off, on another subnet, or not yet set up
-(a Fire TV with ADB still disabled, say) simply won't appear.
+simply won't appear.
 
 ### Add a TV — manual entry
 
@@ -112,8 +112,8 @@ still connect to a red device.
 The first connection pairs the device, and the credential is saved so later
 sessions connect straight through:
 
-- **Samsung, LG, Fire TV** — accept the on-screen authorization popup.
-- **Apple TV** — type the PIN it shows on the TV.
+- **Samsung, LG** — accept the on-screen authorization popup.
+- **Apple TV, Fire TV** — type the PIN it shows on the TV.
 - **Android TV / Google TV** — type the pairing code it shows on the TV.
 - **Roku** — no pairing at all; its control protocol is unauthenticated.
 
@@ -136,7 +136,7 @@ play/pause, rewind, fast-forward, stop), the number pad, and power are on-screen
 buttons. Buttons the connected TV doesn't support are shown disabled — the
 pictured Roku has no menu key, no number pad, and only a single play/pause toggle
 in place of discrete play, pause, and stop; Apple TV has no mute; Fire TV has no
-channel keys; and so on. The top row's fourth button, **Macros**, is set off by a
+channel keys, no volume or mute, and no combined play/pause or stop; and so on. The top row's fourth button, **Macros**, is set off by a
 divider because it opens an app screen instead of sending a key to the TV — see
 **Macros** below.
 
@@ -327,19 +327,24 @@ The Keyboard Shortcuts screen itself:
 **Platform quirks**
 
 - **Text entry is best-effort on every platform.** Samsung `SendInputString`, LG
-  `insertText`, Android TV's Remote v2 input method, and Fire TV's ADB `input
-  text` support all vary by app and firmware; a failed send reports "not
-  supported" rather than silently dropping input. Android TV in particular needs
-  a text field already focused on the TV — with nothing focused it reports "not
-  supported" instead.
+  `insertText`, and Android TV's Remote v2 input method support all vary by app
+  and firmware; a failed send reports "not supported" rather than silently
+  dropping input. Android TV and Fire TV both need a text field already focused
+  on the TV — with nothing focused they report "not supported" instead.
 - **Power-on is best-effort.** A TV that's off is woken with a Wake-on-LAN magic
   packet to its stored MAC, which requires the TV's "Wake on LAN / Network
   Standby" setting to be enabled (off by default on many sets). Power-**off** is
   reliable.
 - **Missing keys by platform.** Apple TV has no mute (the Companion protocol
   lacks it); Roku exposes only a single play/pause toggle with no number pad or
-  menu key; Fire TV has no channel keys (no tuner).
-- **Fire TV needs ADB debugging** enabled on the TV before it can be controlled.
+  menu key; Fire TV has no channel keys (no tuner), no volume or mute (it reports
+  it cannot control either), and no combined play/pause or stop (its control API
+  offers no action for them).
+- **Fire TV number-pad digits only reach a focused text field**, since its
+  control API has no arbitrary-keycode path — they are typed, not sent as keys.
+- **Fire TV rewind and fast-forward scrub with the player's d-pad** (±10s per
+  press), which is a Fire TV player convention rather than a protocol guarantee,
+  so an app with a custom player may not honour it.
 
 **Distribution**
 

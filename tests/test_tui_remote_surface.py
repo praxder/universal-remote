@@ -528,6 +528,34 @@ class TestRemoteSurface:
 
         assert any("UP" in message for message in captured["messages"])
 
+    def test_given_a_key_fails_for_a_text_reason_when_pressed_then_that_reason_shows(
+        self, tmp_path
+    ):
+        # A Fire TV digit is typed into the focused field rather than sent as a
+        # keycode, so its failure reason is a text one — and the device is reachable,
+        # which the generic "may be unreachable" message would misstate.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        captured: dict = {}
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                adapter.sessions[0].dispatch_error = TextUnsupportedError(
+                    "No text field is focused on this Fire TV"
+                )
+
+                # Act: press a key whose dispatch reports text as unsupported.
+                await pilot.press("up")
+                await pilot.pause()
+
+                captured["messages"] = [str(n.message) for n in app._notifications]
+
+        asyncio.run(scenario())
+
+        assert "No text field is focused on this Fire TV" in captured["messages"]
+
     def test_given_a_text_send_fails_when_submitted_then_the_remote_survives(
         self, tmp_path
     ):
