@@ -6,10 +6,24 @@ Fire OS exposes the undocumented REST API used by Amazon's own Fire TV remote ap
 
 ```
 ① POST http://<ip>:8009/apps/FireTVRemote      DIAL wake → 201; opens :8080 in ~1.5s
-② POST https://<ip>:8080/v1/FireTV/pin/display  → PIN shown on the television
+② POST https://<ip>:8080/v1/FireTV/pin/display  {"friendlyName":"…"} → PIN on the TV
 ③ POST https://<ip>:8080/v1/FireTV/pin/verify   {"pin":"…"} → {"description":"<token>"}
 ④ POST https://<ip>:8080/v1/FireTV?action=home  + X-Client-Token
 ```
+
+Both pairing routes were re-probed against the device after the first implementation
+failed against it, which corrected two facts recorded above:
+
+- `pin/display` **requires** the `friendlyName` body. Without it — bodyless, `{}`, or
+  the name as a query parameter — the device answers `400 {"description":"Bad
+  arguments supplied. Please check inputs."}` and shows nothing. With it, `200 OK`.
+- A **wrong PIN is not a failed request**: `pin/verify` answers `200` with an *empty*
+  `description`, so an empty token is how a rejected PIN presents. Treating only a
+  failure status as rejection would have stored an empty credential as a success.
+
+Every unauthenticated route answers `403 {"description":"Request unauthorized, missing
+client token"}`, so the device's own `description` is the reason to report on failure —
+a bare status number says nothing about what it objected to.
 
 Constants: `X-Api-Key: 0987654321` (a fixed value in the protocol, not a per-user secret), `User-Agent: okhttp/4.10.0`. TLS is self-signed, so certificate verification must be disabled for this host. The token is short (7 characters) and survives a re-wake.
 

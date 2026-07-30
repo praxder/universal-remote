@@ -65,6 +65,6 @@
 
 - [x] 9.1 Run formatters and linters and fix all findings
 - [x] 9.2 Run the full test suite and fix all failures
-- [ ] 9.3 Pair against a real Fire TV with ADB debugging **off** and confirm the PIN flow completes
+- [x] 9.3 Pair against a real Fire TV with ADB debugging **off** and confirm the PIN flow completes
 - [ ] 9.4 Confirm on hardware: d-pad, OK, back, home, menu, play, pause, text entry, and a digit
 - [ ] 9.5 Confirm FAST_FORWARD and REWIND scrub during playback, and note any player where they do not

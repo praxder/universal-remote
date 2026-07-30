@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     from ..registry import AdapterRegistry
 
 PLATFORM = "firetv"
+CLIENT_NAME = "Universal Remote"  # the label the television shows when pairing
 PAIR_PROMPT = "Enter the PIN shown on your Fire TV"
 NO_FIELD_MESSAGE = "No text field is focused on this Fire TV"
 # The Amazon mDNS service; the friendly name is in the TXT "n" key, since the
@@ -214,13 +215,14 @@ class FireTvAdapter:
 
     async def _exchange_pin(self, api: RemoteApi, prompt) -> str:
         await api.wake()
-        await api.display_pin()  # the television now shows its PIN
+        await api.display_pin(CLIENT_NAME)  # the television now shows its PIN
         try:
             token = await api.verify_pin(await prompt(PAIR_PROMPT))
         except CommandRejectedError as exc:
             raise PairingCancelledError("The Fire TV did not accept that PIN") from exc
         if not token:
-            raise PairingCancelledError("The Fire TV returned no pairing token")
+            # A wrong PIN is answered with an empty token rather than a failed request.
+            raise PairingCancelledError("The Fire TV did not accept that PIN")
         return token
 
     def _api(

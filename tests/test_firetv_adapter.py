@@ -4,6 +4,7 @@ import pytest
 
 from tests.fakes import FakeFireTvTransport, firetv_port_open
 from universal_remote.adapters.firetv import (
+    CLIENT_NAME,
     DIGIT_KEYS,
     DISCOVERY_SERVICE,
     FIRETV_ACTIONS,
@@ -204,6 +205,14 @@ class TestFireTvPairing:
             f"{_CONTROL}{PIN_VERIFY_PATH}",
         ]
 
+    def test_given_a_pin_request_when_displayed_then_the_client_name_is_supplied(self):
+        # Without it the device answers "Bad arguments supplied" and shows no PIN.
+        transport = FakeFireTvTransport()
+
+        run(_adapter(transport).pair(_device(), prompt=_prompt))
+
+        assert transport.requests[1].json == {"friendlyName": CLIENT_NAME}
+
     def test_given_a_prompted_pin_when_verifying_then_it_is_sent_to_the_device(self):
         transport = FakeFireTvTransport()
 
@@ -224,6 +233,14 @@ class TestFireTvPairing:
         run(_adapter(transport).pair(_device(), prompt=_prompt))
 
         assert transport.closed is True
+
+    def test_given_a_wrong_pin_when_pairing_then_pairing_is_reported_as_failed(self):
+        # The device does not fail the request for a wrong PIN: it answers 200 with an
+        # empty token, so an empty credential is the rejection and must not be stored.
+        transport = FakeFireTvTransport(token="")
+
+        with pytest.raises(PairingCancelledError):
+            run(_adapter(transport).pair(_device(), prompt=_prompt))
 
     def test_given_a_rejected_pin_when_pairing_then_pairing_is_reported_as_failed(self):
         transport = FakeFireTvTransport()

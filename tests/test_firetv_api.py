@@ -75,7 +75,7 @@ class TestFireTvRequestConstruction:
         # Pairing runs before a token exists; sending an empty one would be a lie.
         transport = FakeFireTvTransport()
 
-        run(_api(transport).display_pin())
+        run(_api(transport).display_pin("Universal Remote"))
 
         assert "X-Client-Token" not in transport.requests[0].headers
 
@@ -154,6 +154,17 @@ class TestFireTvWake:
             run(_api(transport).wake())
 
 
+class TestFireTvPinDisplay:
+    def test_given_a_pin_request_when_sent_then_the_client_name_is_supplied(self):
+        # The route answers "Bad arguments supplied" without a friendly name, and the
+        # name is what the television labels the pairing request with.
+        transport = FakeFireTvTransport()
+
+        run(_api(transport).display_pin("Universal Remote"))
+
+        assert transport.requests[0].json == {"friendlyName": "Universal Remote"}
+
+
 class TestFireTvCommandOutcome:
     def test_given_the_device_rejects_a_command_then_it_is_reported_as_rejected(self):
         transport = FakeFireTvTransport()
@@ -161,6 +172,18 @@ class TestFireTvCommandOutcome:
 
         with pytest.raises(CommandRejectedError):
             run(_api(transport).send_action("nonsense"))
+
+    def test_given_a_rejection_carries_a_reason_when_raised_then_it_names_that_reason(
+        self,
+    ):
+        # The device explains itself in `description`; dropping it leaves a bare status
+        # that says nothing about what the device actually objected to.
+        transport = FakeFireTvTransport()
+        transport.reject = "/v1/FireTV"
+        transport.reject_reason = "Bad arguments supplied. Please check inputs."
+
+        with pytest.raises(CommandRejectedError, match="Bad arguments supplied"):
+            run(_api(transport).send_action("home"))
 
     def test_given_the_service_has_stopped_when_a_command_is_sent_then_it_is_unavailable(
         self,

@@ -206,6 +206,8 @@ class FakeFireTvTransport:
         self.closed = False
         # A URL fragment whose requests the device answers 400 — a rejected action.
         self.reject: str | None = None
+        # What the device says in `description` when it rejects.
+        self.reject_reason = ""
         # A URL fragment whose first request fails at the transport, standing in for
         # a remote service that stopped while the session was idle.
         self.fail_once: str | None = None
@@ -222,7 +224,7 @@ class FakeFireTvTransport:
             self._failed = True
             raise OSError("connection refused")
         if self.reject and self.reject in request.url:
-            return Response(400, {})
+            return Response(400, {"description": self.reject_reason})
         return Response(200, self._body(request))
 
     def _body(self, request: Request) -> dict[str, str]:

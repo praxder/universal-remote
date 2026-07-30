@@ -204,12 +204,24 @@ class RemoteApi:
             self._control("POST", KEYBOARD_PATH, json={"text": text}),
         )
 
-    async def display_pin(self) -> None:
-        """Ask the device to show its pairing PIN on the television."""
-        await self._command(self._control("POST", PIN_DISPLAY_PATH))
+    async def display_pin(self, friendly_name: str) -> None:
+        """Ask the device to show a pairing PIN on the television.
+
+        The name identifies the client the television is being asked to trust, and the
+        route rejects the request outright without one.
+        """
+        await self._command(
+            self._control(
+                "POST", PIN_DISPLAY_PATH, json={"friendlyName": friendly_name}
+            )
+        )
 
     async def verify_pin(self, pin: str) -> str:
-        """Exchange a PIN for the client token; the device returns it as a description."""
+        """Exchange a PIN for the client token; the device returns it as a description.
+
+        A wrong PIN is not a failed request — the device answers 200 with an empty
+        description — so an empty return is how a rejected PIN presents.
+        """
         response = await self._command(
             self._control("POST", PIN_VERIFY_PATH, json={"pin": pin}),
         )
@@ -249,9 +261,10 @@ class RemoteApi:
         """Send a request the device must accept, refusing to infer success."""
         response = await self._send(request)
         if not response.ok:
-            raise CommandRejectedError(
-                f"The Fire TV refused {request.url} ({response.status})"
-            )
+            # The device explains itself in `description`; a bare status would leave
+            # the caller guessing at what it objected to.
+            reason = response.body.get("description") or f"status {response.status}"
+            raise CommandRejectedError(f"The Fire TV refused {request.url}: {reason}")
         return response
 
     async def _send(self, request: Request) -> Response:
