@@ -1,6 +1,6 @@
 [project]
 name = "universal-remote"
-version = "1.4.0"
+version = "2.0.0"
 description = "A local, terminal-based universal TV remote."
 readme = "README.md"
 license = "MIT"

@@ -2,6 +2,69 @@
 
 <!-- version list -->
 
+## v2.0.0 (2026-07-31)
+
+### Bug Fixes
+
+- **androidtv**: Send text over Remote v2, drop ADB
+  ([`45dba31`](https://github.com/praxder/universal-remote/commit/45dba31779a0437f80d1f72fe019e5f1d5cc87f4))
+
+- **androidtv**: Stop reporting discarded text as sent
+  ([`bcb64b4`](https://github.com/praxder/universal-remote/commit/bcb64b49fb6a3e35b11454070849ccacb2135210))
+
+- **firetv**: Confirm a text send from the field, not its state
+  ([`744c18e`](https://github.com/praxder/universal-remote/commit/744c18e76c5902c2199bbc830fa3360ccf3c0891))
+
+- **firetv**: Name the client when requesting a pairing PIN
+  ([`a0c2bdd`](https://github.com/praxder/universal-remote/commit/a0c2bdd37ccfda56af3bed57c910f1434b9b8fcb))
+
+### Documentation
+
+- Name the Fire TV transport as Amazon's private API
+  ([`5ab22a5`](https://github.com/praxder/universal-remote/commit/5ab22a50621e7969ffec07e0f969a56b0079215c))
+
+- Show the reorder buttons in the device list screenshot
+  ([`41b29c3`](https://github.com/praxder/universal-remote/commit/41b29c3bd2ea3cab5dd9698ac9f249185f889a36))
+
+- Tie the ADB text path to Fire TV only
+  ([`3ef4a4a`](https://github.com/praxder/universal-remote/commit/3ef4a4a796ae12b2c1395b57f444712bab5a782f))
+
+- **openspec**: Archive the Android TV Remote v2 text fix
+  ([`fff24ae`](https://github.com/praxder/universal-remote/commit/fff24ae25bb2f2a845dce7e74fc87a9b0e68c308))
+
+- **openspec**: Archive the device list reordering change
+  ([`23ecbf0`](https://github.com/praxder/universal-remote/commit/23ecbf0e53f288d4fa55a2c801f531e6d78fc8ef))
+
+- **openspec**: Archive the Fire TV REST transport change
+  ([`1b42759`](https://github.com/praxder/universal-remote/commit/1b427593c4c71136cfedf6a24b677b7fdee6ecd5))
+
+- **openspec**: Complete Android TV Remote v2 text verification
+  ([`b442b96`](https://github.com/praxder/universal-remote/commit/b442b96cc7135df9eff93a31ae5f6e1dc292318b))
+
+- **openspec**: Drop the withdrawn ADB opt-in store scenario
+  ([`ecafde5`](https://github.com/praxder/universal-remote/commit/ecafde5a53de87f349bd2db0928d6a9339bf49e4))
+
+- **openspec**: Propose Android TV Remote v2 text fix
+  ([`ba7a46f`](https://github.com/praxder/universal-remote/commit/ba7a46f5bf6727c9376b99148cfd8f4fca6bf21a))
+
+- **openspec**: Propose device list reordering
+  ([`6e55cb7`](https://github.com/praxder/universal-remote/commit/6e55cb7f842ab802001c478ab3b3ad0ee030fa1d))
+
+- **openspec**: Propose Fire TV REST transport
+  ([`327dc01`](https://github.com/praxder/universal-remote/commit/327dc01004caa5e59c22563829d22aa0fe29028f))
+
+- **openspec**: Record the verified focus-loss text failure
+  ([`14e6070`](https://github.com/praxder/universal-remote/commit/14e6070d2ca5d1c829b532a4c873ef5f72bbf3c0))
+
+### Features
+
+- **devices**: Reorder saved devices from the list
+  ([`519de7b`](https://github.com/praxder/universal-remote/commit/519de7b86a81b19f1d2d680123c78bdf0ecfe53c))
+
+- **firetv**: Drive the REST remote API, drop ADB
+  ([`d216555`](https://github.com/praxder/universal-remote/commit/d216555bfbcad7d4b6dd65e57c92e0282ed6df7a))
+
+
 ## v1.4.0 (2026-07-29)
 
 ### Bug Fixes
