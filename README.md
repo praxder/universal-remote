@@ -340,6 +340,11 @@ The Keyboard Shortcuts screen itself:
   menu key; Fire TV has no channel keys (no tuner), no volume or mute (it reports
   it cannot control either), and no combined play/pause or stop (its control API
   offers no action for them).
+- **Fire TV rides Amazon's undocumented remote API** — the HTTPS API Amazon's
+  own remote app speaks, not a published one. That's why it needs no developer
+  mode and no ADB, but Amazon can change or withdraw it in any Fire OS update.
+  The device serves it behind a self-signed certificate, so certificate
+  verification is waived for those requests and no others.
 - **Fire TV number-pad digits only reach a focused text field**, since its
   control API has no arbitrary-keycode path — they are typed, not sent as keys.
 - **Fire TV rewind and fast-forward scrub with the player's d-pad** (±10s per
