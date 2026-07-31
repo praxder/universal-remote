@@ -40,7 +40,7 @@ packaging into the release tarball.
 
 #### Scenario: Bundled framework and dynamic-import dependencies are present
 - **WHEN** the binary performs discovery and pairing
-- **THEN** no missing-module or missing-data-file error occurs for Textual CSS or for the dynamic-import dependencies (`zeroconf`, `pyatv`, `protobuf`, `androidtvremote2`, `adb-shell`)
+- **THEN** no missing-module or missing-data-file error occurs for Textual CSS or for the dynamic-import dependencies (`zeroconf`, `pyatv`, `protobuf`, `androidtvremote2`)
 
 #### Scenario: Launch does not unpack a bundle to a temporary directory
 - **WHEN** the frozen binary is launched from its installed application directory

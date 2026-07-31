@@ -59,7 +59,7 @@
 - [x] 8.5 Update any in-repo documentation that states Fire TV requires ADB or developer mode
 - [x] 8.6 Add a `homebrew-distribution` spec delta dropping `adb-shell` from the dynamic-import dependencies the frozen bundle must carry
 - [x] 8.7 Report the digit/text failure reason on a key press (`tui/remote_screen.py`, `tui/actions.py`): a Fire TV digit is typed rather than sent as a keycode, so "may be unreachable" would misstate an unfocused field
-- [ ] 8.8 At archive time, hand-edit the `## Purpose` line of `openspec/specs/firetv-adapter/spec.md`, which still describes popup pairing and a low-latency path with a fallback — no delta block can express a Purpose change, so archive would leave it asserting the opposite of the shipped behaviour
+- [x] 8.8 At archive time, hand-edit the `## Purpose` line of `openspec/specs/firetv-adapter/spec.md`, which still describes popup pairing and a low-latency path with a fallback — no delta block can express a Purpose change, so archive would leave it asserting the opposite of the shipped behaviour
 
 ## 9. Verification
 
