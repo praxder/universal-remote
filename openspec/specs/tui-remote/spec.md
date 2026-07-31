@@ -27,7 +27,11 @@ The application SHALL launch into a menu offering two modes: Manage Devices and 
 - **THEN** the application performs that action, and its default key no longer triggers it
 
 ### Requirement: Device management screens
-The Manage Devices mode SHALL present a "Devices" ASCII-art banner, the saved devices, and an always-present add entry as the last row of the list, backed by the device store and exposing add, edit, and delete. When one or more devices are saved, the mode SHALL list the devices first, then a separator, then the add entry; when no devices are saved, the list SHALL show only the add entry. Selecting the add entry — by Enter or by mouse click — SHALL open device discovery (see the "Add device via discovery" requirement). Selecting a device row — by Enter or by mouse click — SHALL open that device for editing. Deleting a device SHALL be triggered either by the Backspace key while a device row is highlighted on the list, or by a Delete button on the edit screen (shown only when editing a device, never when adding), and SHALL require the user to confirm before the device is removed: the system SHALL present the same confirmation prompt naming the device, remove the device only when the user confirms, and leave the store unchanged when the user cancels. When deletion is confirmed from the edit screen, the application SHALL return to the saved-device list, which SHALL no longer show the removed device. The confirmation prompt SHALL default keyboard focus to its cancel action and SHALL let the user move focus between its confirm and cancel actions with the arrow keys. Pressing Backspace while the add entry is highlighted SHALL do nothing. The add and edit screen SHALL present an ASCII-art banner titled "Add Device" when adding and "Edit Device" when editing, styled with the same top and bottom margin as the "Devices" banner. The add and edit screen SHALL order its cells as device type, then name, then IP address. When adding, the device type SHALL be a selector offering the registered platforms by their human-readable names and defaulting to the first; when editing, the device type SHALL be shown as a read-only cell while the name and IP address remain editable. When editing, the screen SHALL show a Delete button below Save, aligned to the same left edge; the add screen SHALL NOT show a Delete button. The device-type cell, the name and IP address cells, the Save button, and — when editing — the Delete button SHALL be reachable both by Tab and by the Up and Down arrow keys — Up moves focus to the previous cell and Down to the next — while the Left and Right arrows continue to move the text cursor within a focused input. Because the Up and Down arrows navigate between cells, the device-type dropdown SHALL open on Enter or Space rather than on an arrow key. The Save button's left edge SHALL be aligned with the cells above it.
+The Manage Devices mode SHALL present a "Devices" ASCII-art banner, the saved devices, and an always-present add entry as the last row of the list, backed by the device store and exposing add, edit, delete, and reorder. When one or more devices are saved, the mode SHALL list the devices first, then a separator, then the add entry; when no devices are saved, the list SHALL show only the add entry. Selecting the add entry — by Enter or by mouse click — SHALL open device discovery (see the "Add device via discovery" requirement). Selecting a device row — by Enter or by mouse click — SHALL open that device for editing. Deleting a device SHALL be triggered either by the Backspace key while a device row is highlighted on the list, or by a Delete button on the edit screen (shown only when editing a device, never when adding), and SHALL require the user to confirm before the device is removed: the system SHALL present the same confirmation prompt naming the device, remove the device only when the user confirms, and leave the store unchanged when the user cancels. When deletion is confirmed from the edit screen, the application SHALL return to the saved-device list, which SHALL no longer show the removed device. The confirmation prompt SHALL default keyboard focus to its cancel action and SHALL let the user move focus between its confirm and cancel actions with the arrow keys. Pressing Backspace while the add entry is highlighted SHALL do nothing.
+
+Below the device list — outside it, after the add entry — the mode SHALL present a Move Up button and a Move Down button side by side on one row, which move the highlighted device one place earlier or one place later in the saved-device order (see the device-management capability's "Reorder saved devices" requirement). The same two moves SHALL also be available from the list itself by `shift+up` and `shift+down`, and — mirroring this application's Vim navigation aliases — by `K` and `J`, so a keyboard user need not leave the list; the plain Up and Down arrows and the unshifted Vim keys continue to move the highlight without reordering. A move SHALL persist immediately and SHALL NOT change any stored field of the device. After a move the list SHALL renumber its rows and SHALL keep the moved device highlighted at its new position, so pressing the same move again walks that device a further place. Activating a move by mouse or by Tab-and-Enter SHALL return keyboard focus to the device list. The two buttons SHALL be present and enabled whenever the mode is shown, and a move that cannot be made SHALL do nothing at all — leaving the list and the store unchanged — in each of these cases: the highlighted device is already first and Move Up is activated; the highlighted device is already last and Move Down is activated; the add entry is highlighted; fewer than two devices are saved. Reordering SHALL be offered only here: no other screen SHALL change the device order.
+
+The add and edit screen SHALL present an ASCII-art banner titled "Add Device" when adding and "Edit Device" when editing, styled with the same top and bottom margin as the "Devices" banner. The add and edit screen SHALL order its cells as device type, then name, then IP address. When adding, the device type SHALL be a selector offering the registered platforms by their human-readable names and defaulting to the first; when editing, the device type SHALL be shown as a read-only cell while the name and IP address remain editable. When editing, the screen SHALL show a Delete button below Save, aligned to the same left edge; the add screen SHALL NOT show a Delete button. The device-type cell, the name and IP address cells, the Save button, and — when editing — the Delete button SHALL be reachable both by Tab and by the Up and Down arrow keys — Up moves focus to the previous cell and Down to the next — while the Left and Right arrows continue to move the text cursor within a focused input. Because the Up and Down arrows navigate between cells, the device-type dropdown SHALL open on Enter or Space rather than on an arrow key. The Save button's left edge SHALL be aligned with the cells above it.
 
 #### Scenario: Devices listed above the add row
 - **WHEN** the user opens Manage Devices with one or more saved devices
@@ -65,6 +69,52 @@ The Manage Devices mode SHALL present a "Devices" ASCII-art banner, the saved de
 #### Scenario: Backspace on the add entry does nothing
 - **WHEN** the add entry is highlighted and the user presses Backspace
 - **THEN** no confirmation prompt is shown and no device is removed
+
+#### Scenario: Move buttons shown below the list
+- **WHEN** the user opens Manage Devices
+- **THEN** a Move Up button and a Move Down button are shown side by side on one row below the list, both enabled
+
+#### Scenario: Move Down button moves the highlighted device later
+- **WHEN** the first device is highlighted and the user activates Move Down
+- **THEN** that device is listed second, the previously second device is listed first, and the rows are renumbered accordingly
+- **AND** the new order is persisted to the store
+
+#### Scenario: Move Up button moves the highlighted device earlier
+- **WHEN** the second device is highlighted and the user activates Move Up
+- **THEN** that device is listed first and the rows are renumbered accordingly
+- **AND** the new order is persisted to the store
+
+#### Scenario: Shift-arrow keys move the highlighted device
+- **WHEN** a device row is highlighted and the user presses `shift+down` or `shift+up`
+- **THEN** that device moves one place later or one place earlier, exactly as the matching button does
+
+#### Scenario: Shifted Vim keys move the highlighted device
+- **WHEN** a device row is highlighted and the user presses `J` or `K`
+- **THEN** that device moves one place later or one place earlier, the same as `shift+down` or `shift+up`
+
+#### Scenario: Highlight follows the moved device
+- **WHEN** the first of three devices is highlighted and the user moves it down twice
+- **THEN** that device is listed third and is the highlighted row
+
+#### Scenario: Focus returns to the list after a button move
+- **WHEN** the user activates Move Up or Move Down from the button
+- **THEN** keyboard focus is on the device list, with the moved device highlighted
+
+#### Scenario: Moving the first device up does nothing
+- **WHEN** the first device is highlighted and the user activates Move Up
+- **THEN** the listed order is unchanged and the store is unchanged
+
+#### Scenario: Moving the last device down does nothing
+- **WHEN** the last device is highlighted and the user activates Move Down
+- **THEN** the listed order is unchanged and the store is unchanged
+
+#### Scenario: Moving with the add entry highlighted does nothing
+- **WHEN** the add entry is highlighted and the user activates either move
+- **THEN** the listed order is unchanged and the store is unchanged
+
+#### Scenario: A move leaves the device's stored fields alone
+- **WHEN** a device is moved on the list
+- **THEN** its stored name, platform, and IP address are unchanged
 
 #### Scenario: Edit screen offers a Delete button
 - **WHEN** the user opens the edit flow for a saved device
@@ -308,7 +358,7 @@ The entry menu SHALL display one famous movie or TV quote with attribution benea
 - **THEN** the quote provider is consulted once and the same quote remains for that session
 
 ### Requirement: Numbered device lists and digit selection
-Both device-selection lists — the Manage Devices list and the Use Remote device picker — SHALL prefix each saved device row with its 1-based position followed by a period and a space (for example, `1. Apple TV`, `2. Android TV`). The numbering SHALL reflect the order in which the devices are listed and SHALL count only saved devices; the `+ Add` entry SHALL NOT be numbered. Pressing a digit key `1` through `9` while such a list is showing SHALL act on the device at that position exactly as selecting that row does — opening it for editing on the Manage Devices list and beginning the connect/pair flow on the Use Remote picker. A digit that does not correspond to a listed device SHALL do nothing. Numbering is a display and shortcut concern only: it SHALL NOT change the stored device name.
+Both device-selection lists — the Manage Devices list and the Use Remote device picker — SHALL prefix each saved device row with its 1-based position followed by a period and a space (for example, `1. Apple TV`, `2. Android TV`). The numbering SHALL reflect the stored device order, which the user controls from the Manage Devices list (see the "Device management screens" requirement) and which persists across runs; both lists SHALL show the same order, and the Use Remote picker SHALL reflect a reordering made on the Manage Devices list the next time it is opened. The numbering SHALL count only saved devices; the `+ Add` entry SHALL NOT be numbered. Pressing a digit key `1` through `9` while such a list is showing SHALL act on the device at that position exactly as selecting that row does — opening it for editing on the Manage Devices list and beginning the connect/pair flow on the Use Remote picker — and SHALL therefore follow the current order rather than the order the devices were added in. A digit that does not correspond to a listed device SHALL do nothing. Numbering is a display and shortcut concern only: it SHALL NOT change the stored device name.
 
 #### Scenario: Manage Devices rows are numbered
 - **WHEN** the user opens Manage Devices with one or more saved devices
@@ -330,6 +380,14 @@ Both device-selection lists — the Manage Devices list and the Use Remote devic
 #### Scenario: Out-of-range digit does nothing
 - **WHEN** a device list is showing and the user presses a digit greater than the number of listed devices
 - **THEN** nothing happens and no screen is opened
+
+#### Scenario: Use Remote picker reflects a reordering
+- **WHEN** the user reorders the devices on the Manage Devices list and then opens Use Remote
+- **THEN** the picker lists the devices in the reordered order with numbering to match
+
+#### Scenario: Digit follows the reordered positions
+- **WHEN** the devices have been reordered and the user presses a digit on either list
+- **THEN** the action applies to the device now at that position, not to the device that was there before the reordering
 
 ### Requirement: Vim-style menu and list navigation
 Every screen whose menu items or list rows are navigable with the arrow keys SHALL also be navigable with the Vim direction keys `h`, `j`, `k`, and `l`, mirroring the arrow keys: `k` and `h` move to the previous item (as Up and Left do) and `j` and `l` move to the next item (as Down and Right do). This SHALL apply to the entry menu, both device-selection lists, and the delete-confirmation dialog. Text-entry screens — the add and edit device form — SHALL continue to move focus between fields with the arrow keys only, so that `h`, `j`, `k`, and `l` typed into an input fill that input rather than moving focus.
@@ -421,57 +479,6 @@ The application's command palette (opened with Ctrl+P) SHALL expose the Theme, Q
 - **WHEN** the user opens the command palette
 - **THEN** no Screenshot command is listed
 
-### Requirement: Android TV text-input mode toggle
-
-The Add Device and Edit Device screens SHALL present a text-input-mode toggle **only when the device's type is Android TV**; for every other device type the toggle SHALL NOT appear, and the device list SHALL NOT offer any action to change a device's text-input mode. The toggle selects between standard Remote v2 text and ADB text.
-
-When the user switches the toggle to ADB, the application SHALL run the one-time ADB pairing, prompting for the pairing address and pairing code and pairing through the adapter. On success the device SHALL be recorded as opted into ADB text when the form is saved. On cancel or failure the toggle SHALL revert to standard and the device SHALL NOT be opted in. Switching the toggle back to standard SHALL clear the opt-in without pairing.
-
-#### Scenario: Toggle appears only for Android TV
-
-- **WHEN** the Add or Edit screen is shown for an Android TV device
-- **THEN** the text-input-mode toggle is visible
-- **AND WHEN** the screen is shown for a device of any other type
-- **THEN** the toggle is not shown
-
-#### Scenario: Switching to ADB pairs and opts in on save
-
-- **WHEN** the user switches the toggle to ADB, completes pairing with a valid address and code, and saves the form
-- **THEN** the application records the device as opted into ADB text and persists it
-
-#### Scenario: Failed or cancelled pairing reverts the toggle
-
-- **WHEN** the user switches the toggle to ADB but the pairing is cancelled or fails
-- **THEN** the toggle reverts to standard and the device is not opted into ADB text
-
-#### Scenario: Editing flips an existing device's mode
-
-- **WHEN** the user edits an Android TV device already opted into ADB text and switches the toggle back to standard, then saves
-- **THEN** the device is no longer opted into ADB text and no pairing is run
-
-### Requirement: Post-add ADB text hint for Android TV
-
-When an Android TV device is added directly from the discovery screen, the application SHALL show a one-time hint that text input can be routed over ADB if it has trouble in some apps, pointing the user to edit the device and switch its text-input mode. The hint SHALL NOT appear when a device of any other type is added.
-
-#### Scenario: Adding a discovered Android TV device shows the hint
-
-- **WHEN** the user selects and adds an Android TV device from the discovery screen
-- **THEN** the application shows a hint that text input can be switched to ADB, which the user dismisses
-
-#### Scenario: Adding a non-Android device shows no hint
-
-- **WHEN** the user selects and adds a device of any other type from the discovery screen
-- **THEN** no ADB text hint is shown
-
-### Requirement: ADB text unavailable is surfaced during use
-
-When a device is opted into ADB text and a text send falls back to Remote v2 because the ADB path was unavailable, the Use Remote surface SHALL show a one-line status explaining that ADB text was unavailable, rather than failing silently or blocking further use.
-
-#### Scenario: Fallback shows a status message
-
-- **WHEN** an opted-in device's text send falls back to Remote v2 because the ADB path was unavailable
-- **THEN** the remote shows a one-line status explaining that ADB text was unavailable
-
 ### Requirement: Remote screen status bar identifies the active device
 While Use Remote mode is showing the on-screen remote, the top status bar SHALL identify the active device as `Name: <name> • Type: <type> • IP: <ip>`, where `<name>` is the device's name, `<ip>` is its IP address, and `<type>` is the platform's human-readable label — the same label used for the device-type picker on the add/edit screen, not the raw platform identifier. The status bar SHALL NOT include any other prefix or text.
 
@@ -486,6 +493,8 @@ While Use Remote mode is showing the on-screen remote, the top status bar SHALL 
 ### Requirement: Text entry via a modal
 The remote's Text action SHALL open a text-entry modal rather than focusing a docked field. While the modal's input is focused, typed characters fill a buffer and Enter sends the buffered text as a single text action and closes the modal; Escape closes the modal without sending the buffered text and without sending the device's Back key. When text is unsupported by the active adapter, activating the Text action SHALL surface a clear message that text is not supported on this device and SHALL NOT open an editable input.
 
+When a text send is attempted and reported as unsupported, the status SHALL carry the reason the adapter gave — such as that no text field is focused on the device — rather than stating only that text is not supported, because the device-specific reason is what tells the user what to do about it. When the adapter gives no reason, the status SHALL fall back to stating that text is not supported on this device, so a send never fails without an explanation.
+
 #### Scenario: Compose then send
 - **WHEN** the text-entry modal is open and the user types characters and presses Enter
 - **THEN** the buffered text is sent to the device as a single text action and the modal closes
@@ -497,6 +506,14 @@ The remote's Text action SHALL open a text-entry modal rather than focusing a do
 #### Scenario: Text unsupported surfaces a message
 - **WHEN** the active adapter reports text as unsupported and the user activates the Text action
 - **THEN** a message explains text is not supported on this device and no editable text input is opened
+
+#### Scenario: A failed send explains why
+- **WHEN** the user sends text and the adapter reports it unsupported with a reason, such as no text field being focused on the device
+- **THEN** the status shows that reason rather than only that text is not supported
+
+#### Scenario: A failed send with no reason still explains itself
+- **WHEN** the user sends text and the adapter reports it unsupported without giving a reason
+- **THEN** the status states that text is not supported on this device
 
 ### Requirement: Custom buttons on the remote
 The remote SHALL present exactly five custom buttons in a dedicated row. Each button SHALL show its configured title resolved for the active device, or its default title `Custom N` (where `N` is the button's 1-based position) when no title is configured for that device. Each custom button MUST be clickable with the mouse. Clicking a custom button SHALL run its assigned action when one is resolved for the active device, and SHALL open the button's configuration modal when no action is assigned. A custom button MAY also be activated by an assigned keyboard shortcut (see the keyboard-shortcuts catalog), which SHALL behave identically to clicking that button — running its resolved action, or opening its configuration when none is assigned. To re-edit a button that has an assigned action, the user SHALL use a distinct edit gesture: pressing an edit-mode key SHALL arm edit-mode, and the next activation of a custom button — whether by clicking it or by pressing its keyboard shortcut — SHALL open that button's configuration modal instead of running its action, after which edit-mode SHALL clear. The edit-mode key SHALL toggle: pressing it while edit-mode is already armed SHALL disarm edit-mode without opening any configuration. While edit-mode is armed, the custom buttons SHALL show a visual indicator distinguishing the armed edit state from their normal run appearance, and that indicator SHALL clear together with edit-mode.

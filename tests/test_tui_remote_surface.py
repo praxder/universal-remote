@@ -6,6 +6,7 @@ from tests.fakes import FakeAdapter
 from universal_remote.capabilities import Capabilities
 from universal_remote.devices.models import Device
 from universal_remote.devices.store import DeviceStore
+from universal_remote.errors import TextUnsupportedError
 from universal_remote.keys import Key
 from universal_remote.registry import AdapterRegistry
 from universal_remote.tui.app import UniversalRemoteApp
@@ -527,6 +528,34 @@ class TestRemoteSurface:
 
         assert any("UP" in message for message in captured["messages"])
 
+    def test_given_a_key_fails_for_a_text_reason_when_pressed_then_that_reason_shows(
+        self, tmp_path
+    ):
+        # A Fire TV digit is typed into the focused field rather than sent as a
+        # keycode, so its failure reason is a text one — and the device is reachable,
+        # which the generic "may be unreachable" message would misstate.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        captured: dict = {}
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                adapter.sessions[0].dispatch_error = TextUnsupportedError(
+                    "No text field is focused on this Fire TV"
+                )
+
+                # Act: press a key whose dispatch reports text as unsupported.
+                await pilot.press("up")
+                await pilot.pause()
+
+                captured["messages"] = [str(n.message) for n in app._notifications]
+
+        asyncio.run(scenario())
+
+        assert "No text field is focused on this Fire TV" in captured["messages"]
+
     def test_given_a_text_send_fails_when_submitted_then_the_remote_survives(
         self, tmp_path
     ):
@@ -559,6 +588,62 @@ class TestRemoteSurface:
         assert captured["screen"] == "RemoteScreen"
         assert "warning" in captured["severities"]
         assert not any("went wrong" in message for message in captured["messages"])
+
+    def test_given_the_adapter_says_why_text_failed_when_submitted_then_it_is_shown(
+        self, tmp_path
+    ):
+        # "not supported on this device" is wrong and unhelpful when the real reason is
+        # that nothing is focused on the TV — something the user can act on.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        captured: dict = {}
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                adapter.sessions[0].text_dispatch_error = TextUnsupportedError(
+                    "No text field is focused on this Android TV"
+                )
+
+                await pilot.press("t")
+                await pilot.pause()
+                app.screen.query_one("#text-entry-input", Input).value = "hello"
+                await pilot.press("enter")
+                await pilot.pause()
+
+                captured["messages"] = [str(n.message) for n in app._notifications]
+
+        asyncio.run(scenario())
+
+        assert any("No text field is focused" in m for m in captured["messages"])
+
+    def test_given_text_unsupported_with_no_reason_when_submitted_then_a_generic_line_shows(
+        self, tmp_path
+    ):
+        # An adapter that reports text unsupported without a reason still gets a
+        # readable toast rather than an empty one.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        captured: dict = {}
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                adapter.sessions[0].text_dispatch_error = TextUnsupportedError()
+
+                await pilot.press("t")
+                await pilot.pause()
+                app.screen.query_one("#text-entry-input", Input).value = "hello"
+                await pilot.press("enter")
+                await pilot.pause()
+
+                captured["messages"] = [str(n.message) for n in app._notifications]
+
+        asyncio.run(scenario())
+
+        assert any("not supported on this device" in m for m in captured["messages"])
 
 
 class TestCustomButtons:

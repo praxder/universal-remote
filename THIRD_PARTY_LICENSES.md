@@ -26,7 +26,6 @@ Paste the resulting table below the heading that follows.
 | Name                       | Version   | License                              | URL                                                                  |
 |----------------------------|-----------|--------------------------------------|----------------------------------------------------------------------|
 | Pygments                   | 2.20.0    | BSD-2-Clause                         | https://pygments.org                                                 |
-| adb_shell                  | 0.4.4     | Apache Software License              | https://github.com/JeffLIrion/adb_shell                              |
 | aiofiles                   | 25.1.0    | Apache Software License              | https://github.com/Tinche/aiofiles                                   |
 | aiohappyeyeballs           | 2.7.1     | Python Software Foundation License   | https://github.com/aio-libs/aiohappyeyeballs                         |
 | aiohttp                    | 3.14.1    | Apache-2.0 AND MIT                   | https://github.com/aio-libs/aiohttp                                  |
@@ -34,7 +33,6 @@ Paste the resulting table below the heading that follows.
 | aiowebostv                 | 0.7.5     | Apache-2.0                           | UNKNOWN                                                              |
 | androidtvremote2           | 0.3.1     | Apache-2.0                           | https://github.com/tronikos/androidtvremote2                         |
 | annotated-types            | 0.7.0     | MIT License                          | https://github.com/annotated-types/annotated-types                   |
-| async-timeout              | 5.0.1     | Apache Software License              | https://github.com/aio-libs/async-timeout                            |
 | async_upnp_client          | 0.47.0    | Apache-2.0                           | UNKNOWN                                                              |
 | attrs                      | 26.1.0    | MIT                                  | https://www.attrs.org/en/stable/changelog.html                       |
 | awesomeversion             | 25.8.0    | MIT                                  | https://github.com/ludeeus/awesomeversion                            |
@@ -57,7 +55,6 @@ Paste the resulting table below the heading that follows.
 | platformdirs               | 4.10.0    | MIT                                  | https://github.com/tox-dev/platformdirs                              |
 | propcache                  | 0.5.2     | Apache Software License              | https://github.com/aio-libs/propcache                                |
 | protobuf                   | 7.35.1    | 3-Clause BSD License                 | https://developers.google.com/protocol-buffers/                      |
-| pyasn1                     | 0.6.4     | BSD-2-Clause                         | https://github.com/pyasn1/pyasn1                                     |
 | pyatv                      | 0.18.0    | MIT                                  | https://pyatv.dev                                                    |
 | pycparser                  | 3.0       | BSD-3-Clause                         | https://github.com/eliben/pycparser                                  |
 | pydantic                   | 2.13.4    | MIT                                  | https://github.com/pydantic/pydantic                                 |
@@ -66,7 +63,6 @@ Paste the resulting table below the heading that follows.
 | requests                   | 2.34.2    | Apache Software License              | https://github.com/psf/requests                                      |
 | rich                       | 14.3.4    | MIT License                          | https://github.com/Textualize/rich                                   |
 | rokuecp                    | 0.19.5    | MIT License                          | https://github.com/ctalkington/python-rokuecp                        |
-| rsa                        | 4.9.1     | Apache Software License              | https://stuvel.eu/rsa                                                |
 | samsungtvws                | 3.0.5     | LGPL-3.0                             | UNKNOWN                                                              |
 | six                        | 1.17.0    | MIT License                          | https://github.com/benjaminp/six                                     |
 | srptools                   | 1.0.1     | BSD License                          | https://github.com/idlesign/srptools                                 |

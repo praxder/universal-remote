@@ -5,6 +5,7 @@ from tests.fakes import FakeAdapter
 from universal_remote.capabilities import Capabilities
 from universal_remote.devices.models import Device
 from universal_remote.devices.store import DeviceStore
+from universal_remote.errors import TextUnsupportedError
 from universal_remote.keys import Key
 from universal_remote.macros.models import (
     Macro,
@@ -449,6 +450,30 @@ class TestAbortOnFailure:
                 assert result.ok is False
                 assert "step 1" in result.message
                 assert "unreachable" in result.message.lower()
+
+        asyncio.run(scenario())
+
+    def test_given_a_key_that_fails_for_a_text_reason_then_that_reason_is_reported(
+        self, tmp_path
+    ):
+        # A Fire TV digit is typed into the focused field rather than sent as a
+        # keycode, so its failure reason is a text one — not an unreachable device.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+        macro = Macro(name="Digits", steps=[key_step("NUM_1")], step_pause_ms=0)
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                adapter.sessions[-1].dispatch_error = TextUnsupportedError(
+                    "No text field is focused on this Fire TV"
+                )
+
+                result = await _play(app, pilot, adapter, macro)
+
+                assert result.ok is False
+                assert "No text field is focused on this Fire TV" in result.message
 
         asyncio.run(scenario())
 

@@ -71,3 +71,24 @@ class DeviceStore:
     def delete(self, device_id: str) -> None:
         devices = [device for device in self.list() if device.id != device_id]
         self.save_all(devices)
+
+    def move_up(self, device_id: str) -> None:
+        """Swap the device with the one before it; a no-op if it is already first."""
+        self._swap(device_id, -1)
+
+    def move_down(self, device_id: str) -> None:
+        """Swap the device with the one after it; a no-op if it is already last."""
+        self._swap(device_id, 1)
+
+    def _swap(self, device_id: str, offset: int) -> None:
+        devices = self.list()
+        index = next(
+            (i for i, device in enumerate(devices) if device.id == device_id), None
+        )
+        if index is None:
+            return
+        target = index + offset
+        if not 0 <= target < len(devices):
+            return
+        devices[index], devices[target] = devices[target], devices[index]
+        self.save_all(devices)

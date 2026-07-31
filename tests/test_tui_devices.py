@@ -293,6 +293,243 @@ class TestSelection:
         asyncio.run(scenario())
 
 
+class TestReorder:
+    """Move Up / Move Down on the Manage Devices list."""
+
+    def _store(self, tmp_path, *names) -> DeviceStore:
+        store = DeviceStore(path=tmp_path / "d.json")
+        for i, name in enumerate(names):
+            store.add(Device(name=name, platform="fake-tv", ip=f"10.0.0.{i + 1}"))
+        return store
+
+    async def _open(self, pilot) -> OptionList:
+        await pilot.press("d")
+        await pilot.pause()
+        return pilot.app.screen.query_one("#device-list", OptionList)
+
+    @staticmethod
+    def _prompts(option_list: OptionList) -> list[str]:
+        return [
+            option_list.get_option_at_index(i).prompt
+            for i in range(option_list.option_count)
+        ]
+
+    def test_given_manage_devices_when_opened_then_move_buttons_sit_below_the_list(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                up = app.screen.query_one("#move-up", Button)
+                down = app.screen.query_one("#move-down", Button)
+                assert not up.disabled and not down.disabled
+                assert up.region.y == down.region.y  # side by side on one row
+                assert down.region.x > up.region.x
+                assert up.region.y >= option_list.region.bottom  # below the list
+
+        asyncio.run(scenario())
+
+    def test_given_the_first_device_when_move_down_is_pressed_then_it_moves_later(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                await pilot.click("#move-down")
+                await pilot.pause()
+                assert self._prompts(option_list) == [
+                    "1. Bedroom",
+                    "2. Living Room",
+                    "+ Add",
+                ]
+                assert [d.name for d in store.list()] == ["Bedroom", "Living Room"]
+
+        asyncio.run(scenario())
+
+    def test_given_the_second_device_when_move_up_is_pressed_then_it_moves_earlier(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                option_list.highlighted = 1
+                await pilot.click("#move-up")
+                await pilot.pause()
+                assert self._prompts(option_list) == [
+                    "1. Bedroom",
+                    "2. Living Room",
+                    "+ Add",
+                ]
+                assert [d.name for d in store.list()] == ["Bedroom", "Living Room"]
+
+        asyncio.run(scenario())
+
+    def test_given_a_highlighted_device_when_shift_down_pressed_then_it_moves_later(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await self._open(pilot)
+                await pilot.press("shift+down")
+                await pilot.pause()
+                assert [d.name for d in store.list()] == ["Bedroom", "Living Room"]
+
+        asyncio.run(scenario())
+
+    def test_given_a_highlighted_device_when_shift_up_pressed_then_it_moves_earlier(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                option_list.highlighted = 1
+                await pilot.press("shift+up")
+                await pilot.pause()
+                assert [d.name for d in store.list()] == ["Bedroom", "Living Room"]
+
+        asyncio.run(scenario())
+
+    def test_given_a_highlighted_device_when_capital_j_pressed_then_it_moves_later(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await self._open(pilot)
+                await pilot.press("J")
+                await pilot.pause()
+                assert [d.name for d in store.list()] == ["Bedroom", "Living Room"]
+
+        asyncio.run(scenario())
+
+    def test_given_a_highlighted_device_when_capital_k_pressed_then_it_moves_earlier(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                option_list.highlighted = 1
+                await pilot.press("K")
+                await pilot.pause()
+                assert [d.name for d in store.list()] == ["Bedroom", "Living Room"]
+
+        asyncio.run(scenario())
+
+    def test_given_a_device_moved_down_twice_then_it_is_last_and_still_highlighted(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "A", "B", "C")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                await pilot.press("shift+down")
+                await pilot.pause()
+                await pilot.press("shift+down")
+                await pilot.pause()
+                assert [d.name for d in store.list()] == ["B", "C", "A"]
+                assert option_list.highlighted == 2
+                assert option_list.get_option_at_index(2).prompt == "3. A"
+
+        asyncio.run(scenario())
+
+    def test_given_a_move_activated_by_button_then_focus_returns_to_the_list(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                await pilot.click("#move-down")
+                await pilot.pause()
+                assert app.focused is option_list
+
+        asyncio.run(scenario())
+
+    def test_given_the_first_device_when_moved_up_then_nothing_changes(self, tmp_path):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                await pilot.click("#move-up")
+                await pilot.pause()
+                assert self._prompts(option_list) == [
+                    "1. Living Room",
+                    "2. Bedroom",
+                    "+ Add",
+                ]
+                assert [d.name for d in store.list()] == ["Living Room", "Bedroom"]
+
+        asyncio.run(scenario())
+
+    def test_given_the_last_device_when_moved_down_then_nothing_changes(self, tmp_path):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                option_list.highlighted = 1
+                await pilot.click("#move-down")
+                await pilot.pause()
+                assert self._prompts(option_list) == [
+                    "1. Living Room",
+                    "2. Bedroom",
+                    "+ Add",
+                ]
+                assert [d.name for d in store.list()] == ["Living Room", "Bedroom"]
+
+        asyncio.run(scenario())
+
+    def test_given_the_add_row_highlighted_when_a_move_is_pressed_then_nothing_changes(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                option_list.highlighted = _index_of(option_list, "__add__")
+                await pilot.press("shift+up")
+                await pilot.pause()
+                await pilot.press("shift+down")
+                await pilot.pause()
+                assert self._prompts(option_list) == [
+                    "1. Living Room",
+                    "2. Bedroom",
+                    "+ Add",
+                ]
+                assert [d.name for d in store.list()] == ["Living Room", "Bedroom"]
+
+        asyncio.run(scenario())
+
+
 class TestAddDevice:
     def test_given_manual_ip_and_name_when_saved_then_the_device_persists(
         self, tmp_path
@@ -355,7 +592,6 @@ class TestAddDevice:
                     "platform",
                     "name",
                     "ip",
-                    "text-adb-cell",
                     "error",
                     "save",
                 ]
