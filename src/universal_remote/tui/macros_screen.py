@@ -362,7 +362,9 @@ class MacroDetailModal(ModalScreen[tuple[str, Macro, int] | None]):
                 yield Button("Save", id="macro-save", variant="primary")
                 yield Button("Run", id="macro-run", variant="success")
                 yield Button("Close", id="macro-close")
-                yield Button("Delete", id="macro-delete", variant="error")
+                yield Button(
+                    "Delete", id="macro-delete", variant="error", classes="destructive"
+                )
 
     def _rows(self) -> list[Option]:
         """One numbered, described row per step, or an unselectable empty placeholder."""

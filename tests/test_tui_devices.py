@@ -1,5 +1,6 @@
 import asyncio
 
+from textual.color import Color
 from textual.widgets import Button, Input, Label, OptionList, Select, Static
 
 from tests.fakes import FakeAdapter
@@ -1032,6 +1033,59 @@ class TestEditAndDelete:
 
         asyncio.run(scenario())
 
+    def test_given_the_confirm_prompt_when_delete_is_focused_then_its_text_is_red(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        device = store.add(Device(name="Keep", platform="fake-tv", ip="1.1.1.1"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, device.id)
+                await pilot.pause()
+                await pilot.press("backspace")
+                await pilot.pause()
+
+                # The prompt opens on Cancel, so move to the destructive action.
+                await pilot.press("up")
+                await pilot.pause()
+
+                assert app.screen.query_one(
+                    "#confirm", Button
+                ).styles.color == Color.parse(app.get_css_variables()["text-error"])
+
+        asyncio.run(scenario())
+
+    def test_given_the_confirm_prompt_when_cancel_is_focused_then_its_text_is_not_red(
+        self, tmp_path
+    ):
+        # The red belongs to the destructive action alone: a focused Cancel keeps the
+        # app-wide accent, which is what proves the destructive rule is scoped.
+        store = DeviceStore(path=tmp_path / "d.json")
+        device = store.add(Device(name="Keep", platform="fake-tv", ip="1.1.1.1"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, device.id)
+                await pilot.pause()
+                await pilot.press("backspace")
+                await pilot.pause()
+
+                assert app.focused.id == "cancel"
+                assert app.screen.query_one(
+                    "#cancel", Button
+                ).styles.color == Color.parse(app.get_css_variables()["accent"])
+
+        asyncio.run(scenario())
+
 
 class TestEditScreenDelete:
     def test_given_the_edit_flow_when_opened_then_delete_shows_below_save(
@@ -1052,6 +1106,30 @@ class TestEditScreenDelete:
                 delete = app.screen.query_one("#delete", Button)
                 assert delete.region.x == save.region.x
                 assert delete.region.y > save.region.y
+
+        asyncio.run(scenario())
+
+    def test_given_the_edit_flow_when_delete_is_focused_then_its_text_is_red(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                delete = app.screen.query_one("#delete", Button)
+
+                delete.focus()
+                await pilot.pause()
+
+                assert delete.styles.color == Color.parse(
+                    app.get_css_variables()["text-error"]
+                )
 
         asyncio.run(scenario())
 

@@ -290,7 +290,7 @@ class ButtonConfigModal(ModalScreen[bool]):
             with Horizontal(id="button-config-buttons"):
                 yield Button("OK", id="button-config-ok", variant="primary")
                 yield Button("Cancel", id="button-config-cancel")
-                yield Button("Reset", id="button-config-reset")
+                yield Button("Reset", id="button-config-reset", classes="destructive")
 
     def _current_action(self) -> dict | None:
         """The button's currently assigned action, resolved for the active device."""

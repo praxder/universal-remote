@@ -1,5 +1,6 @@
 import asyncio
 
+from textual.color import Color
 from textual.widgets import Button, Input, Label, RadioSet
 
 from tests.fakes import FakeAdapter
@@ -214,6 +215,28 @@ class TestButtonConfigModal:
                 )
                 assert "1" not in app.custom_buttons.get("device", {}).get(
                     device.id, {}
+                )
+
+        asyncio.run(scenario())
+
+    def test_given_the_reset_control_when_it_is_focused_then_its_text_is_red(
+        self, tmp_path
+    ):
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_config(app, pilot, 1)
+                reset = app.screen.query_one("#button-config-reset", Button)
+
+                reset.focus()
+                await pilot.pause()
+
+                assert reset.styles.color == Color.parse(
+                    app.get_css_variables()["text-error"]
                 )
 
         asyncio.run(scenario())

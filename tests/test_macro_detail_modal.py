@@ -1,5 +1,6 @@
 import asyncio
 
+from textual.color import Color
 from textual.widgets import Button, Input, Label
 
 from tests.fakes import FakeAdapter
@@ -389,6 +390,30 @@ class TestDetailModalLayout:
                 await _open_detail(app, pilot, _macro())
 
                 assert app.screen.query_one("#macro-run", Button).variant == "success"
+
+        asyncio.run(scenario())
+
+    def test_given_the_delete_control_when_it_is_focused_then_its_text_is_red(
+        self, tmp_path
+    ):
+        # Focus replaces the error variant's red fill, so the red has to move to the
+        # label or the destructive control reads as the tamest one on the row.
+        store = _store_with_device(tmp_path)
+        adapter = FakeAdapter(platform="fake-tv")
+
+        async def scenario():
+            app = _app(store, adapter)
+            async with app.run_test(size=_FIT_SIZE) as pilot:
+                await _goto_remote(app, pilot)
+                await _open_detail(app, pilot, _macro())
+                delete = app.screen.query_one("#macro-delete", Button)
+
+                delete.focus()
+                await pilot.pause()
+
+                assert delete.styles.color == Color.parse(
+                    app.get_css_variables()["text-error"]
+                )
 
         asyncio.run(scenario())
 

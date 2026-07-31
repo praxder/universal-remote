@@ -47,6 +47,13 @@ class UniversalRemoteApp(App[None]):
         border-top: tall $surface-lighten-1;
         border-bottom: tall $surface-lighten-1;
     }
+    /* Destructive controls (Delete, Reset) read red while focused, so the button about
+       to be pressed announces that it destroys something rather than looking like every
+       other focused button. $text-error, not $error: the focus fill above is
+       $surface-lighten-1, against which the saturated $error sits at about 2.5:1 on the
+       default dark theme — $text-error is the token Textual derives for red *text* on a
+       surface, and reaches about 4.6:1 there. */
+    Button.destructive:focus { color: $text-error; }
     /* #title width matches the TITLE_ART banner so it never wraps */
     #title { width: 42; text-align: center; margin-bottom: 1; color: $accent; }
     /* left-aligned so the multi-width banner lines keep their column alignment */

@@ -200,7 +200,7 @@ class ConfirmDeleteScreen(ModalScreen[bool]):
     def compose(self) -> ComposeResult:
         with Vertical(id="confirm-delete"):
             yield Label(f"Delete {self._device_name}?", id="confirm-message")
-            yield Button("Delete", id="confirm")
+            yield Button("Delete", id="confirm", classes="destructive")
             yield Button("Cancel", id="cancel")
 
     def on_mount(self) -> None:
@@ -265,7 +265,7 @@ class AddDeviceScreen(Screen[None]):
             yield Label("", id="error")
             yield Button("Save", id="save")
             if self._existing is not None:
-                yield Button("Delete", id="delete")
+                yield Button("Delete", id="delete", classes="destructive")
         yield Footer()
 
     def _device_type_cell(self):
