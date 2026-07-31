@@ -91,6 +91,94 @@ class TestReconnectionIdentifier:
         assert loaded[0].identifier is None
 
 
+class TestReorder:
+    def _store_with(self, tmp_path, *names) -> DeviceStore:
+        store = DeviceStore(path=tmp_path / "devices.json")
+        store.save_all([_device(name=name) for name in names])
+        return store
+
+    def test_given_three_devices_when_the_second_moves_up_then_it_is_listed_first(
+        self, tmp_path
+    ):
+        store = self._store_with(tmp_path, "A", "B", "C")
+        second = store.list()[1]
+
+        store.move_up(second.id)
+
+        assert [d.name for d in store.list()] == ["B", "A", "C"]
+
+    def test_given_three_devices_when_the_first_moves_down_then_it_is_listed_second(
+        self, tmp_path
+    ):
+        store = self._store_with(tmp_path, "A", "B", "C")
+        first = store.list()[0]
+
+        store.move_down(first.id)
+
+        assert [d.name for d in store.list()] == ["B", "A", "C"]
+
+    def test_given_a_moved_device_when_the_store_is_read_again_then_the_order_persists(
+        self, tmp_path
+    ):
+        path = tmp_path / "devices.json"
+        store = DeviceStore(path=path)
+        store.save_all([_device(name="A"), _device(name="B")])
+        store.move_down(store.list()[0].id)
+
+        reloaded = DeviceStore(path=path).list()
+
+        assert [d.name for d in reloaded] == ["B", "A"]
+
+    def test_given_the_first_device_when_moved_up_then_the_order_is_unchanged(
+        self, tmp_path
+    ):
+        store = self._store_with(tmp_path, "A", "B", "C")
+
+        store.move_up(store.list()[0].id)
+
+        assert [d.name for d in store.list()] == ["A", "B", "C"]
+
+    def test_given_the_last_device_when_moved_down_then_the_order_is_unchanged(
+        self, tmp_path
+    ):
+        store = self._store_with(tmp_path, "A", "B", "C")
+
+        store.move_down(store.list()[-1].id)
+
+        assert [d.name for d in store.list()] == ["A", "B", "C"]
+
+    def test_given_an_unknown_id_when_moved_then_the_order_is_unchanged(self, tmp_path):
+        store = self._store_with(tmp_path, "A", "B", "C")
+
+        store.move_up("not-a-saved-id")
+        store.move_down("not-a-saved-id")
+
+        assert [d.name for d in store.list()] == ["A", "B", "C"]
+
+    def test_given_a_device_with_a_credential_when_moved_then_its_fields_survive(
+        self, tmp_path
+    ):
+        path = tmp_path / "devices.json"
+        store = DeviceStore(path=path)
+        moved = _device(
+            name="Bedroom",
+            platform="roku",
+            ip="10.0.0.9",
+            credential="secret-token",
+            identifier="roku-id-123",
+        )
+        store.save_all([_device(name="A"), moved])
+
+        store.move_up(moved.id)
+
+        reloaded = next(d for d in store.list() if d.id == moved.id)
+        assert reloaded.name == "Bedroom"
+        assert reloaded.platform == "roku"
+        assert reloaded.ip == "10.0.0.9"
+        assert reloaded.credential == "secret-token"
+        assert reloaded.identifier == "roku-id-123"
+
+
 class TestLegacyFieldTolerance:
     def test_given_an_entry_with_legacy_mac_and_model_when_loaded_then_it_loads(
         self, tmp_path

@@ -80,6 +80,12 @@ footer that always shows the keys available on the current screen.
 (`1`–`9`) to open it, or use **Add** (`a`), **Edit** (`e`), and **Delete**
 (`Backspace`).
 
+Put the TV you reach for most at the top: **Move Up** and **Move Down** below the
+list — or `shift+↑` / `shift+↓` (`K` / `J`) without leaving it — shuffle the
+highlighted TV one place at a time, and the new order is saved straight away. That
+order is the one **Use Remote** shows too, so it also decides which TV each `1`–`9`
+shortcut reaches.
+
 ![Device list](docs/screenshots/device-list.png)
 
 ### Add a TV — automatic discovery

@@ -162,6 +162,74 @@ class TestUseRemoteSelection:
         asyncio.run(scenario())
 
 
+class TestUseRemoteReflectsReordering:
+    """The picker is read-only about order, but follows the one set elsewhere."""
+
+    def test_given_a_reordered_store_when_opening_use_remote_then_the_new_order_shows(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Living"))
+        second = store.add(_dev(name="Bedroom", ip="2.2.2.2"))
+        store.move_up(second.id)
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                picker = app.screen.query_one("#device-picker", OptionList)
+                prompts = [
+                    picker.get_option_at_index(i).prompt
+                    for i in range(picker.option_count)
+                ]
+                assert prompts == ["[yellow]●[/] 1. Bedroom", "[yellow]●[/] 2. Living"]
+
+        asyncio.run(scenario())
+
+    def test_given_a_reordered_store_when_a_digit_is_pressed_then_the_new_nth_is_acted_on(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Living", credential="tok"))  # was #1, becomes #2
+        second = store.add(_dev(name="Bedroom", ip="2.2.2.2"))  # no credential
+        store.move_up(second.id)  # Bedroom is now #1
+        adapter = FakeAdapter(platform="fake-tv", prompt_message="Enter the PIN")
+
+        async def scenario():
+            app = _app(store, adapter=adapter)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                await pilot.press("1")
+                await _settle(pilot)
+                assert isinstance(app.screen, PairingScreen)
+                assert app.screen._device.name == "Bedroom"
+
+        asyncio.run(scenario())
+
+    def test_given_the_picker_when_shift_arrows_pressed_then_the_order_is_unchanged(
+        self, tmp_path
+    ):
+        # The reorder keys are bound on DeviceListScreen, not on the DeviceOptionList
+        # widget both screens share, so they must be inert here.
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_dev(name="Living"))
+        store.add(_dev(name="Bedroom", ip="2.2.2.2"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("r")
+                await pilot.pause()
+                for key in ("shift+down", "shift+up", "J", "K"):
+                    await pilot.press(key)
+                    await pilot.pause()
+                assert [d.name for d in store.list()] == ["Living", "Bedroom"]
+
+        asyncio.run(scenario())
+
+
 class TestUseRemoteVimNavigation:
     def test_given_the_picker_when_j_and_k_pressed_then_the_highlight_moves(
         self, tmp_path

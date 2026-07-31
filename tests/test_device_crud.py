@@ -41,6 +41,46 @@ class TestDeviceCrud:
         assert [d.name for d in store.list()] == ["Keep"]
 
 
+class TestCrudPreservesOrder:
+    """Guarantees the "List devices" requirement makes about the stored order."""
+
+    def test_given_saved_devices_when_one_is_added_then_it_is_listed_last(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_device(name="A"))
+        store.add(_device(name="B"))
+
+        store.add(_device(name="C"))
+
+        assert [d.name for d in store.list()] == ["A", "B", "C"]
+
+    def test_given_a_middle_device_when_edited_then_it_keeps_its_position(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_device(name="A"))
+        middle = store.add(_device(name="B"))
+        store.add(_device(name="C"))
+
+        middle.name = "Renamed"
+        store.update(middle)
+
+        assert [d.name for d in store.list()] == ["A", "Renamed", "C"]
+
+    def test_given_three_devices_when_one_is_deleted_then_the_rest_keep_their_order(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(_device(name="A"))
+        middle = store.add(_device(name="B"))
+        store.add(_device(name="C"))
+
+        store.delete(middle.id)
+
+        assert [d.name for d in store.list()] == ["A", "C"]
+
+
 class TestFindConflict:
     def test_given_a_duplicate_name_when_checked_then_the_name_message_is_returned(
         self, tmp_path

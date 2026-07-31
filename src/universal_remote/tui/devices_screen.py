@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical
+from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen, Screen
 from textual.widgets import (
     Button,
@@ -43,14 +45,28 @@ EDIT_TITLE_ART = r""" _____    _ _ _     ____             _
 |_____\__,_|_|\__| |____/ \___| \_/ |_|\___\___|"""
 
 
+def _row_of(devices: list[Device], select_id: str | None) -> int:
+    """The row to highlight after a rebuild: the named device, else the top."""
+    return next((i for i, d in enumerate(devices) if d.id == select_id), 0)
+
+
 class DeviceListScreen(Screen[None]):
     # Go Back (Escape by default) is the catalogued Global action, built on mount.
     SHORTCUT_SCOPES = frozenset({Scope.GLOBAL})
 
+    # The reorder keys live here rather than on DeviceOptionList, which the
+    # read-only Use Remote picker shares. OptionList binds plain up/down but not
+    # the shifted variants, so those bubble from the focused list up to here.
     BINDINGS = [
         ("a", "add", "Add"),
         ("e", "edit", "Edit"),
         ("backspace", "delete", "Delete"),
+        # All four are hidden from the Footer: at 80 columns two more hints push
+        # "esc Go Back" into the palette hint. The buttons carry discoverability.
+        Binding("shift+up", "move_up", "Move Up", show=False),
+        Binding("shift+down", "move_down", "Move Down", show=False),
+        Binding("K", "move_up", "Move Up", show=False),
+        Binding("J", "move_down", "Move Down", show=False),
     ]
 
     def compose(self) -> ComposeResult:
@@ -58,6 +74,9 @@ class DeviceListScreen(Screen[None]):
         with Vertical(id="devices"):
             yield Static(TITLE_ART, id="devices-title")
             yield DeviceOptionList(id="device-list")
+            with Horizontal(id="move-buttons"):
+                yield Button("Move Up", id="move-up")
+                yield Button("Move Down", id="move-down")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -67,7 +86,7 @@ class DeviceListScreen(Screen[None]):
     def on_screen_resume(self) -> None:
         self._reload()
 
-    def _reload(self) -> None:
+    def _reload(self, select_id: str | None = None) -> None:
         option_list = self.query_one("#device-list", DeviceOptionList)
         option_list.clear_options()
         devices = self.app.store.list()
@@ -77,7 +96,7 @@ class DeviceListScreen(Screen[None]):
         if devices:
             option_list.add_option(None)  # divider between devices and the add row
         option_list.add_option(Option("+ Add", id=ADD_ID))
-        option_list.highlighted = 0
+        option_list.highlighted = _row_of(devices, select_id)
 
     def _selected(self) -> Device | None:
         option_list = self.query_one("#device-list", OptionList)
@@ -132,6 +151,28 @@ class DeviceListScreen(Screen[None]):
                 self._reload()
 
         self.app.push_screen(ConfirmDeleteScreen(device.name), _on_confirm)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "move-up":
+            self.action_move_up()
+        elif event.button.id == "move-down":
+            self.action_move_down()
+
+    def action_move_up(self) -> None:
+        self._move(self.app.store.move_up)
+
+    def action_move_down(self) -> None:
+        self._move(self.app.store.move_down)
+
+    def _move(self, reorder: Callable[[str], None]) -> None:
+        # _selected() is None on the add row and on an empty list; the store's own
+        # early return covers the first/last boundary. Both are silent no-ops.
+        device = self._selected()
+        if device is None:
+            return
+        reorder(device.id)
+        self._reload(select_id=device.id)
+        self.query_one("#device-list", DeviceOptionList).focus()
 
     def action_go_back(self) -> None:
         self.app.pop_screen()

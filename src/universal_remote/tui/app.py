@@ -71,6 +71,16 @@ class UniversalRemoteApp(App[None]):
         width: auto; height: 1; margin-left: 2;
         text-style: bold; color: $accent;
     }
+    /* The device list keeps its default `height: auto` so it hugs its rows and the
+       reorder row sits directly beneath it rather than at the bottom of the screen.
+       Scrolling the whole column is what keeps that row reachable on a terminal too
+       short for the list: without it the buttons are simply clipped away. */
+    #devices { overflow-y: auto; }
+    /* reorder row under the device list: `auto` height because Horizontal
+       defaults to 1fr, which would take the space the list needs at 80x24 */
+    #move-buttons { width: auto; height: auto; }
+    #move-buttons #move-up { margin: 1 2 0 0; }
+    #move-buttons #move-down { margin: 1 0 0 0; }
     /* left edge aligned with the fields above (no left indent) */
     #add-device #save { margin: 1 0 0 0; }
     /* edit-only Delete button: same left edge and top margin as Save */
