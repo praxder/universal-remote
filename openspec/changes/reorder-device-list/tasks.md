@@ -38,11 +38,10 @@
 ## 6. Documentation
 
 - [x] 6.1 Update the README's "Manage your devices" section (README.md:79) to mention reordering by the two buttons and by `shift+up` / `shift+down`, and that the order drives the Use Remote picker and the `1`–`9` shortcuts
-- [ ] 6.2 Regenerate `docs/screenshots/device-list.png` — it shows the list without the button row
-  - **Blocked:** the twelve sibling assets are real terminal captures, and `screencapture` returns a black
-    frame here (no Screen Recording permission for this process). An `export_screenshot` SVG render would
-    not match their font or chrome. Recipe: `XDG_CONFIG_HOME=<tmp>` with a seeded six-device `devices.json`,
-    run `uv run universal-remote` in iTerm at 80x28, press `d`, capture the content area (~842px wide).
+- [x] 6.2 Regenerate `docs/screenshots/device-list.png` — it shows the list without the button row
+  - Captured by Adam from the running app (843x663, matching the sibling assets' ~842x643). This process
+    cannot do it: `screencapture` returns a black frame without Screen Recording permission, and an
+    `export_screenshot` SVG render would not match the other assets' terminal font or chrome.
 
 ## 7. Preflight
 
