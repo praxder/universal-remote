@@ -815,13 +815,9 @@ class RemoteScreen(Screen[None]):
     def action_edit_mode(self) -> None:
         # Toggle edit-mode: `e` arms it, `e` again disarms it. While armed, the next
         # custom-button activation opens its config instead of running it, and the
-        # custom buttons carry a visual cue. A toast names the new state.
-        if self._edit_mode:
-            self._set_edit_mode(False)
-            self.app.notify("Edit mode off.")
-            return
-        self._set_edit_mode(True)
-        self.app.notify("Edit mode: activate a custom button to configure it.")
+        # custom buttons carry a visual cue — the only signal, since a toast would
+        # cover the very buttons it describes.
+        self._set_edit_mode(not self._edit_mode)
 
     def _set_edit_mode(self, armed: bool) -> None:
         # One place toggles the flag and the visual cue on the custom buttons, so the
