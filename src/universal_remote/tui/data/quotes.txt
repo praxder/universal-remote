@@ -1,7 +1,6 @@
 May the Force be with you.|Han Solo|Star Wars
 I'll be back.|The Terminator|The Terminator
 Here's Johnny!|Jack Torrance|The Shining
-Frankly, my dear, I don't give a damn.|Rhett Butler|Gone with the Wind
 You're gonna need a bigger boat.|Chief Brody|Jaws
 Say hello to my little friend!|Tony Montana|Scarface
 I see dead people.|Cole Sear|The Sixth Sense
@@ -54,7 +53,6 @@ With great power comes great responsibility.|Uncle Ben|Spider-Man
 I am Iron Man.|Tony Stark|Iron Man
 I can do this all day.|Steve Rogers|Captain America: The First Avenger
 Wakanda forever!|T'Challa|Black Panther
-Why don't you slip into something more comfortable?|Jean Harlow|Hell's Angels
 Magic Mirror on the wall, who is the fairest one of all?|The Evil Queen|Snow White and the Seven Dwarfs
 Hakuna Matata.|Timon|The Lion King
 When you wish upon a star.|Jiminy Cricket|Pinocchio
@@ -86,7 +84,6 @@ Legen, wait for it, dary.|Barney Stinson|How I Met Your Mother
 How you doin'?|Joey Tribbiani|Friends
 We were on a break!|Ross Geller|Friends
 Bazinga!|Sheldon Cooper|The Big Bang Theory
-That's what she said.|Michael Scott|The Office
 I'm not superstitious, but I am a little stitious.|Michael Scott|The Office
 Bears. Beets. Battlestar Galactica.|Jim Halpert|The Office
 Treat yo self.|Tom Haverford|Parks and Recreation
