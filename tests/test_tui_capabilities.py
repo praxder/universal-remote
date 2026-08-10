@@ -170,12 +170,13 @@ class TestTextEntryModal:
                 await pilot.pause()
                 await pilot.press("escape")
                 await pilot.pause()
-                # Escape closes the modal only; the live remote stays open.
+                # Escape closes the modal only; the live remote stays open. Asserted
+                # here rather than after the run, because quitting the app tears the
+                # remote down and closes the session by design.
                 assert isinstance(app.screen, RemoteScreen)
+                session = adapter.sessions[0]
+                assert Key.BACK not in session.sent_keys
+                assert session.sent_text == []
+                assert session.closed is False  # the remote session was not torn down
 
         asyncio.run(scenario())
-
-        session = adapter.sessions[0]
-        assert Key.BACK not in session.sent_keys
-        assert session.sent_text == []
-        assert session.closed is False  # the remote session was not torn down

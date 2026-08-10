@@ -34,6 +34,11 @@ class FakeSession(BaseSession):
         # The text-entry counterpart: when set, sending text raises it, standing in
         # for an unexpected device-side text failure the remote must survive.
         self.text_dispatch_error: Exception | None = None
+        # When set, closing raises it — a device that went away before the app quit.
+        self.close_error: Exception | None = None
+        # When set, closing sleeps this long before completing — a release that hangs
+        # on a device that stopped answering (a websocket close to a sleeping TV).
+        self.close_delay: float = 0.0
 
     async def _dispatch_key(self, key: Key) -> None:
         if self.dispatch_error is not None:
@@ -46,6 +51,10 @@ class FakeSession(BaseSession):
         self.sent_text.append(text)
 
     async def _release(self) -> None:
+        if self.close_error is not None:
+            raise self.close_error
+        if self.close_delay:
+            await asyncio.sleep(self.close_delay)
         self.closed = True
 
 

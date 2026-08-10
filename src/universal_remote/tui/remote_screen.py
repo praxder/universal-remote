@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Callable
@@ -21,6 +22,7 @@ from textual.widgets import (
     Rule,
 )
 
+from ..error_log import log_exception
 from ..errors import TextUnsupportedError, UnsupportedKeyError
 from ..keys import Key
 from ..macros.models import Macro, action_step, insert_after, key_step, text_step
@@ -471,6 +473,11 @@ class RemoteScreen(Screen[None]):
     SHORTCUT_SCOPES = frozenset({Scope.REMOTE, Scope.GLOBAL})
     SHORTCUT_HIDE = frozenset({"global.go_back"})
 
+    # Seconds a session release gets while the remote closes. A healthy close is
+    # near-instant; this bounds one to a device that stopped answering, so quitting
+    # never stalls on it (see `_release_session`).
+    CLOSE_TIMEOUT = 2.0
+
     def __init__(
         self,
         session: "Session",
@@ -553,8 +560,31 @@ class RemoteScreen(Screen[None]):
         for index in range(1, 6):
             self._label_custom(index)
 
-    def on_unmount(self) -> None:
+    async def on_unmount(self) -> None:
         self.app.title = self._previous_title
+        await self._release_session()
+
+    async def _release_session(self) -> None:
+        """Close the live session on the way out — bounded, and never raising.
+
+        Go Back closes the session before popping, but quitting (Ctrl+C, Ctrl+Q, the
+        palette) tears this screen down without going through it. An adapter session
+        that owns an HTTP client — Roku's ECP session, Fire TV's — would then be
+        garbage-collected open, and aiohttp prints "Unclosed client session" to the
+        terminal after the app exits. `close()` is idempotent, so the Go Back path
+        still closes exactly once.
+
+        This runs during shutdown, outside the app's error net, so a device that went
+        away since the last keypress must not turn one printed warning into another:
+        a raising close would dump a traceback after the app exits, and a hanging one
+        (a websocket close to a sleeping TV) would keep the app from exiting at all.
+        The release is therefore bounded and logged rather than surfaced — the app is
+        already on its way out, and the device drops the connection regardless.
+        """
+        try:
+            await asyncio.wait_for(self._session.close(), self.CLOSE_TIMEOUT)
+        except Exception as error:  # includes the timeout; nothing is left to show
+            log_exception(error)
 
     def _key_button(self, key: Key, label: str) -> Button:
         button = Button(label, id=f"key-{key.name.lower()}")
