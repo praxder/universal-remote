@@ -171,6 +171,19 @@ CATALOG: list[Action] = [
         editable=False,
         show=False,
     ),
+    # Reserved quit keys — `ctrl+c` is bound by the app itself (see `UniversalRemoteApp`)
+    # and `ctrl+q` by Textual, so this entry only reserves them: it keeps a device action
+    # from being assigned a key that would then be silently shadowed by the quit binding.
+    Action(
+        "framework.quit",
+        "Quit (Any Screen)",
+        Scope.GLOBAL,
+        "ctrl+c",
+        None,
+        editable=False,
+        aliases=("ctrl+q",),
+        show=False,
+    ),
     # Reserved focus-navigation keys — handled natively by Textual, never assignable.
     Action(
         "framework.focus_next",

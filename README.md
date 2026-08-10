@@ -281,10 +281,10 @@ returns to the menu:
   Esc included**; the mouse-only **Delete** and **Cancel** buttons clear it or back
   out. Every shortcut is unique app-wide: a key already taken by another action, or
   a reserved key, is refused with a toast and nothing changes. Reserved keys — the
-  D-pad, Enter, `Ctrl+P`, `Tab`/`Shift+Tab`, and `E` (the remote's edit-mode key
-  for reconfiguring a custom button that has an action) — show as dimmed rows so you
-  can see they're in use but fixed. Changes apply immediately and are **remembered
-  across runs**.
+  D-pad, Enter, `Ctrl+P`, `Tab`/`Shift+Tab`, the quit keys `Ctrl+C`/`Ctrl+Q`, and
+  `E` (the remote's edit-mode key for reconfiguring a custom button that has an
+  action) — show as dimmed rows so you can see they're in use but fixed. Changes
+  apply immediately and are **remembered across runs**.
 - **Third-party licenses** — opens the generated
   [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) on GitHub in your browser.
 - **Open in GitHub** — opens the project repository in your browser.
@@ -302,6 +302,11 @@ The Keyboard Shortcuts screen itself:
   everywhere alongside the arrow keys, and are the d-pad on the remote itself.
 - **Number shortcuts.** In any device list, press a device's number (`1`–`9`) to
   jump straight to it.
+- **Quit from anywhere.** `Ctrl+C` exits immediately — from any screen, with a
+  dialog open, or while you're typing in a field. `Ctrl+Q` does the same, and `q`
+  quits from the landing menu. Because quitting wins everywhere, `Ctrl+C` no longer
+  copies inside a text field; use your terminal's own copy (select with the mouse,
+  then `Cmd+C`).
 - **Command palette.** `Ctrl+P` opens a fuzzy command palette (shown as
   `^p palette` in the footer) for everything the current screen offers — including
   a **Keyboard Shortcuts** entry that pops a read-only cheat sheet of every binding

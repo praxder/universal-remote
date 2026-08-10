@@ -152,6 +152,14 @@ class TestReservedCatalog:
         assert palette.default_key == "ctrl+p"
         assert palette.target is None
 
+    def test_given_the_catalog_when_read_then_the_quit_keys_are_reserved(self):
+        quit_action = _by_id()["framework.quit"]
+
+        assert quit_action.editable is False
+        assert quit_action.default_key == "ctrl+c"
+        assert quit_action.aliases == ("ctrl+q",)  # the alternate quit key
+        assert quit_action.target is None  # bound by the app itself, not the catalog
+
     def test_given_the_catalog_when_read_then_the_focus_nav_keys_are_reserved(self):
         by_id = _by_id()
 
@@ -227,6 +235,8 @@ class TestConflictsAndReserved:
         assert is_reserved("up") is True
         assert is_reserved("tab") is True
         assert is_reserved("shift+tab") is True
+        assert is_reserved("ctrl+c") is True
+        assert is_reserved("ctrl+q") is True
 
     def test_given_a_free_key_when_checked_then_is_reserved_is_false(self):
         assert is_reserved("v") is False
@@ -262,6 +272,16 @@ class TestWithoutReserved:
 
         assert "remote.stop" not in pruned
         assert pruned["remote.play_pause"] == "p"
+
+    def test_given_an_override_on_a_quit_key_when_pruned_then_it_is_dropped(self):
+        # `ctrl+c` was assignable to Mute before it became the quit key; the app's
+        # priority binding would silently shadow it, so it must be dropped.
+        overrides = {"remote.mute": "ctrl+c", "remote.menu": "o"}
+
+        pruned = without_reserved(overrides)
+
+        assert "remote.mute" not in pruned
+        assert pruned["remote.menu"] == "o"
 
     def test_given_only_free_key_overrides_when_pruned_then_they_are_kept(self):
         overrides = {"remote.mute": "m", "remote.menu": "o"}

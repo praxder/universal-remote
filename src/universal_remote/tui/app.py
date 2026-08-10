@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from textual.app import App, SystemCommand
+from textual.binding import Binding
 from textual.screen import Screen
 from textual.worker import WorkerFailed
 
@@ -24,6 +25,16 @@ class UniversalRemoteApp(App[None]):
     """Launches into the entry menu; screens read `store` and `registry` off the app."""
 
     TITLE = "Universal Remote"
+
+    # Ctrl+C exits on a single press from anywhere. Textual binds it to `help_quit` (a
+    # "press Ctrl+Q to quit" toast) and does not mark it priority, so by default it
+    # never fires inside a modal — the non-priority pass walks a binding chain that is
+    # truncated at the modal, excluding the App — and it loses to Input/TextArea copy.
+    # `priority=True` is checked in `App.on_event` before the key reaches the focused
+    # widget and walks the full chain, so it wins everywhere. Naming `ctrl+c` here
+    # replaces Textual's binding for that key rather than stacking with it, so the
+    # toast is gone. Kept out of the footer: the supported 80-column width is full.
+    BINDINGS = [Binding("ctrl+c", "quit", "Quit", show=False, priority=True)]
 
     # Add the read-only "Keyboard Shortcuts" entry to the default command palette.
     COMMANDS = App.COMMANDS | {ShortcutsCommandProvider}
