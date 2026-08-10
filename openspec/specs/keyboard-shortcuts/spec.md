@@ -19,7 +19,7 @@ The Macros action SHALL default to no shortcut and SHALL be kept out of the foot
 
 The Configure Custom Button action SHALL be reserved and fixed to `e`: it toggles custom-button edit-mode — arming it, or disarming it when already armed (see the remote surface's edit gesture) — and its key MUST NOT be reassigned. It SHALL be catalogued so it appears as a fixed row in the Keyboard Shortcuts table.
 
-The catalog SHALL also include reserved entries for framework keys that are not device actions — Activate Control (`enter`), Command Palette (`ctrl+p`), and focus navigation Tab (`tab`) and Shift+Tab (`shift+tab`) — so the user can see those keys are in use.
+The catalog SHALL also include reserved entries for framework keys that are not device actions — Activate Control (`enter`), Command Palette (`ctrl+p`), focus navigation Tab (`tab`) and Shift+Tab (`shift+tab`), and quit (`ctrl+c`, with `ctrl+q` as a fixed alias) — so the user can see those keys are in use.
 
 #### Scenario: Every rebindable action is catalogued
 
@@ -29,7 +29,7 @@ The catalog SHALL also include reserved entries for framework keys that are not 
 #### Scenario: Reserved entries are catalogued and marked fixed
 
 - **WHEN** the application enumerates its reserved entries
-- **THEN** the catalog contains the four D-pad directional actions, the Configure Custom Button edit-mode action (`e`), and the framework keys (Activate Control, Command Palette, and focus navigation Tab and Shift+Tab), each marked as reserved and not rebindable
+- **THEN** the catalog contains the four D-pad directional actions, the Configure Custom Button edit-mode action (`e`), and the framework keys (Activate Control, Command Palette, focus navigation Tab and Shift+Tab, and quit — Ctrl+C with Ctrl+Q as a fixed alias), each marked as reserved and not rebindable
 
 #### Scenario: Some actions start with no shortcut
 
@@ -68,7 +68,7 @@ The application SHALL provide a Keyboard Shortcuts screen, reached from the Sett
 #### Scenario: Reserved entries are shown disabled
 
 - **WHEN** the table is displayed
-- **THEN** the reserved entries (the D-pad directions, the Configure Custom Button edit-mode key, Activate Control, the Command Palette, and focus-navigation Tab and Shift+Tab) appear as disabled rows that cannot be activated for capture
+- **THEN** the reserved entries (the D-pad directions, the Configure Custom Button edit-mode key, Activate Control, the Command Palette, focus-navigation Tab and Shift+Tab, and the quit keys Ctrl+C and Ctrl+Q) appear as disabled rows that cannot be activated for capture
 
 #### Scenario: Actions without a shortcut show as blank
 
@@ -82,7 +82,7 @@ The application SHALL provide a Keyboard Shortcuts screen, reached from the Sett
 
 ### Requirement: Shortcuts are displayed in a readable form
 
-Every shortcut shown in the table SHALL be rendered as an uppercase label rather than its raw internal key name: modifier-plus-key combinations SHALL be joined with a hyphen (for example `ctrl+p` shown as `CTRL-P`), and named keys SHALL use a short friendly form (for example `space` as `SPACE`, `escape` as `ESC`). A reserved D-pad row SHALL show both its arrow key and its Vim alias (for example `UP` / `K`).
+Every shortcut shown in the table SHALL be rendered as an uppercase label rather than its raw internal key name: modifier-plus-key combinations SHALL be joined with a hyphen (for example `ctrl+p` shown as `CTRL-P`), and named keys SHALL use a short friendly form (for example `space` as `SPACE`, `escape` as `ESC`). A reserved row that has fixed aliases SHALL show its primary key and every alias, separated by ` / ` — a D-pad row shows its arrow key and its Vim alias (for example `UP` / `K`), and the quit row shows `CTRL-C` / `CTRL-Q`.
 
 #### Scenario: Modifier combination is shown in friendly form
 
@@ -134,11 +134,11 @@ Every shortcut SHALL be unique across the entire application: a key MAY be assig
 
 ### Requirement: Reserved keys cannot be assigned
 
-A new assignment to a key reserved by a fixed catalog entry SHALL be refused with an error toast. The reserved keys SHALL be those held by the reserved entries: the D-pad directional keys (the arrow keys and `h`, `j`, `k`, `l`), the edit-mode key `e` (Configure Custom Button), Enter (Activate Control), Tab and Shift+Tab (focus navigation), and the command-palette key (`ctrl+p`). A rebindable action's existing default binding SHALL be exempt from this rule so that a default which coincides with a reserved key (for example OK defaulting to Enter) remains valid.
+A new assignment to a key reserved by a fixed catalog entry SHALL be refused with an error toast. The reserved keys SHALL be those held by the reserved entries: the D-pad directional keys (the arrow keys and `h`, `j`, `k`, `l`), the edit-mode key `e` (Configure Custom Button), Enter (Activate Control), Tab and Shift+Tab (focus navigation), the command-palette key (`ctrl+p`), and the quit keys `ctrl+c` and `ctrl+q`. A rebindable action's existing default binding SHALL be exempt from this rule so that a default which coincides with a reserved key (for example OK defaulting to Enter) remains valid.
 
 #### Scenario: Assigning a reserved key is refused
 
-- **WHEN** the user tries to assign a rebindable action a reserved key such as `j`, `e`, Enter, Tab, or `ctrl+p`
+- **WHEN** the user tries to assign a rebindable action a reserved key such as `j`, `e`, Enter, Tab, `ctrl+p`, or `ctrl+q`
 - **THEN** the assignment is refused and a toast explains the key is reserved
 
 #### Scenario: A default on a reserved key remains valid
@@ -230,4 +230,35 @@ A lone-modifier key MAY have been persisted as an override before it was rejecte
 
 - **WHEN** loading drops one or more lone-modifier overrides
 - **THEN** the pruned override set is written back so the dropped bindings stay gone on the next run
+
+### Requirement: Ctrl+C quits immediately from anywhere
+
+The application SHALL exit on a single Ctrl+C press, whichever screen is showing, whether or not a modal is open, and whether or not a text input or text area holds focus. Ctrl+C MUST NOT show a prompt naming another key to quit, and MUST NOT require a second press. Ctrl+Q SHALL continue to quit as well.
+
+Because Ctrl+C takes precedence over the focused widget's own key handling, it SHALL override the framework's Ctrl+C-to-copy behavior inside a text input or text area; copying there falls back to the terminal emulator's own copy. Neither quit key SHALL appear as a footer hint, because the supported 80-column footer has no room for a further hint.
+
+#### Scenario: Ctrl+C quits from a screen
+
+- **WHEN** the user presses Ctrl+C on any screen, including the entry menu
+- **THEN** the application exits immediately, with no prompt naming another quit key
+
+#### Scenario: Ctrl+C quits while a modal is open
+
+- **WHEN** the user presses Ctrl+C while any modal is open
+- **THEN** the application exits immediately rather than the key being swallowed by the modal
+
+#### Scenario: Ctrl+C quits while the capture modal is reading a key
+
+- **WHEN** the user presses Ctrl+C while the shortcut capture modal is waiting for a key
+- **THEN** the application exits immediately and no shortcut is assigned
+
+#### Scenario: Ctrl+C quits while a text field has focus
+
+- **WHEN** the user presses Ctrl+C while a text input or text area has focus
+- **THEN** the application exits immediately instead of copying the selected text
+
+#### Scenario: Ctrl+Q still quits
+
+- **WHEN** the user presses Ctrl+Q
+- **THEN** the application exits, as it did before Ctrl+C was bound
 

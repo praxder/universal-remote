@@ -25,7 +25,7 @@
 ## 4. Documentation
 
 - [x] 4.1 README: add `Ctrl+C`/`Ctrl+Q` to the reserved-keys list and a "Quit from anywhere" bullet noting that Ctrl+C no longer copies in a text field and terminal copy still does
-- [ ] 4.2 Recapture `docs/screenshots/shortcuts.png` and `docs/screenshots/shortcuts-palette.png` — both are built by `_populate_shortcuts_table`, so both now show a table missing the Quit (Any Screen) row (must be captured from the running app by hand; an `export_screenshot` render would not match the sibling assets' chrome — see `openspec/changes/archive/2026-07-31-reorder-device-list/tasks.md:41-44`)
+- [x] 4.2 Recapture `docs/screenshots/shortcuts.png` and `docs/screenshots/shortcuts-palette.png` — both are built by `_populate_shortcuts_table`, so both now show a table missing the Quit (Any Screen) row (must be captured from the running app by hand; an `export_screenshot` render would not match the sibling assets' chrome — see `openspec/changes/archive/2026-07-31-reorder-device-list/tasks.md:41-44`)
 
 ## 5. Preflight and verification
 
