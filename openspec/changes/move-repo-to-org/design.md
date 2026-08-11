@@ -217,6 +217,5 @@ is named `universal-remote`. With the installed user base at roughly one, a
 
 ## Open Questions
 
-- Does `LICENSE`'s copyright holder become Right Now Ministries? A legal/ownership
-  call that does not change the specs, the approach, or the task breakdown — the
-  task exists either way, only its content differs.
+- ~~Does `LICENSE`'s copyright holder become Right Now Ministries?~~ **Resolved:**
+  yes. Task 2.6 rewrites the line to `Copyright (c) 2026 RightNow Ministries`.
