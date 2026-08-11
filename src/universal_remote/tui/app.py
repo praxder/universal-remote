@@ -95,14 +95,16 @@ class UniversalRemoteApp(App[None]):
        short for the list: without it the buttons are simply clipped away. */
     #devices { overflow-y: auto; }
     /* reorder row under the device list: `auto` height because Horizontal
-       defaults to 1fr, which would take the space the list needs at 80x24 */
+       defaults to 1fr, which would take the space the list needs at 80x24.
+       Move Up carries a one-column left gutter so it is not flush against the
+       terminal edge; Horizontal pushes Move Down right along with it. */
     #move-buttons { width: auto; height: auto; }
-    #move-buttons #move-up { margin: 1 2 0 0; }
+    #move-buttons #move-up { margin: 1 2 0 1; }
     #move-buttons #move-down { margin: 1 0 0 0; }
-    /* left edge aligned with the fields above (no left indent) */
-    #add-device #save { margin: 1 0 0 0; }
+    /* one column of left gutter so the button is not flush against the terminal edge */
+    #add-device #save { margin: 1 0 0 1; }
     /* edit-only Delete button: same left edge and top margin as Save */
-    #add-device #delete { margin: 1 0 0 0; }
+    #add-device #delete { margin: 1 0 0 1; }
     /* duplicate-save error: hidden until there is a message, then shown in red */
     #add-device #error { display: none; color: $error; margin: 1 0 0 0; }
     #quote { width: 42; text-align: center; margin-top: 1; color: $text-muted; }

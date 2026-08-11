@@ -333,6 +333,22 @@ class TestReorder:
 
         asyncio.run(scenario())
 
+    def test_given_manage_devices_when_opened_then_move_up_has_a_one_column_gutter(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+
+                up = app.screen.query_one("#move-up", Button)
+
+                assert up.region.x == option_list.region.x + 1
+
+        asyncio.run(scenario())
+
     def test_given_the_first_device_when_move_down_is_pressed_then_it_moves_later(
         self, tmp_path
     ):
@@ -1378,7 +1394,7 @@ class TestVimNavigation:
 
 
 class TestAddFormLayout:
-    def test_given_the_add_form_when_rendered_then_save_left_aligns_with_the_fields(
+    def test_given_the_add_form_when_rendered_then_save_sits_one_column_in_from_the_fields(
         self, tmp_path
     ):
         store = DeviceStore(path=tmp_path / "d.json")
@@ -1393,7 +1409,8 @@ class TestAddFormLayout:
                 save = app.screen.query_one("#save")
                 name = app.screen.query_one("#name", Input)
                 ip = app.screen.query_one("#ip", Input)
-                assert save.region.x == name.region.x == ip.region.x
+                assert name.region.x == ip.region.x
+                assert save.region.x == name.region.x + 1
 
         asyncio.run(scenario())
 
