@@ -36,14 +36,15 @@ requests for ordinary contributions.
 
 ### Requirement: Scoped credential for the pipeline's protected-branch pushes
 
-The credential the pipeline pushes with SHALL be scoped to contents-write on this
-repository alone. It SHALL NOT be an organization-wide or account-wide token,
-even though bypassing the branch's review requirement demands more privilege than
-the default workflow token carries.
+The credential the pipeline pushes with SHALL be a short-lived installation token
+scoped to contents-write on this repository alone, minted per run. It SHALL NOT
+be a long-lived organization-wide or account-wide token, even though bypassing
+the branch's review requirement demands more privilege than the default workflow
+token carries.
 
 #### Scenario: Credential is limited to this repository
 - **WHEN** the workflow pushes the version bump, the tag, or the formula bump
-- **THEN** it authenticates with a fine-grained token whose write access covers this repository only
+- **THEN** it authenticates with an installation token minted for that run whose write access covers this repository only, and which expires when the run ends
 
 #### Scenario: Credential is not reused for the release upload
 - **WHEN** the workflow creates the GitHub Release and uploads the binary asset

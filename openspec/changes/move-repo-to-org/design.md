@@ -4,11 +4,18 @@ See `proposal.md` — Why. What shapes this design is not the code but the
 destination org's governance. Verified against the live API on the target repo
 (`gh api repos/RightNowMinistries/universal-remote/rules/branches/main`):
 
-| Ruleset | Source | Rules | Applies to | `bypass_actors` |
-| --- | --- | --- | --- | --- |
-| Require Peer Review | org | `pull_request`: 1 approval, code-owner review, last-push approval | `~DEFAULT_BRANCH`, `main`, `development`, `hotfix` | `null` |
-| Branch Hygiene | org | `deletion`, `non_fast_forward` | same four refs | `null` |
-| No Delete Repository Policy | enterprise | `repository_delete`, `repository_transfer` | whole repo | `null` |
+| Ruleset | Source | Rules | Applies to |
+| --- | --- | --- | --- |
+| Require Peer Review (`5324688`) | org | `pull_request`: 1 approval, code-owner review, last-push approval | `~DEFAULT_BRANCH`, `main`, `development`, `hotfix` |
+| Branch Hygiene (`17752160`) | org | `deletion`, `non_fast_forward` | same four refs |
+| No Delete Repository Policy (`5327550`) | enterprise | `repository_delete`, `repository_transfer` | whole repo |
+
+`bypass_actors` is **not readable from here** — `gh api orgs/…/rulesets/5324688`
+returns 404 without the `admin:org` scope. The repo-scoped view reports
+`current_user_can_bypass: "pull_requests_only"` on Require Peer Review, so some
+bypass entry already reaches the maintainer for pull-request merges; which actor
+grants it is unknown, and direct pushes are not covered either way. The rulesets
+live in a Terraform workspace the platform team owns.
 
 Plus: `members_can_create_public_repositories: false`,
 `members_can_create_private_repositories: false`, and our role in the org is
@@ -18,9 +25,11 @@ Three consequences drive everything below:
 
 1. **No transfer.** Transferring a repo into an org requires repo-creation rights
    there, which members do not have.
-2. **No unattended push to `main` or `development`.** Every automated push the
-   release pipeline makes today — the version bump and the formula bump — lands
-   on a branch that requires a reviewed pull request, and no actor is exempt.
+2. **No unattended push to `main` or `development` as `github-actions[bot]`.**
+   Every automated push the release pipeline makes today — the version bump and
+   the formula bump — lands on a branch that requires a reviewed pull request,
+   and the default `GITHUB_TOKEN` is not an eligible bypass actor. See
+   Decision 2 for the org's answer to this.
 3. **Tags are unruled.** All three rulesets target `branch` or `repository`;
    none targets `tag`. Tag pushes go through untouched.
 
@@ -71,24 +80,51 @@ the tap clone itself needs git credentials. If the org refuses public, this
 change's Homebrew requirements need rewriting before implementation starts —
 treat it as a blocking prerequisite, not a fallback.
 
-### 2. An org owner adds a bypass actor to "Require Peer Review": the Repository admin role
+### 2. The pipeline authenticates as the org's CI bot GitHub App, which the ruleset grants `bypass_mode: always`
 
-**Why:** the release pipeline pushes two commits to `main` per release, and no
-GitHub actor is currently exempt. Scoping the bypass to the **Repository admin**
-role also fixes a second problem that exists with or without this change: GitHub
-forbids approving your own pull request, so a solo maintainer cannot merge
-`development` → `main` at all under this ruleset.
+**Why:** the release pipeline pushes two commits to `main` per release, and
+`github-actions[bot]` is not an eligible ruleset bypass actor at all — the
+default `GITHUB_TOKEN` cannot be granted one.
+
+**Set by the platform team, not chosen here.** The original ask was a bypass
+actor for the **Repository admin** role. DevOps replied that the org already
+solves this with a dedicated **CI bot GitHub App** (app-id `4117226`, private key
+in the `CI_BOT_PRIVATE_KEY` org secret), Terraform-managed onto the bypass list
+of every `main`-targeting ruleset with `bypass_mode: always`. The workflow mints
+an installation token and pushes as the App.
+
+This is strictly better than what was asked for:
+
+- **The repo-admin trade-off disappears.** Peer review does not become advisory
+  for anyone. One App is exempt, not a role.
+- **It is precedent, not invention.** `RightNowMinistries/kids-tv` runs exactly
+  this shape; see its `.github/workflows/deploy.yml` and
+  `docs/ci/release-pipeline.md`.
+- **Scope follows the App installation**, so a ruleset-wide bypass entry still
+  only reaches repos the App is installed on.
+
+**Unresolved gap — the human merge.** The App bypass covers the pipeline's
+pushes. It does not let a solo maintainer merge `development` → `main`: GitHub
+forbids approving your own pull request, and the ruleset wants one approval plus
+code-owner review plus last-push approval. The repo currently reports
+`current_user_can_bypass: "pull_requests_only"` for the maintainer, which would
+cover exactly this — but the actor behind that entry is not visible without
+`admin:org`, so it is unconfirmed. DevOps has been asked. If it does not cover
+self-merge, every release needs a colleague on the `development` → `main` PR;
+that is an accepted operational cost, not a redesign, since the pipeline itself
+still runs unattended.
 
 **Alternatives considered:**
 
-- *Deploy key as the bypass actor.* Tighter scope, but it exempts only the bot,
-  leaving every `development` → `main` merge waiting on a colleague.
+- *Bypass actor for the Repository admin role.* The original ask. Superseded:
+  broader blast radius and it makes peer review advisory for repo admins.
+- *Deploy key as the bypass actor.* The App is the org's supported form of this.
 - *Bot opens a formula-bump PR each release.* No owner involvement, but a manual
   approval per release, and required code-owner review plus last-push approval
   means the bot cannot self-merge.
 - *Restructure so nothing touches a protected branch* — derive the version from
   the tag with `hatch-vcs` and push tags only. This genuinely works for the
-  version bump, and is the fallback if the bypass is refused. It does **not**
+  version bump, and is the fallback if the App route is refused. It does **not**
   solve the formula bump: Homebrew reads the tap's default branch, and the
   default branch is always matched by the ruleset's `~DEFAULT_BRANCH` condition,
   so there is no unprotected branch a formula can usefully live on.
@@ -97,12 +133,13 @@ forbids approving your own pull request, so a solo maintainer cannot merge
   pushed. Rejected: it discards checksum verification, and `brew upgrade` skips
   `:latest` casks unless run with `--greedy`.
 
-**Trade-off to state plainly to the owner:** repo-admin bypass means peer review
-becomes advisory for repo admins on this repo.
-
-With the bypass in place, the `version` job keeps working exactly as it does
-today — no `hatch-vcs`, no tag-only restructure. The pipeline change is confined
-to the `tap` job.
+With the App in place, the `version` job keeps its current shape — no
+`hatch-vcs`, no tag-only restructure. `python-semantic-release` pushes to
+`hvcs_client.remote_url(use_token=True)` (`ignore_token_for_push` defaults to
+false, and this project does not set it), so handing the action the App
+installation token as `github_token` is enough to make the push authenticate as
+the App. The `tap` job runs raw git, so it takes the kids-tv shape instead:
+check out with the App token, then commit and push.
 
 ### 3. The formula lives at `Formula/universal-remote.rb` in this repo, tapped with the two-argument form
 
@@ -173,14 +210,22 @@ in favour of a clean first release; the gap lasts one merge.
 - **An org owner declines the public flip** → the Homebrew requirements in this
   change are wrong as written. Resolve before implementation; do not start and
   discover it at task 6.
-- **An org owner declines the ruleset bypass** → fall back to Decision 2's
-  `hatch-vcs` tag-only restructure for the version bump, and accept a
-  human-approved formula-bump PR per release. This is a materially different
-  release design, so re-open the proposal rather than improvising in `tasks.md`.
-- **A PAT is used where `GITHUB_TOKEN` used to be** → a PAT-authored push *does*
-  re-trigger workflows, unlike `GITHUB_TOKEN`. Both automated commits must carry
-  `[skip ci]`; the version-bump commit already does via
-  `[tool.semantic_release] commit_message`, and the formula commit gains it.
+- **The CI bot App is not installed on this repo, or not added to the bypass
+  list** → fall back to Decision 2's `hatch-vcs` tag-only restructure for the
+  version bump, and accept a human-approved formula-bump PR per release. This is
+  a materially different release design, so re-open the proposal rather than
+  improvising in `tasks.md`.
+- **An App installation token is used where `GITHUB_TOKEN` used to be** → an
+  App-authored push *does* re-trigger workflows, unlike `GITHUB_TOKEN`. Both
+  automated commits must carry `[skip ci]`. The version-bump commit already does
+  via `[tool.semantic_release] commit_message` in `pyproject.toml`, and the
+  formula commit gains it. **This changes what `[skip ci]` is load-bearing for:**
+  today it is belt-and-suspenders, because `GITHUB_TOKEN` would not re-trigger
+  anyway. After the swap it is the only thing standing between the version-bump
+  commit and an infinite `on: push: main` loop. Do not remove or reword it.
+  (kids-tv belts this a second way — a `setup`-job guard that skips runs whose
+  head commit is the bot's release commit. Worth copying if the loop ever
+  materialises.)
 - **The `tap` job races the `version` job's push** → `tap` checks out `main`
   after `version` has already pushed, and `concurrency: group: release` prevents
   overlapping runs, but the job pulls before pushing so a rebase resolves rather

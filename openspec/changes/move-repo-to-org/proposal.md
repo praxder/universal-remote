@@ -33,9 +33,12 @@ it become one release.
 - **Point every repo URL at the new home** — the Settings screen's GitHub row,
   the README install and Releases links, and the specs that name the old tap.
 - **Org prerequisites (not code, and not ours to grant):** an org owner must make
-  the repo public and add a bypass actor to the org's "Require Peer Review"
-  ruleset for it. Without the bypass no release can complete unattended, and
-  merging `development` → `main` needs another person's approval every time.
+  the repo public, and DevOps must install the org's CI bot GitHub App on this
+  repo and add it to the "Require Peer Review" ruleset's bypass list with
+  `bypass_mode: always` — the pattern `RightNowMinistries/kids-tv` already uses.
+  Without that, no release can complete unattended: `github-actions[bot]` is not
+  an eligible bypass actor. Merging `development` → `main` may still need another
+  person's approval; see design.md — Decision 2.
 
 ## Capabilities
 
@@ -62,8 +65,9 @@ it become one release.
   `version` and `tap` jobs' push credential.
 - **Docs:** `README.md` install + Releases links, `CONTRIBUTING.md` (the formula
   bump lands on `main`, so `development`'s copy is intentionally stale).
-- **Secrets:** `HOMEBREW_TAP_TOKEN` deleted; a `RELEASE_TOKEN` added with rights
-  to push to the protected default branch.
+- **Secrets:** `HOMEBREW_TAP_TOKEN` deleted; no new repo secret — the pipeline
+  mints a per-run installation token from the existing `CI_BOT_PRIVATE_KEY` org
+  secret, which must be made visible to this repo.
 - **Legal:** `LICENSE` still reads `Copyright (c) 2026 Adam Smith`. Moving to a
   company repo is the moment to decide whether the holder becomes Right Now
   Ministries.
