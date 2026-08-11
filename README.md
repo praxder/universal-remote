@@ -9,6 +9,10 @@ Apple TV, Roku, Fire TV, and Android TV / Google TV** — all from one app.
 Everything runs on your LAN; nothing leaves your network. The architecture is
 platform-agnostic, so supporting a new TV platform is one new adapter module.
 
+> **Heads up:** this is a hobby project, provided as-is with no warranty of any
+> kind. It was written mostly by AI in my spare time, so expect bugs and rough
+> edges. Use at your own risk.
+
 ## Install
 
 ### Homebrew (macOS, Apple Silicon) — recommended
