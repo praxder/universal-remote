@@ -39,7 +39,7 @@
 - [ ] 5.2 No PAT to create — confirm instead that the CI bot App is installed on the repo and that `CI_BOT_PRIVATE_KEY` resolves in a workflow run (task 1.4 checks visibility; this checks it actually mints a token)
 - [x] 5.3 Confirm "Allow merge commits" is enabled — python-semantic-release needs every conventional commit, so `development` → `main` must never be squashed
 - [x] 5.4 Confirm repo Actions settings still report `allowed_actions: "all"`, so `python-semantic-release` and `astral-sh/setup-uv` run
-- [ ] 5.5 Repoint the local clone's `origin` at the new URL
+- [x] 5.5 Repoint the local clone's `origin` at the new URL
 
 ## 6. Cut the first release and verify
 
