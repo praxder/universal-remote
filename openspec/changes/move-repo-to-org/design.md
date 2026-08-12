@@ -93,6 +93,29 @@ in the `CI_BOT_PRIVATE_KEY` org secret), Terraform-managed onto the bypass list
 of every `main`-targeting ruleset with `bypass_mode: always`. The workflow mints
 an installation token and pushes as the App.
 
+**The bypass already covers this repo — nothing to request.**
+`tf-engineering-tools/github/repos/rulesets.tf` declares
+`github_organization_ruleset.require_review` with
+`repository_name.include = ["~ALL"]` and an exclude list of six analytics repos
+that does not name `universal-remote`, plus:
+
+```hcl
+bypass_actors {
+  actor_id    = local.integrations.rightnow_ci  # 4117226
+  actor_type  = "Integration"
+  bypass_mode = "always"
+}
+```
+
+The same block appears on every other ruleset that could touch this repo. So the
+grant is org-wide and already applied — `repos-universal-remote.tf` in the same
+workspace already carries `visibility = "public"`, which matches reality, so the
+state is live rather than merely written. What remains is only making
+`CI_BOT_PRIVATE_KEY` readable here; that secret is **not** in
+`github/secrets/secrets.tf` and appears in no Terraform in the org, so it is
+managed by hand in the org's Actions settings and cannot be moved by a pull
+request.
+
 This is strictly better than what was asked for:
 
 - **The repo-admin trade-off disappears.** Peer review does not become advisory
@@ -168,12 +191,27 @@ from its default branch. The formula bump is committed to `main`. The target rep
 currently defaults to `development`; leaving it there would serve every `brew`
 user a formula frozen at whatever version `development` happens to hold.
 
-**And it is not ours to set.** `PATCH /repos/…` with `default_branch=main`
-returns `422 You don't have permission to change the default branch`, despite
-`permissions.admin: true` on the repo — an org or enterprise policy reserves it.
-So this joins the org-prerequisite list rather than the configuration checklist,
-and it blocks the Homebrew half of this change just as firmly as the public flip
-did.
+**And it is not ours to set, nor Terraform's.** `PATCH /repos/…` with
+`default_branch=main` returns `422 You don't have permission to change the
+default branch`, despite `permissions.admin: true` on the repo and a `repo`
+scope on the token — an org or enterprise policy reserves it.
+
+Terraform is not the lever either. The shared repository module does expose a
+`default_branch` variable, but `github_repository.repository` carries:
+
+```hcl
+lifecycle {
+  ignore_changes = [auto_init, default_branch]
+}
+```
+
+`ignore_changes` suppresses the attribute whatever its source, so setting
+`default_branch = "main"` in `repos-universal-remote.tf` would plan and apply as
+a no-op. Removing it from `ignore_changes` would put Terraform in charge of the
+default branch for **every** repo in the org — far too broad a blast radius for
+this change. So an org admin flips it in the GitHub UI. Note `kids-tv` still
+defaults to `development` and is fine, because it is not a Homebrew tap; this
+repo is, which is the whole reason the setting matters here.
 
 The corollary is that `development`'s copy of the formula is permanently stale
 between merges, exactly as `pyproject.toml`'s version already is. That is
