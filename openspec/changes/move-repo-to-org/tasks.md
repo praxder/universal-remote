@@ -35,7 +35,7 @@
 
 ## 5. Configure the new repo
 
-- [ ] 5.1 Set the default branch to `main` — Homebrew reads a tap from its default branch, so leaving it on `development` serves every user a stale formula (design.md — Decision 4)
+- [ ] 5.1 **Ask DevOps** to set the default branch to `main` — Homebrew reads a tap from its default branch, so leaving it on `development` serves every user a stale formula (design.md — Decision 4). Not self-serve: `PATCH /repos/…` with `default_branch=main` returns `422 You don't have permission to change the default branch` even with `permissions.admin: true`, so an org or enterprise policy owns it
 - [ ] 5.2 No PAT to create — confirm instead that the CI bot App is installed on the repo and that `CI_BOT_PRIVATE_KEY` resolves in a workflow run (task 1.4 checks visibility; this checks it actually mints a token)
 - [x] 5.3 Confirm "Allow merge commits" is enabled — python-semantic-release needs every conventional commit, so `development` → `main` must never be squashed
 - [x] 5.4 Confirm repo Actions settings still report `allowed_actions: "all"`, so `python-semantic-release` and `astral-sh/setup-uv` run

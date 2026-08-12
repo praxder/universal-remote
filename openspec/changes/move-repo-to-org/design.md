@@ -168,6 +168,13 @@ from its default branch. The formula bump is committed to `main`. The target rep
 currently defaults to `development`; leaving it there would serve every `brew`
 user a formula frozen at whatever version `development` happens to hold.
 
+**And it is not ours to set.** `PATCH /repos/…` with `default_branch=main`
+returns `422 You don't have permission to change the default branch`, despite
+`permissions.admin: true` on the repo — an org or enterprise policy reserves it.
+So this joins the org-prerequisite list rather than the configuration checklist,
+and it blocks the Homebrew half of this change just as firmly as the public flip
+did.
+
 The corollary is that `development`'s copy of the formula is permanently stale
 between merges, exactly as `pyproject.toml`'s version already is. That is
 intended and gets one line in `CONTRIBUTING.md`.
