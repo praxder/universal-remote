@@ -1,0 +1,1506 @@
+import asyncio
+
+from textual.color import Color
+from textual.widgets import Button, Input, Label, OptionList, Select, Static
+
+from tests.fakes import FakeAdapter
+from universal_remote.devices.models import Device
+from universal_remote.devices.store import DeviceStore
+from universal_remote.registry import AdapterRegistry
+from universal_remote.tui.app import UniversalRemoteApp
+from universal_remote.tui.custom_buttons import ButtonScope, set_title
+from universal_remote.tui.devices_screen import (
+    ADD_TITLE_ART,
+    EDIT_TITLE_ART,
+    AddDeviceScreen,
+    ConfirmDeleteScreen,
+    DeviceListScreen,
+)
+from universal_remote.tui.discover_screen import DiscoverScreen
+
+
+def _registry(*platforms: str):
+    registry = AdapterRegistry()
+    for platform in platforms or ("fake-tv",):
+        registry.register(FakeAdapter(platform=platform))
+    return registry
+
+
+def _app(store, registry=None):
+    return UniversalRemoteApp(store=store, registry=registry or _registry())
+
+
+def _index_of(option_list: OptionList, option_id: str) -> int:
+    for index in range(option_list.option_count):
+        if option_list.get_option_at_index(index).id == option_id:
+            return index
+    raise AssertionError(f"option {option_id!r} not found")
+
+
+async def _open_manual_add(pilot) -> None:
+    """Open the manual add form via the discovery screen's "+ Add manually" row.
+
+    The add entry now opens discovery first; with the test registry's adapters
+    declaring no discovery, the manual row is the sole (highlighted) row.
+    """
+    await pilot.press("a")
+    await pilot.pause()
+    await pilot.press("enter")
+    await pilot.pause()
+
+
+class TestDeviceList:
+    def test_given_saved_devices_when_opening_manage_devices_then_they_are_listed(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+                option_list = app.screen.query_one("#device-list", OptionList)
+                names = [
+                    option_list.get_option_at_index(i).prompt
+                    for i in range(option_list.option_count)
+                ]
+                assert "1. Living Room" in names
+
+        asyncio.run(scenario())
+
+    def test_given_saved_devices_when_opening_then_rows_are_numbered_and_add_is_bare(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+        store.add(Device(name="Bedroom", platform="fake-tv", ip="10.0.0.6"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                prompts = [
+                    option_list.get_option_at_index(i).prompt
+                    for i in range(option_list.option_count)
+                ]
+                assert prompts == ["1. Living Room", "2. Bedroom", "+ Add"]
+
+        asyncio.run(scenario())
+
+    def test_given_no_devices_when_opening_manage_devices_then_only_the_add_row_shows(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                assert option_list.option_count == 1
+                assert option_list.get_option_at_index(0).id == "__add__"
+
+        asyncio.run(scenario())
+
+    def test_given_saved_devices_when_opening_then_devices_first_then_add_row_last(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        first = store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+        second = store.add(Device(name="Bedroom", platform="fake-tv", ip="10.0.0.6"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                ids = [
+                    option_list.get_option_at_index(i).id
+                    for i in range(option_list.option_count)
+                ]
+                assert ids == [first.id, second.id, "__add__"]
+
+        asyncio.run(scenario())
+
+
+class TestStalePlatformSelection:
+    def test_given_a_stale_platform_device_when_selected_then_a_tailored_toast_and_no_edit(
+        self, tmp_path
+    ):
+        # A saved device may name a platform whose adapter is no longer registered.
+        # Opening it for edit must be refused at the seam with a tailored message,
+        # not raise into the global error net while composing the edit form.
+        store = DeviceStore(path=tmp_path / "d.json")
+        device = store.add(Device(name="Old TV", platform="gone", ip="9.9.9.9"))
+
+        async def scenario():
+            app = _app(store, registry=_registry("fake-tv"))  # "gone" not registered
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, device.id)
+                await pilot.pause()
+                await pilot.press("enter")
+                await pilot.pause()
+                # Stayed on the list; no edit form was opened.
+                assert isinstance(app.screen, DeviceListScreen)
+                # Handled locally: the error net was not invoked...
+                assert app._exception is None
+                # ...and a tailored error toast named the device.
+                errors = [
+                    n.message for n in app._notifications if n.severity == "error"
+                ]
+                assert any("Old TV" in message for message in errors)
+
+        asyncio.run(scenario())
+
+
+class TestSelection:
+    def test_given_the_add_row_when_selected_by_enter_then_discovery_opens(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("enter")
+                await pilot.pause()
+                assert isinstance(app.screen, DiscoverScreen)
+
+        asyncio.run(scenario())
+
+    def test_given_the_add_row_when_clicked_then_discovery_opens(self, tmp_path):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                # the first list row renders at relative y=1 in the OptionList
+                await pilot.click("#device-list", offset=(2, 1))
+                await pilot.pause()
+                assert isinstance(app.screen, DiscoverScreen)
+
+        asyncio.run(scenario())
+
+    def test_given_a_device_row_when_selected_by_enter_then_the_edit_flow_opens(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        device = store.add(
+            Device(name="Living Room", platform="fake-tv", ip="10.0.0.5")
+        )
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, device.id)
+                await pilot.pause()
+                await pilot.press("enter")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                assert app.screen._existing.id == device.id
+
+        asyncio.run(scenario())
+
+    def test_given_a_device_row_when_clicked_then_the_edit_flow_opens(self, tmp_path):
+        store = DeviceStore(path=tmp_path / "d.json")
+        device = store.add(
+            Device(name="Living Room", platform="fake-tv", ip="10.0.0.5")
+        )
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                # the sole device is the first list row, at relative y=1
+                await pilot.click("#device-list", offset=(2, 1))
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                assert app.screen._existing.id == device.id
+
+        asyncio.run(scenario())
+
+    def test_given_manage_devices_when_a_digit_is_pressed_then_the_nth_device_edits(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+        second = store.add(Device(name="Bedroom", platform="fake-tv", ip="10.0.0.6"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("2")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                assert app.screen._existing.id == second.id
+
+        asyncio.run(scenario())
+
+    def test_given_manage_devices_when_an_out_of_range_digit_is_pressed_then_nothing_opens(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("2")  # only one device; index 2 is the add row
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+
+        asyncio.run(scenario())
+
+    def test_given_the_add_row_highlighted_when_edit_or_delete_pressed_then_nothing_happens(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")  # add row is the only (highlighted) row
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+                await pilot.press("backspace")
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+                assert store.list() == []
+
+        asyncio.run(scenario())
+
+
+class TestReorder:
+    """Move Up / Move Down on the Manage Devices list."""
+
+    def _store(self, tmp_path, *names) -> DeviceStore:
+        store = DeviceStore(path=tmp_path / "d.json")
+        for i, name in enumerate(names):
+            store.add(Device(name=name, platform="fake-tv", ip=f"10.0.0.{i + 1}"))
+        return store
+
+    async def _open(self, pilot) -> OptionList:
+        await pilot.press("d")
+        await pilot.pause()
+        return pilot.app.screen.query_one("#device-list", OptionList)
+
+    @staticmethod
+    def _prompts(option_list: OptionList) -> list[str]:
+        return [
+            option_list.get_option_at_index(i).prompt
+            for i in range(option_list.option_count)
+        ]
+
+    def test_given_manage_devices_when_opened_then_move_buttons_sit_below_the_list(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                up = app.screen.query_one("#move-up", Button)
+                down = app.screen.query_one("#move-down", Button)
+                assert not up.disabled and not down.disabled
+                assert up.region.y == down.region.y  # side by side on one row
+                assert down.region.x > up.region.x
+                assert up.region.y >= option_list.region.bottom  # below the list
+
+        asyncio.run(scenario())
+
+    def test_given_manage_devices_when_opened_then_move_up_has_a_one_column_gutter(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+
+                up = app.screen.query_one("#move-up", Button)
+
+                assert up.region.x == option_list.region.x + 1
+
+        asyncio.run(scenario())
+
+    def test_given_the_first_device_when_move_down_is_pressed_then_it_moves_later(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                await pilot.click("#move-down")
+                await pilot.pause()
+                assert self._prompts(option_list) == [
+                    "1. Bedroom",
+                    "2. Living Room",
+                    "+ Add",
+                ]
+                assert [d.name for d in store.list()] == ["Bedroom", "Living Room"]
+
+        asyncio.run(scenario())
+
+    def test_given_the_second_device_when_move_up_is_pressed_then_it_moves_earlier(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                option_list.highlighted = 1
+                await pilot.click("#move-up")
+                await pilot.pause()
+                assert self._prompts(option_list) == [
+                    "1. Bedroom",
+                    "2. Living Room",
+                    "+ Add",
+                ]
+                assert [d.name for d in store.list()] == ["Bedroom", "Living Room"]
+
+        asyncio.run(scenario())
+
+    def test_given_a_highlighted_device_when_shift_down_pressed_then_it_moves_later(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await self._open(pilot)
+                await pilot.press("shift+down")
+                await pilot.pause()
+                assert [d.name for d in store.list()] == ["Bedroom", "Living Room"]
+
+        asyncio.run(scenario())
+
+    def test_given_a_highlighted_device_when_shift_up_pressed_then_it_moves_earlier(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                option_list.highlighted = 1
+                await pilot.press("shift+up")
+                await pilot.pause()
+                assert [d.name for d in store.list()] == ["Bedroom", "Living Room"]
+
+        asyncio.run(scenario())
+
+    def test_given_a_highlighted_device_when_capital_j_pressed_then_it_moves_later(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await self._open(pilot)
+                await pilot.press("J")
+                await pilot.pause()
+                assert [d.name for d in store.list()] == ["Bedroom", "Living Room"]
+
+        asyncio.run(scenario())
+
+    def test_given_a_highlighted_device_when_capital_k_pressed_then_it_moves_earlier(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                option_list.highlighted = 1
+                await pilot.press("K")
+                await pilot.pause()
+                assert [d.name for d in store.list()] == ["Bedroom", "Living Room"]
+
+        asyncio.run(scenario())
+
+    def test_given_a_device_moved_down_twice_then_it_is_last_and_still_highlighted(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "A", "B", "C")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                await pilot.press("shift+down")
+                await pilot.pause()
+                await pilot.press("shift+down")
+                await pilot.pause()
+                assert [d.name for d in store.list()] == ["B", "C", "A"]
+                assert option_list.highlighted == 2
+                assert option_list.get_option_at_index(2).prompt == "3. A"
+
+        asyncio.run(scenario())
+
+    def test_given_a_move_activated_by_button_then_focus_returns_to_the_list(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                await pilot.click("#move-down")
+                await pilot.pause()
+                assert app.focused is option_list
+
+        asyncio.run(scenario())
+
+    def test_given_the_first_device_when_moved_up_then_nothing_changes(self, tmp_path):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                await pilot.click("#move-up")
+                await pilot.pause()
+                assert self._prompts(option_list) == [
+                    "1. Living Room",
+                    "2. Bedroom",
+                    "+ Add",
+                ]
+                assert [d.name for d in store.list()] == ["Living Room", "Bedroom"]
+
+        asyncio.run(scenario())
+
+    def test_given_the_last_device_when_moved_down_then_nothing_changes(self, tmp_path):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                option_list.highlighted = 1
+                await pilot.click("#move-down")
+                await pilot.pause()
+                assert self._prompts(option_list) == [
+                    "1. Living Room",
+                    "2. Bedroom",
+                    "+ Add",
+                ]
+                assert [d.name for d in store.list()] == ["Living Room", "Bedroom"]
+
+        asyncio.run(scenario())
+
+    def test_given_the_add_row_highlighted_when_a_move_is_pressed_then_nothing_changes(
+        self, tmp_path
+    ):
+        store = self._store(tmp_path, "Living Room", "Bedroom")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                option_list = await self._open(pilot)
+                option_list.highlighted = _index_of(option_list, "__add__")
+                await pilot.press("shift+up")
+                await pilot.pause()
+                await pilot.press("shift+down")
+                await pilot.pause()
+                assert self._prompts(option_list) == [
+                    "1. Living Room",
+                    "2. Bedroom",
+                    "+ Add",
+                ]
+                assert [d.name for d in store.list()] == ["Living Room", "Bedroom"]
+
+        asyncio.run(scenario())
+
+
+class TestAddDevice:
+    def test_given_manual_ip_and_name_when_saved_then_the_device_persists(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                assert isinstance(app.screen, AddDeviceScreen)
+                app.screen.query_one("#ip", Input).value = "10.0.0.9"
+                app.screen.query_one("#name", Input).value = "Bedroom TV"
+                await pilot.click("#save")
+                await pilot.pause()
+
+        asyncio.run(scenario())
+
+        saved = store.list()
+        assert [d.name for d in saved] == ["Bedroom TV"]
+        assert saved[0].ip == "10.0.0.9"
+        assert saved[0].platform == "fake-tv"
+
+    def test_given_a_manual_device_when_saved_then_a_success_toast_is_shown(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                app.screen.query_one("#ip", Input).value = "10.0.0.9"
+                app.screen.query_one("#name", Input).value = "Bedroom TV"
+                await pilot.click("#save")
+                await pilot.pause()
+                messages = [n.message for n in app._notifications]
+                assert 'Added "Bedroom TV".' in messages
+
+        asyncio.run(scenario())
+
+    def test_given_the_add_flow_when_opened_then_cells_are_ordered_type_name_ip(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                children = app.screen.query_one("#add-device").children
+                assert [w.id for w in children] == [
+                    "add-title",
+                    "platform",
+                    "name",
+                    "ip",
+                    "error",
+                    "save",
+                ]
+
+        asyncio.run(scenario())
+
+    def test_given_multiple_adapters_when_adding_then_the_dropdown_shows_friendly_labels(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        registry = AdapterRegistry()
+        registry.register(
+            FakeAdapter(platform="samsung-tizen", display_name="Samsung Tizen")
+        )
+        registry.register(FakeAdapter(platform="lg-webos", display_name="LG WebOS"))
+
+        async def scenario():
+            app = _app(store, registry=registry)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                selector = app.screen.query_one("#platform", Select)
+                labels = [(str(prompt), value) for prompt, value in selector._options]
+                assert labels == [
+                    ("Samsung Tizen", "samsung-tizen"),
+                    ("LG WebOS", "lg-webos"),
+                ]
+                assert selector.value == "samsung-tizen"
+
+        asyncio.run(scenario())
+
+    def test_given_the_add_flow_when_opened_then_the_add_banner_is_shown(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                banner = app.screen.query_one("#add-title", Static)
+                assert str(banner.render()) == ADD_TITLE_ART
+
+        asyncio.run(scenario())
+
+    def test_given_the_edit_flow_when_opened_then_the_edit_banner_is_shown(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                banner = app.screen.query_one("#add-title", Static)
+                assert str(banner.render()) == EDIT_TITLE_ART
+
+        asyncio.run(scenario())
+
+    def test_given_multiple_adapters_when_adding_then_the_selected_platform_is_saved(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store, registry=_registry("samsung-tizen", "lg-webos"))
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                selector = app.screen.query_one("#platform", Select)
+                assert selector.value == "samsung-tizen"
+                selector.value = "lg-webos"
+                app.screen.query_one("#ip", Input).value = "10.0.0.9"
+                await pilot.click("#save")
+                await pilot.pause()
+
+        asyncio.run(scenario())
+
+        assert store.list()[0].platform == "lg-webos"
+
+
+class TestDuplicateRejection:
+    def test_given_the_add_screen_opens_then_the_error_row_is_hidden(self, tmp_path):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                assert app.screen.query_one("#error", Label).display is False
+
+        asyncio.run(scenario())
+
+    def test_given_a_conflict_when_saving_then_the_error_row_becomes_visible(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                app.screen.query_one("#name", Input).value = "Living Room"
+                await pilot.click("#save")
+                await pilot.pause()
+                assert app.screen.query_one("#error", Label).display is True
+
+        asyncio.run(scenario())
+
+    def test_given_a_duplicate_name_when_saving_a_new_device_then_it_is_blocked(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                app.screen.query_one("#name", Input).value = "living room"
+                app.screen.query_one("#ip", Input).value = "10.0.0.9"
+                await pilot.click("#save")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                error = str(app.screen.query_one("#error", Label).render())
+                assert error == "A device named 'living room' already exists."
+
+        asyncio.run(scenario())
+
+        assert [d.name for d in store.list()] == ["Living Room"]
+
+    def test_given_a_duplicate_ip_when_saving_a_new_device_then_it_is_blocked(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                app.screen.query_one("#name", Input).value = "Bedroom"
+                app.screen.query_one("#ip", Input).value = "10.0.0.5"
+                await pilot.click("#save")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                error = str(app.screen.query_one("#error", Label).render())
+                assert error == "A device with IP 10.0.0.5 already exists."
+
+        asyncio.run(scenario())
+
+        assert [d.name for d in store.list()] == ["Living Room"]
+
+    def test_given_a_unique_name_and_ip_when_saving_then_the_device_persists(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                app.screen.query_one("#name", Input).value = "Bedroom"
+                app.screen.query_one("#ip", Input).value = "10.0.0.9"
+                await pilot.click("#save")
+                await pilot.pause()
+                # A successful save closes the manual form back to the discovery
+                # screen (which sits between the device list and the add form).
+                assert isinstance(app.screen, DiscoverScreen)
+
+        asyncio.run(scenario())
+
+        assert sorted(d.name for d in store.list()) == ["Bedroom", "Living Room"]
+
+    def test_given_an_edited_device_kept_unchanged_when_saved_then_it_persists(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                await pilot.click("#save")
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+
+        asyncio.run(scenario())
+
+        assert [d.name for d in store.list()] == ["Living Room"]
+
+    def test_given_an_edit_onto_another_devices_name_when_saved_then_it_is_blocked(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+        bedroom = store.add(Device(name="Bedroom", platform="fake-tv", ip="10.0.0.6"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, bedroom.id)
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                app.screen.query_one("#name", Input).value = "Living Room"
+                await pilot.click("#save")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                error = str(app.screen.query_one("#error", Label).render())
+                assert error == "A device named 'Living Room' already exists."
+
+        asyncio.run(scenario())
+
+        assert sorted(d.name for d in store.list()) == ["Bedroom", "Living Room"]
+
+    def test_given_an_edit_onto_another_devices_ip_when_saved_then_it_is_blocked(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+        bedroom = store.add(Device(name="Bedroom", platform="fake-tv", ip="10.0.0.6"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, bedroom.id)
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                app.screen.query_one("#ip", Input).value = "10.0.0.5"
+                await pilot.click("#save")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                error = str(app.screen.query_one("#error", Label).render())
+                assert error == "A device with IP 10.0.0.5 already exists."
+
+        asyncio.run(scenario())
+
+        assert sorted(d.ip for d in store.list()) == ["10.0.0.5", "10.0.0.6"]
+
+
+class TestEditAndDelete:
+    def test_given_a_selected_device_when_edited_then_it_updates_without_adding(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Old", platform="fake-tv", ip="1.1.1.1"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                app.screen.query_one("#name", Input).value = "New"
+                await pilot.click("#save")
+                await pilot.pause()
+
+        asyncio.run(scenario())
+
+        remaining = store.list()
+        assert len(remaining) == 1
+        assert remaining[0].name == "New"
+
+    def test_given_a_selected_device_when_edited_then_no_added_toast_is_shown(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Old", platform="fake-tv", ip="1.1.1.1"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                app.screen.query_one("#name", Input).value = "New"
+                await pilot.click("#save")
+                await pilot.pause()
+                messages = [n.message for n in app._notifications]
+                assert not any("Added" in m for m in messages)
+
+        asyncio.run(scenario())
+
+    def test_given_two_devices_when_one_is_deleted_then_only_it_is_removed(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Keep", platform="fake-tv", ip="1.1.1.1"))
+        drop = store.add(Device(name="Drop", platform="fake-tv", ip="2.2.2.2"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, drop.id)
+                await pilot.pause()
+                await pilot.press("backspace")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                await pilot.click("#confirm")
+                await pilot.pause()
+
+        asyncio.run(scenario())
+
+        assert [d.name for d in store.list()] == ["Keep"]
+
+    def test_given_a_deleted_device_when_confirmed_then_its_custom_buttons_are_purged(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        drop = store.add(Device(name="Drop", platform="fake-tv", ip="2.2.2.2"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                # A device-scoped title for the doomed device, plus a global title
+                # that must survive the delete.
+                set_title(
+                    app.custom_buttons,
+                    1,
+                    "DropOnly",
+                    ButtonScope.DEVICE,
+                    device_id=drop.id,
+                    platform="fake-tv",
+                )
+                set_title(
+                    app.custom_buttons,
+                    2,
+                    "Everywhere",
+                    ButtonScope.GLOBAL,
+                    device_id=drop.id,
+                    platform="fake-tv",
+                )
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, drop.id)
+                await pilot.pause()
+                await pilot.press("backspace")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                await pilot.click("#confirm")
+                await pilot.pause()
+                # The device-scoped entry is gone, in memory and on disk; the global
+                # title stands.
+                assert drop.id not in app.custom_buttons.get("device", {})
+                assert app.custom_buttons["global"]["2"]["title"] == "Everywhere"
+                persisted = app.preferences.load().custom_buttons
+                assert drop.id not in persisted.get("device", {})
+
+        asyncio.run(scenario())
+
+    def test_given_a_device_when_delete_is_cancelled_then_it_is_kept(self, tmp_path):
+        store = DeviceStore(path=tmp_path / "d.json")
+        keep = store.add(Device(name="Keep", platform="fake-tv", ip="1.1.1.1"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, keep.id)
+                await pilot.pause()
+                await pilot.press("backspace")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                await pilot.click("#cancel")
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+
+        asyncio.run(scenario())
+
+        assert [d.name for d in store.list()] == ["Keep"]
+
+    def test_given_the_confirm_prompt_when_arrow_pressed_then_focus_moves_between_buttons(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        device = store.add(Device(name="Keep", platform="fake-tv", ip="1.1.1.1"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, device.id)
+                await pilot.pause()
+                await pilot.press("backspace")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                assert app.focused.id == "cancel"  # destructive action starts on cancel
+                await pilot.press("up")
+                await pilot.pause()
+                assert app.focused.id == "confirm"
+
+        asyncio.run(scenario())
+
+    def test_given_the_confirm_prompt_when_delete_is_focused_then_its_text_is_red(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        device = store.add(Device(name="Keep", platform="fake-tv", ip="1.1.1.1"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, device.id)
+                await pilot.pause()
+                await pilot.press("backspace")
+                await pilot.pause()
+
+                # The prompt opens on Cancel, so move to the destructive action.
+                await pilot.press("up")
+                await pilot.pause()
+
+                assert app.screen.query_one(
+                    "#confirm", Button
+                ).styles.color == Color.parse(app.get_css_variables()["text-error"])
+
+        asyncio.run(scenario())
+
+    def test_given_the_confirm_prompt_when_cancel_is_focused_then_its_text_is_not_red(
+        self, tmp_path
+    ):
+        # The red belongs to the destructive action alone: a focused Cancel keeps the
+        # app-wide accent, which is what proves the destructive rule is scoped.
+        store = DeviceStore(path=tmp_path / "d.json")
+        device = store.add(Device(name="Keep", platform="fake-tv", ip="1.1.1.1"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, device.id)
+                await pilot.pause()
+                await pilot.press("backspace")
+                await pilot.pause()
+
+                assert app.focused.id == "cancel"
+                assert app.screen.query_one(
+                    "#cancel", Button
+                ).styles.color == Color.parse(app.get_css_variables()["accent"])
+
+        asyncio.run(scenario())
+
+
+class TestEditScreenDelete:
+    def test_given_the_edit_flow_when_opened_then_delete_shows_below_save(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                save = app.screen.query_one("#save", Button)
+                delete = app.screen.query_one("#delete", Button)
+                assert delete.region.x == save.region.x
+                assert delete.region.y > save.region.y
+
+        asyncio.run(scenario())
+
+    def test_given_the_edit_flow_when_delete_is_focused_then_its_text_is_red(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                delete = app.screen.query_one("#delete", Button)
+
+                delete.focus()
+                await pilot.pause()
+
+                assert delete.styles.color == Color.parse(
+                    app.get_css_variables()["text-error"]
+                )
+
+        asyncio.run(scenario())
+
+    def test_given_the_add_flow_when_opened_then_no_delete_button(self, tmp_path):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                assert isinstance(app.screen, AddDeviceScreen)
+                assert len(app.screen.query("#delete")) == 0
+
+        asyncio.run(scenario())
+
+    def test_given_the_edit_flow_when_delete_pressed_then_confirm_prompt_shows(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                await pilot.click("#delete")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                assert [d.name for d in store.list()] == ["Living Room"]
+
+        asyncio.run(scenario())
+
+    def test_given_the_edit_delete_when_confirmed_then_removed_and_back_to_list(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                await pilot.click("#delete")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                await pilot.click("#confirm")
+                await pilot.pause()
+                assert isinstance(app.screen, DeviceListScreen)
+                option_list = app.screen.query_one("#device-list", OptionList)
+                # only the add row remains; the deleted device is gone from the list
+                assert option_list.get_option_at_index(0).id == "__add__"
+
+        asyncio.run(scenario())
+
+        assert store.list() == []
+
+    def test_given_the_edit_delete_when_confirmed_then_its_custom_buttons_are_purged(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        device = store.add(
+            Device(name="Living Room", platform="fake-tv", ip="10.0.0.5")
+        )
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                set_title(
+                    app.custom_buttons,
+                    1,
+                    "DeviceOnly",
+                    ButtonScope.DEVICE,
+                    device_id=device.id,
+                    platform="fake-tv",
+                )
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                await pilot.click("#delete")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                await pilot.click("#confirm")
+                await pilot.pause()
+                # The edit-screen delete path purges the same way the list path does.
+                assert device.id not in app.custom_buttons.get("device", {})
+
+        asyncio.run(scenario())
+
+    def test_given_the_edit_delete_when_cancelled_then_kept_and_stays_on_edit(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                await pilot.click("#delete")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                await pilot.click("#cancel")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+
+        asyncio.run(scenario())
+
+        assert [d.name for d in store.list()] == ["Living Room"]
+
+    def test_given_save_focused_on_edit_when_down_pressed_then_delete_is_focused(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                app.screen.query_one("#save", Button).focus()
+                await pilot.pause()
+                assert app.focused.id == "save"
+                await pilot.press("down")
+                await pilot.pause()
+                assert app.focused.id == "delete"
+
+        asyncio.run(scenario())
+
+
+class TestVimNavigation:
+    def test_given_a_device_list_when_j_and_k_pressed_then_the_highlight_moves(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+        store.add(Device(name="Bedroom", platform="fake-tv", ip="10.0.0.6"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                assert option_list.highlighted == 0
+                await pilot.press("j")
+                await pilot.pause()
+                assert option_list.highlighted == 1
+                await pilot.press("k")
+                await pilot.pause()
+                assert option_list.highlighted == 0
+
+        asyncio.run(scenario())
+
+    def test_given_a_device_list_when_h_and_l_pressed_then_the_highlight_moves(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        store.add(Device(name="Living Room", platform="fake-tv", ip="10.0.0.5"))
+        store.add(Device(name="Bedroom", platform="fake-tv", ip="10.0.0.6"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                assert option_list.highlighted == 0
+                await pilot.press("l")
+                await pilot.pause()
+                assert option_list.highlighted == 1
+                await pilot.press("h")
+                await pilot.pause()
+                assert option_list.highlighted == 0
+
+        asyncio.run(scenario())
+
+    def test_given_the_confirm_dialog_when_hjkl_pressed_then_focus_moves(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        device = store.add(Device(name="Keep", platform="fake-tv", ip="1.1.1.1"))
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                option_list = app.screen.query_one("#device-list", OptionList)
+                option_list.highlighted = _index_of(option_list, device.id)
+                await pilot.pause()
+                await pilot.press("backspace")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmDeleteScreen)
+                assert app.focused.id == "cancel"  # destructive action starts here
+                await pilot.press("k")
+                await pilot.pause()
+                assert app.focused.id == "confirm"
+                await pilot.press("j")
+                await pilot.pause()
+                assert app.focused.id == "cancel"
+                await pilot.press("h")
+                await pilot.pause()
+                assert app.focused.id == "confirm"
+                await pilot.press("l")
+                await pilot.pause()
+                assert app.focused.id == "cancel"
+
+        asyncio.run(scenario())
+
+    def test_given_the_name_input_when_vim_letters_typed_then_they_fill_and_focus_stays(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                name = app.screen.query_one("#name", Input)
+                name.focus()
+                await pilot.pause()
+                assert app.focused.id == "name"
+                await pilot.press("h", "j", "k", "l")
+                await pilot.pause()
+                assert name.value == "hjkl"
+                assert app.focused.id == "name"
+
+        asyncio.run(scenario())
+
+
+class TestAddFormLayout:
+    def test_given_the_add_form_when_rendered_then_save_sits_one_column_in_from_the_fields(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                assert isinstance(app.screen, AddDeviceScreen)
+                save = app.screen.query_one("#save")
+                name = app.screen.query_one("#name", Input)
+                ip = app.screen.query_one("#ip", Input)
+                assert name.region.x == ip.region.x
+                assert save.region.x == name.region.x + 1
+
+        asyncio.run(scenario())
+
+    def test_given_the_add_and_devices_banners_then_they_share_top_and_bottom_margin(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                devices = app.screen.query_one("#devices-title", Static).styles.margin
+                await _open_manual_add(pilot)
+                add = app.screen.query_one("#add-title", Static).styles.margin
+                assert (add.top, add.bottom) == (devices.top, devices.bottom)
+
+        asyncio.run(scenario())
+
+
+class TestEditDeviceType:
+    def test_given_the_edit_flow_when_opened_then_device_type_is_read_only(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+        registry = AdapterRegistry()
+        registry.register(
+            FakeAdapter(platform="samsung-tizen", display_name="Samsung Tizen")
+        )
+        store.add(Device(name="Den", platform="samsung-tizen", ip="10.0.0.5"))
+
+        async def scenario():
+            app = _app(store, registry=registry)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await pilot.press("e")
+                await pilot.pause()
+                assert isinstance(app.screen, AddDeviceScreen)
+                display = app.screen.query_one("#platform-display", Input)
+                assert display.value == "Samsung Tizen"
+                assert display.disabled is True
+                assert len(app.screen.query("#platform")) == 0
+
+        asyncio.run(scenario())
+
+
+class TestFormNavigation:
+    def test_given_the_device_type_cell_when_arrows_pressed_then_focus_moves_through_cells(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                app.screen.query_one("#platform", Select).focus()
+                await pilot.pause()
+                assert app.focused.id == "platform"
+                for expected in ("name", "ip", "save"):
+                    await pilot.press("down")
+                    await pilot.pause()
+                    assert app.focused.id == expected
+                await pilot.press("up")
+                await pilot.pause()
+                assert app.focused.id == "ip"
+
+        asyncio.run(scenario())
+
+    def test_given_the_device_type_cell_when_enter_pressed_then_the_dropdown_opens(
+        self, tmp_path
+    ):
+        store = DeviceStore(path=tmp_path / "d.json")
+
+        async def scenario():
+            app = _app(store)
+            async with app.run_test() as pilot:
+                await pilot.press("d")
+                await pilot.pause()
+                await _open_manual_add(pilot)
+                selector = app.screen.query_one("#platform", Select)
+                selector.focus()
+                await pilot.pause()
+                assert selector.expanded is False
+                await pilot.press("enter")
+                await pilot.pause()
+                assert selector.expanded is True
+
+        asyncio.run(scenario())

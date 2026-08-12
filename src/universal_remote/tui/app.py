@@ -1,0 +1,301 @@
+"""The root Textual application, holding the device store and adapter registry."""
+
+from __future__ import annotations
+
+from textual.app import App, SystemCommand
+from textual.binding import Binding
+from textual.screen import Screen
+from textual.worker import WorkerFailed
+
+from typing import Callable, Iterable
+
+from ..devices.store import DeviceStore
+from ..error_log import log_exception
+from ..errors import UniversalRemoteError
+from ..preferences.store import Preferences, PreferencesStore
+from ..registry import AdapterRegistry
+from ..registry import registry as default_registry
+from .custom_buttons import forget_device
+from .menu import MenuScreen
+from .quotes import Quote, random_quote
+from .shortcuts_screen import ShortcutsCommandProvider
+
+
+class UniversalRemoteApp(App[None]):
+    """Launches into the entry menu; screens read `store` and `registry` off the app."""
+
+    TITLE = "Universal Remote"
+
+    # Ctrl+C exits on a single press from anywhere. Textual binds it to `help_quit` (a
+    # "press Ctrl+Q to quit" toast) and does not mark it priority, so by default it
+    # never fires inside a modal — the non-priority pass walks a binding chain that is
+    # truncated at the modal, excluding the App — and it loses to Input/TextArea copy.
+    # `priority=True` is checked in `App.on_event` before the key reaches the focused
+    # widget and walks the full chain, so it wins everywhere. Naming `ctrl+c` here
+    # replaces Textual's binding for that key rather than stacking with it, so the
+    # toast is gone. Kept out of the footer: the supported 80-column width is full.
+    BINDINGS = [Binding("ctrl+c", "quit", "Quit", show=False, priority=True)]
+
+    # Add the read-only "Keyboard Shortcuts" entry to the default command palette.
+    COMMANDS = App.COMMANDS | {ShortcutsCommandProvider}
+
+    CSS = """
+    Screen { align: center middle; }
+    #menu { width: 100%; height: auto; }
+    #menu Button { width: 28; margin: 1 0; }
+    /* Settings entry: a bottom-left button docked above the Footer (which docks
+       last, so it stays below this). Width hugs the button (not 100%) so the bar
+       does not overlay the centered #menu content and swallow its mouse clicks on a
+       short terminal where the menu buttons reach the docked rows. */
+    #settings-bar { dock: bottom; height: auto; width: auto; }
+    #settings-bar Button { width: auto; margin: 0 0 2 2; }
+    /* focus: accent text on a slightly lighter fill instead of reversing fg/bg;
+       keep the default `tall` top/bottom border so the height never changes */
+    Button:focus {
+        text-style: bold;
+        color: $accent;
+        background: $surface-lighten-1;
+        border-top: tall $surface-lighten-1;
+        border-bottom: tall $surface-lighten-1;
+    }
+    /* Destructive controls (Delete, Reset) read red while focused, so the button about
+       to be pressed announces that it destroys something rather than looking like every
+       other focused button. $text-error, not $error: the focus fill above is
+       $surface-lighten-1, against which the saturated $error sits at about 2.5:1 on the
+       default dark theme — $text-error is the token Textual derives for red *text* on a
+       surface, and reaches about 4.6:1 there. */
+    Button.destructive:focus { color: $text-error; }
+    /* #title width matches the TITLE_ART banner so it never wraps */
+    #title { width: 42; text-align: center; margin-bottom: 1; color: $accent; }
+    /* left-aligned so the multi-width banner lines keep their column alignment */
+    #devices-title { width: 36; text-align: left; margin: 1 0 1 0; color: $accent; }
+    /* wider than #devices-title so the "Add/Edit Device" banner never wraps;
+       same top/bottom margin as #devices-title */
+    #add-title { width: 52; text-align: left; margin: 1 0 1 0; color: $accent; }
+    /* wide enough for the "Select Device" banner; padded above and below */
+    #use-remote-title { width: 58; text-align: left; margin: 1 0 1 0; color: $accent; }
+    /* wide enough for the "Discover" banner; padded like the Devices banner */
+    #discover-title { width: 40; text-align: left; margin: 1 0 1 0; color: $accent; }
+    /* wide enough for the "Settings" banner; padded like the other banners */
+    #settings-title { width: 40; text-align: left; margin: 1 0 1 0; color: $accent; }
+    /* Settings rows: each wrapped in Center; the version is a muted, non-interactive label */
+    #settings { width: 100%; height: auto; }
+    #settings Button { width: 40; margin-bottom: 1; }
+    #settings #version { width: auto; margin-top: 1; color: $text-muted; }
+    /* the "searching" indicator: an animated spinner + bold text, hidden once done */
+    #discover-status { height: 1; margin-top: 1; }
+    #discover-status LoadingIndicator { width: 8; height: 1; color: $accent; }
+    #discover-status-text {
+        width: auto; height: 1; margin-left: 2;
+        text-style: bold; color: $accent;
+    }
+    /* The device list keeps its default `height: auto` so it hugs its rows and the
+       reorder row sits directly beneath it rather than at the bottom of the screen.
+       Scrolling the whole column is what keeps that row reachable on a terminal too
+       short for the list: without it the buttons are simply clipped away. */
+    #devices { overflow-y: auto; }
+    /* reorder row under the device list: `auto` height because Horizontal
+       defaults to 1fr, which would take the space the list needs at 80x24.
+       Move Up carries a one-column left gutter so it is not flush against the
+       terminal edge; Horizontal pushes Move Down right along with it. */
+    #move-buttons { width: auto; height: auto; }
+    #move-buttons #move-up { margin: 1 2 0 1; }
+    #move-buttons #move-down { margin: 1 0 0 0; }
+    /* one column of left gutter so the button is not flush against the terminal edge */
+    #add-device #save { margin: 1 0 0 1; }
+    /* edit-only Delete button: same left edge and top margin as Save */
+    #add-device #delete { margin: 1 0 0 1; }
+    /* duplicate-save error: hidden until there is a message, then shown in red */
+    #add-device #error { display: none; color: $error; margin: 1 0 0 0; }
+    #quote { width: 42; text-align: center; margin-top: 1; color: $text-muted; }
+    /* delete confirmation: dim the device list behind a centered dialog box */
+    ConfirmDeleteScreen { align: center middle; background: $background 60%; }
+    #confirm-delete {
+        width: auto; height: auto; padding: 1 2;
+        border: thick $primary; background: $surface;
+    }
+    #confirm-message { text-align: center; margin-bottom: 1; }
+    #confirm-delete Button { width: 16; margin-top: 1; }
+    /* connecting: dim the device list behind a centered dialog box */
+    ConnectingModal { align: center middle; background: $background 60%; }
+    #connecting {
+        width: auto; height: auto; padding: 1 2;
+        border: thick $primary; background: $surface; align: center middle;
+    }
+    #connecting-loading, #connecting-error { width: auto; height: auto; align: center middle; }
+    #connecting LoadingIndicator { height: 1; margin-bottom: 1; }
+    #connect-error { text-align: center; margin-bottom: 1; }
+    #connecting Button { width: 16; margin-top: 1; }
+    #cancel-row { width: 100%; }  /* full width so its centered button centers in the box */
+    #error-buttons { width: 100%; }  /* full width so the retry/back column centers in the box */
+    /* pairing: dim the device selection behind a centered dialog box */
+    PairingScreen { align: center middle; background: $background 60%; }
+    #pairing {
+        width: auto; height: auto; padding: 1 2;
+        border: thick $primary; background: $surface;
+    }
+    /* guidance sets the box width; title/buttons fill it and center their content */
+    #pairing-guidance { text-align: center; }
+    #pairing-title { width: 100%; text-align: center; }
+    /* PIN entry: hidden until an adapter (e.g. Apple TV) asks for a PIN */
+    #pin-entry { display: none; width: 100%; height: auto; }
+    #pin-entry Input { width: 100%; margin-top: 1; }
+    #pairing #submit, #pairing #cancel { width: 100%; margin-top: 1; }
+    """
+
+    def __init__(
+        self,
+        store: DeviceStore | None = None,
+        registry: AdapterRegistry | None = None,
+        quote_provider: Callable[[], Quote | None] | None = None,
+        preferences: PreferencesStore | None = None,
+    ) -> None:
+        super().__init__()
+        self.store = store or DeviceStore()
+        self.registry = registry or default_registry
+        self.quote_provider = quote_provider or random_quote
+        self.preferences = preferences or PreferencesStore()
+        # Action id -> key overrides for the catalogued shortcuts; populated from the
+        # saved preferences on mount (see `on_mount`) and edited live from the
+        # Keyboard Shortcuts screen. Screens read this to build their bindings.
+        self.shortcut_overrides: dict[str, str] = {}
+        # Layered custom-button titles keyed by scope; populated from saved preferences
+        # on mount and read by the remote to label its custom buttons. Resolution lives
+        # in `tui.custom_buttons`.
+        self.custom_buttons: dict = {}
+        # The saved macro registry (`next_number` plus `items` keyed by macro id),
+        # populated from the saved preferences on mount. Read by the macros modals and
+        # by macro playback; the registry operations live in `macros.registry`.
+        self.macros: dict = {}
+        # True once the user has asked not to see the pre-recording hint again; read by
+        # the remote before it presents the hint on Create Macro.
+        self.hide_recording_hint = False
+        # Set true only once our own mount handler has run, so the safety net can
+        # tell a post-mount error (stay open) from a startup/compose/mount failure
+        # (fall through). See `_handle_exception`.
+        self._mount_succeeded = False
+
+    def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
+        """Drop the Maximize and Screenshot commands from the command palette."""
+        for command in super().get_system_commands(screen):
+            if command.title in ("Maximize", "Screenshot"):
+                continue
+            yield command
+
+    def watch_theme(self, theme_name: str) -> None:
+        """Persist every theme change, wherever it originates.
+
+        Textual dispatches both its own private `_watch_theme` and this public
+        watcher, so a change from the Settings picker or the command palette is
+        saved here without touching framework internals. The current shortcuts ride
+        along so saving the theme never drops them.
+        """
+        self.persist_preferences()
+
+    def delete_device(self, device_id: str) -> None:
+        """Remove a saved device and the custom-button titles scoped only to it.
+
+        Deletes from the device store and purges that device's device-scoped
+        `custom_buttons` entries (device-type and global titles stand), then persists
+        the preferences — the two stores are kept in step here so both delete sites
+        do it the same way.
+        """
+        self.store.delete(device_id)
+        forget_device(self.custom_buttons, device_id)
+        self.persist_preferences()
+
+    def persist_preferences(self) -> None:
+        """Write every preference together, best-effort.
+
+        Each field must be named here: this rebuilds `Preferences` from keyword
+        arguments and `watch_theme` calls it on every theme change, so omitting one
+        (say `macros=`) would silently erase it whenever the theme changed.
+        """
+        self.preferences.save(
+            Preferences(
+                theme=self.theme,
+                shortcuts=dict(self.shortcut_overrides),
+                custom_buttons=self.custom_buttons,
+                macros=self.macros,
+                hide_recording_hint=self.hide_recording_hint,
+            )
+        )
+
+    def apply_shortcuts(self) -> None:
+        """Rebuild the catalogued bindings of every mounted screen from the overrides.
+
+        Called after a shortcut is assigned or cleared so the change takes effect
+        without a restart across the whole screen stack.
+        """
+        from .shortcuts import rebuild_shortcuts
+
+        for screen in self.screen_stack:
+            scopes = getattr(screen, "SHORTCUT_SCOPES", None)
+            if scopes:
+                hide = getattr(screen, "SHORTCUT_HIDE", ())
+                rebuild_shortcuts(screen, self.shortcut_overrides, scopes, hide=hide)
+
+    def on_mount(self) -> None:
+        from .shortcuts import without_bare_modifiers, without_reserved
+
+        preferences = self.preferences.load()
+        # Load saved shortcuts into the override map before the menu is pushed, so
+        # its bindings (and every later screen's) build from them. Drop any override
+        # whose key has since become reserved (e.g. `e` bound to a device action before
+        # it was reserved for edit-mode) or is a lone modifier (assignable before the
+        # `is_bare_modifier` guard was fixed): left in place either would bind a fixed
+        # or modifier-only key, so the action reverts to its default. `update` keeps
+        # any overrides set directly on the app (e.g. in tests) when none are saved.
+        kept = without_bare_modifiers(without_reserved(preferences.shortcuts))
+        self.shortcut_overrides.update(kept)
+        # Load saved custom-button titles the same way, before any remote is opened.
+        self.custom_buttons.update(preferences.custom_buttons)
+        # Load the saved macro registry, before the macros list can be opened.
+        self.macros.update(preferences.macros)
+        self.hide_recording_hint = preferences.hide_recording_hint
+        # Ignore a saved theme that is no longer registered (e.g. removed by a
+        # Textual upgrade) so `_validate_theme` cannot raise; the default stands.
+        if preferences.theme in self.available_themes:
+            self.theme = preferences.theme
+        # Persist the cleaned overrides so a pruned stale binding stays gone next run.
+        if kept != preferences.shortcuts:
+            self.persist_preferences()
+        self.push_screen(MenuScreen())
+        self._mount_succeeded = True
+
+    def _handle_exception(self, error: Exception) -> None:
+        """App-wide safety net: an unexpected error toasts and stays, not crashes.
+
+        Until our own `on_mount` has run there is no surface to toast on, so a
+        startup/compose/mount failure falls through to Textual's default teardown.
+        We gate on our own `_mount_succeeded` flag rather than Textual's
+        `_is_mounted`, which is set unconditionally even when compose/mount raises
+        and so cannot distinguish the two. Once mounted, a worker or handler error is
+        logged, surfaced as an error toast, and swallowed so the session survives.
+        The `_exception` bookkeeping is preserved so `run_test()` still re-raises and
+        tests keep surfacing bugs; `run()` never re-raises it, so a real session
+        stays open.
+        """
+        if not self._mount_succeeded:
+            super()._handle_exception(error)
+            return
+        original = error.error if isinstance(error, WorkerFailed) else error
+        try:
+            # The net must never crash on its own reporting — an unwritable log dir
+            # or a failed toast cannot be allowed to become the fatal error.
+            log_exception(original)
+            self.notify(self._error_message(original), title="Error", severity="error")
+        except Exception:
+            pass
+        # Preserve Textual's bookkeeping so `run_test()` re-raises and tests keep
+        # surfacing bugs; `run()` never re-raises it, so a real session stays open.
+        if self._exception is None:
+            self._exception = error
+            self._exception_event.set()
+
+    @staticmethod
+    def _error_message(error: BaseException) -> str:
+        """A domain error's message is user-safe; anything else stays generic."""
+        if isinstance(error, UniversalRemoteError):
+            return str(error)
+        return f"Something went wrong — {type(error).__name__}. The error was logged."

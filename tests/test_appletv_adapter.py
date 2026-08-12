@@ -1,0 +1,349 @@
+import asyncio
+
+import pytest
+from pyatv.const import Protocol
+
+from tests.fakes import FakeAppleTv, FakeAppleTvConfig, FakePairingHandler, FakePyatv
+from universal_remote.adapters.appletv import (
+    APPLETV_RC_KEYS,
+    PLATFORM,
+    AppleTvAdapter,
+    AppleTvSession,
+    register,
+)
+from universal_remote.devices.models import Device
+from universal_remote.discovery import DiscoveredDevice
+from universal_remote.errors import (
+    ConnectionFailedError,
+    PairingCancelledError,
+    TextUnsupportedError,
+    UnsupportedKeyError,
+)
+from universal_remote.keys import Key
+from universal_remote.registry import AdapterRegistry
+
+_CORE_KEYS = {
+    Key.UP,
+    Key.DOWN,
+    Key.LEFT,
+    Key.RIGHT,
+    Key.OK,
+    Key.BACK,
+    Key.HOME,
+    Key.VOL_UP,
+    Key.VOL_DOWN,
+}
+
+
+def run(coro):
+    return asyncio.run(coro)
+
+
+def _device(**overrides) -> Device:
+    base = dict(name="TV", platform=PLATFORM, ip="10.0.0.5")
+    base.update(overrides)
+    return Device(**base)
+
+
+def _prompt_returning(value: str, seen: list[str] | None = None):
+    async def prompt(message: str) -> str:
+        if seen is not None:
+            seen.append(message)
+        return value
+
+    return prompt
+
+
+class TestAppleTvRegistration:
+    def test_given_the_registry_when_appletv_is_registered_then_the_platform_resolves(
+        self,
+    ):
+        registry = AdapterRegistry()
+
+        register(registry)
+
+        assert registry.resolve(PLATFORM).platform == PLATFORM
+
+    def test_given_the_adapter_when_identity_read_then_name_and_platform_are_correct(
+        self,
+    ):
+        adapter = AppleTvAdapter()
+
+        assert adapter.display_name == "Apple TV"
+        assert adapter.platform == "apple-tv"
+
+    def test_given_the_adapter_when_reachability_port_read_then_it_is_the_airplay_port(
+        self,
+    ):
+        # AirPlay 7000 is a proxy for "awake"; Companion control is mDNS-dynamic.
+        assert AppleTvAdapter().reachability_port == 7000
+
+
+class TestAppleTvCapabilities:
+    def test_given_the_adapter_when_capabilities_read_then_the_core_button_set_is_declared(
+        self,
+    ):
+        caps = AppleTvAdapter().capabilities()
+
+        assert _CORE_KEYS <= caps.keys
+
+    def test_given_the_adapter_when_capabilities_read_then_mute_is_absent(self):
+        caps = AppleTvAdapter().capabilities()
+
+        assert Key.MUTE not in caps.keys
+
+    def test_given_the_adapter_when_capabilities_read_then_menu_is_absent(self):
+        # Apple TV's menu button is the BACK key; it declares no separate MENU.
+        caps = AppleTvAdapter().capabilities()
+
+        assert Key.MENU not in caps.keys
+
+    def test_given_the_adapter_when_capabilities_read_then_text_is_declared(self):
+        caps = AppleTvAdapter().capabilities()
+
+        assert caps.text is True
+
+
+class TestAppleTvPairing:
+    def test_given_a_prompt_when_pairing_then_pin_flow_runs_and_credential_returns(
+        self,
+    ):
+        fake = FakePyatv(
+            config=FakeAppleTvConfig(identifier="atv-77"),
+            pairing=FakePairingHandler(credentials="cred-xyz"),
+        )
+        adapter = AppleTvAdapter(pyatv_api=fake)
+        device = _device()
+        seen: list[str] = []
+
+        credential = run(adapter.pair(device, prompt=_prompt_returning("1234", seen)))
+
+        assert credential == "cred-xyz"
+        assert fake.pairing.began is True
+        assert fake.pairing.pin_value == 1234
+        assert fake.pairing.finished is True
+        assert "PIN" in seen[0]
+
+    def test_given_a_prompt_when_pairing_then_the_device_identifier_is_recorded(self):
+        fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-77"))
+        adapter = AppleTvAdapter(pyatv_api=fake)
+        device = _device()
+
+        run(adapter.pair(device, prompt=_prompt_returning("1234")))
+
+        assert device.identifier == "atv-77"
+
+    def test_given_pairing_when_it_finishes_then_the_pairing_handler_is_closed(self):
+        fake = FakePyatv()
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        run(adapter.pair(_device(), prompt=_prompt_returning("1234")))
+
+        assert fake.pairing.closed is True
+
+    def test_given_no_prompt_when_pairing_then_pairing_cancelled_is_raised(self):
+        adapter = AppleTvAdapter(pyatv_api=FakePyatv())
+
+        with pytest.raises(PairingCancelledError):
+            run(adapter.pair(_device(), prompt=None))
+
+
+class TestAppleTvConnect:
+    def test_given_a_stored_device_when_connecting_then_its_ip_is_scanned(self):
+        fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-1"))
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        run(adapter.connect(_device(identifier="atv-1", credential="cred")))
+
+        assert fake.scanned_hosts == [["10.0.0.5"]]
+
+    def test_given_an_identifier_mismatch_when_connecting_then_connection_failed(self):
+        fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-actual"))
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        with pytest.raises(ConnectionFailedError):
+            run(adapter.connect(_device(identifier="atv-stored", credential="cred")))
+
+    def test_given_the_device_is_not_found_when_connecting_then_connection_failed(self):
+        adapter = AppleTvAdapter(pyatv_api=FakePyatv(scan_empty=True))
+
+        with pytest.raises(ConnectionFailedError):
+            run(adapter.connect(_device(identifier="atv-1", credential="cred")))
+
+    def test_given_a_transport_error_when_connecting_then_connection_failed(self):
+        fake = FakePyatv(
+            config=FakeAppleTvConfig(identifier="atv-1"),
+            connect_error=RuntimeError("refused"),
+        )
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        with pytest.raises(ConnectionFailedError):
+            run(adapter.connect(_device(identifier="atv-1", credential="cred")))
+
+    def test_given_a_matching_identity_when_connecting_then_a_session_is_returned(self):
+        fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-1"))
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        session = run(adapter.connect(_device(identifier="atv-1", credential="cred")))
+
+        assert isinstance(session, AppleTvSession)
+
+    def test_given_a_matching_identity_when_connecting_then_the_credential_is_applied(
+        self,
+    ):
+        fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-1"))
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        run(adapter.connect(_device(identifier="atv-1", credential="cred")))
+
+        assert fake.config.applied_credentials[Protocol.Companion] == "cred"
+
+
+class TestAppleTvDiscovery:
+    def test_given_a_scan_when_discovering_then_configs_map_to_discovered_devices(self):
+        fake = FakePyatv(
+            config=FakeAppleTvConfig(
+                identifier="atv-9", name="Bedroom", address="10.0.0.42"
+            )
+        )
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        found = run(adapter.discover(timeout=3))
+
+        assert found == [
+            DiscoveredDevice(
+                name="Bedroom",
+                platform=PLATFORM,
+                ip="10.0.0.42",
+                identifier="atv-9",
+            )
+        ]
+
+    def test_given_an_airplay_only_device_when_discovering_then_it_is_excluded(self):
+        # LG/Samsung TVs answer pyatv's scan via AirPlay 2 but expose no Companion —
+        # the only protocol this adapter pairs and controls over — so listing them
+        # would mislabel a WebOS TV as an Apple TV it cannot drive.
+        fake = FakePyatv(config=FakeAppleTvConfig(has_companion=False))
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        found = run(adapter.discover(timeout=3))
+
+        assert found == []
+
+    def test_given_discovery_when_scanning_then_it_is_network_wide_with_no_hosts(self):
+        fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-1"))
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        run(adapter.discover(timeout=3))
+
+        assert fake.scanned_hosts == [None]
+
+
+class TestAppleTvKeyMapping:
+    def test_given_the_key_maps_when_read_then_generic_keys_map_to_pyatv_methods(self):
+        assert APPLETV_RC_KEYS[Key.UP] == "up"
+        assert APPLETV_RC_KEYS[Key.OK] == "select"
+        assert APPLETV_RC_KEYS[Key.BACK] == "menu"
+        assert APPLETV_RC_KEYS[Key.HOME] == "home"
+        assert APPLETV_RC_KEYS[Key.VOL_UP] == "volume_up"
+        assert APPLETV_RC_KEYS[Key.VOL_DOWN] == "volume_down"
+
+    def test_given_the_key_maps_when_read_then_channel_keys_map_and_menu_is_absent(
+        self,
+    ):
+        assert APPLETV_RC_KEYS[Key.CH_UP] == "channel_up"
+        assert APPLETV_RC_KEYS[Key.CH_DOWN] == "channel_down"
+        assert Key.MENU not in APPLETV_RC_KEYS
+
+    def test_given_the_key_maps_when_read_then_all_six_media_keys_map(self):
+        assert APPLETV_RC_KEYS[Key.PLAY] == "play"
+        assert APPLETV_RC_KEYS[Key.PAUSE] == "pause"
+        assert APPLETV_RC_KEYS[Key.PLAY_PAUSE] == "play_pause"
+        assert APPLETV_RC_KEYS[Key.REWIND] == "skip_backward"
+        assert APPLETV_RC_KEYS[Key.FAST_FORWARD] == "skip_forward"
+        assert APPLETV_RC_KEYS[Key.STOP] == "stop"
+
+    def test_given_the_key_maps_when_read_then_no_number_keys_are_declared(self):
+        # pyatv exposes no digit entry, so Apple TV declares no number keys.
+        assert not any(Key[f"NUM_{digit}"] in APPLETV_RC_KEYS for digit in range(10))
+
+    def test_given_a_directional_key_when_sent_then_remote_control_is_dispatched(self):
+        fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-1"))
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        async def scenario():
+            session = await adapter.connect(_device(identifier="atv-1", credential="c"))
+            await session.send_key(Key.LEFT)
+
+        run(scenario())
+
+        assert fake.atv.remote_control.calls == ["left"]
+
+    def test_given_the_ok_key_when_sent_then_select_is_dispatched(self):
+        fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-1"))
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        async def scenario():
+            session = await adapter.connect(_device(identifier="atv-1", credential="c"))
+            await session.send_key(Key.OK)
+
+        run(scenario())
+
+        assert fake.atv.remote_control.calls == ["select"]
+
+    def test_given_a_volume_key_when_sent_then_remote_control_is_dispatched_not_audio(
+        self,
+    ):
+        # Volume goes through the fire-and-forget RemoteControl HID path, not the
+        # Audio interface: Audio.volume_* blocks on a volume-state ack that an idle
+        # Apple TV never sends, timing out and crashing the remote.
+        fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-1"))
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        async def scenario():
+            session = await adapter.connect(_device(identifier="atv-1", credential="c"))
+            await session.send_key(Key.VOL_UP)
+
+        run(scenario())
+
+        assert fake.atv.remote_control.calls == ["volume_up"]
+        assert fake.atv.audio.calls == []
+
+    def test_given_the_mute_key_when_sent_then_it_is_rejected_as_unsupported(self):
+        fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-1"))
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        async def scenario():
+            session = await adapter.connect(_device(identifier="atv-1", credential="c"))
+            with pytest.raises(UnsupportedKeyError):
+                await session.send_key(Key.MUTE)
+
+        run(scenario())
+
+
+class TestAppleTvText:
+    def test_given_text_when_sent_then_it_is_dispatched_to_the_device(self):
+        fake = FakePyatv(config=FakeAppleTvConfig(identifier="atv-1"))
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        async def scenario():
+            session = await adapter.connect(_device(identifier="atv-1", credential="c"))
+            await session.send_text("hello")
+
+        run(scenario())
+
+        assert fake.atv.keyboard.text == ["hello"]
+
+    def test_given_text_send_fails_when_sending_then_text_unsupported_is_reported(self):
+        fake = FakePyatv(
+            config=FakeAppleTvConfig(identifier="atv-1"),
+            atv=FakeAppleTv(reject_text=True),
+        )
+        adapter = AppleTvAdapter(pyatv_api=fake)
+
+        async def scenario():
+            session = await adapter.connect(_device(identifier="atv-1", credential="c"))
+            with pytest.raises(TextUnsupportedError):
+                await session.send_text("hello")
+
+        run(scenario())
