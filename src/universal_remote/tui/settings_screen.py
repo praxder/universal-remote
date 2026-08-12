@@ -22,7 +22,7 @@ TITLE_ART = r""" ____       _   _   _
 |____/ \___|\__|\__|_|_| |_|\__, |___/
                             |___/"""
 
-REPO_URL = "https://github.com/praxder/universal-remote"
+REPO_URL = "https://github.com/RightNowMinistries/universal-remote"
 LICENSES_URL = f"{REPO_URL}/blob/main/THIRD_PARTY_LICENSES.md"
 
 
