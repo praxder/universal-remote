@@ -108,9 +108,11 @@ bypass_actors {
 ```
 
 The same block appears on every other ruleset that could touch this repo. So the
-grant is org-wide and already applied — `repos-universal-remote.tf` in the same
-workspace already carries `visibility = "public"`, which matches reality, so the
-state is live rather than merely written. What remains is only making
+grant is org-wide and declared, and almost certainly applied —
+`repos-universal-remote.tf` in the same workspace carries
+`visibility = "public"`, which matches reality. That is read off `main` in a
+shallow clone, though, so it does not rule out an unapplied change or a pending
+pull request; the first release run is what confirms it. What remains is making
 `CI_BOT_PRIVATE_KEY` readable here; that secret is **not** in
 `github/secrets/secrets.tf` and appears in no Terraform in the org, so it is
 managed by hand in the org's Actions settings and cannot be moved by a pull
