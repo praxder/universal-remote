@@ -18,19 +18,32 @@ platform-agnostic, so supporting a new TV platform is one new adapter module.
 ### Homebrew (macOS, Apple Silicon) — recommended
 
 ```sh
-brew install praxder/tap/universal-remote
+brew tap rightnowministries/universal-remote https://github.com/RightNowMinistries/universal-remote
+brew install rightnowministries/universal-remote/universal-remote
 ur   # or the full name: universal-remote
 ```
+
+The repository is its own Homebrew tap, but it isn't named `homebrew-*`, so
+Homebrew's one-line shorthand can't auto-tap it — hence the explicit `brew tap`
+first. You only run it once.
 
 Installs a self-contained binary — no Python or `uv` needed. The formula puts
 both `ur` and `universal-remote` on your PATH; they're the same program. Apple
 Silicon (arm64) only; an Intel Mac gets a clear architecture error rather than a
 broken install.
 
+Already installed from the old `praxder/tap`? Re-tap:
+
+```sh
+brew uninstall universal-remote && brew untap praxder/tap
+brew tap rightnowministries/universal-remote https://github.com/RightNowMinistries/universal-remote
+brew install rightnowministries/universal-remote/universal-remote
+```
+
 ### Download from GitHub Releases
 
 Grab the latest `universal-remote-macos-arm64.tar.gz` from the
-[Releases page](https://github.com/praxder/universal-remote/releases/latest).
+[Releases page](https://github.com/RightNowMinistries/universal-remote/releases/latest).
 The binary isn't notarized, so macOS quarantines a browser download — clear the
 flag once after extracting:
 

@@ -23,4 +23,13 @@ commit**, so the release gets the wrong version bump and a one-line changelog.
 Always merge `development` into `main` with a **merge commit** (the repo keeps
 `Allow merge commits` enabled); do not squash and do not fast-forward-flatten.
 
+## `Formula/universal-remote.rb` is stale on `development` — deliberately
+
+This repository is also its own Homebrew tap, and Homebrew reads a tap from the
+default branch. The release pipeline therefore commits the formula bump (new
+`version`, `url`, `sha256`) straight to `main`, and nothing merges it back. So
+`development`'s copy lags `main`'s by one release at all times — exactly as
+`pyproject.toml`'s version already does. Don't "fix" it, and don't hand-edit the
+formula's version fields; the `tap` job owns those three lines.
+
 [python-semantic-release]: https://python-semantic-release.readthedocs.io/
