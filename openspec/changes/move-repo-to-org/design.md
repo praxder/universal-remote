@@ -103,16 +103,21 @@ This is strictly better than what was asked for:
 - **Scope follows the App installation**, so a ruleset-wide bypass entry still
   only reaches repos the App is installed on.
 
-**Unresolved gap — the human merge.** The App bypass covers the pipeline's
-pushes. It does not let a solo maintainer merge `development` → `main`: GitHub
-forbids approving your own pull request, and the ruleset wants one approval plus
-code-owner review plus last-push approval. The repo currently reports
-`current_user_can_bypass: "pull_requests_only"` for the maintainer, which would
-cover exactly this — but the actor behind that entry is not visible without
-`admin:org`, so it is unconfirmed. DevOps has been asked. If it does not cover
-self-merge, every release needs a colleague on the `development` → `main` PR;
-that is an accepted operational cost, not a redesign, since the pipeline itself
-still runs unattended.
+**The human merge — resolved, and it is fine.** The App bypass covers the
+pipeline's pushes, not a person's pull request, so the question was whether a
+solo maintainer can merge `development` → `main` at all: GitHub forbids
+approving your own pull request, and the ruleset wants one approval plus
+code-owner review plus last-push approval.
+
+The import pull request answered it empirically. PR #1 (`import` →
+`development`) reported `mergeStateStatus: BLOCKED` and
+`reviewDecision: REVIEW_REQUIRED`, and the maintainer merged it anyway with
+**zero reviews on record**. So the pre-existing
+`current_user_can_bypass: "pull_requests_only"` entry does cover self-merge, and
+releases need no colleague. Which actor grants it is still not visible without
+`admin:org`, and it is not ours to rely on permanently — if it is ever removed,
+each `development` → `main` merge needs one approval. That is an operational
+cost, not a redesign.
 
 **Alternatives considered:**
 
