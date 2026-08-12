@@ -1,27 +1,27 @@
 ## 1. Org prerequisites — blocking, and not ours to grant
 
-- [ ] 1.1 Ask an org owner to make `RightNowMinistries/universal-remote` **public**. If refused, stop: the Homebrew requirements in `specs/homebrew-distribution/spec.md` assume anonymous read and must be rewritten (see design.md — Decision 1) before any other task starts
+- [x] 1.1 Ask an org owner to make `RightNowMinistries/universal-remote` **public**. If refused, stop: the Homebrew requirements in `specs/homebrew-distribution/spec.md` assume anonymous read and must be rewritten (see design.md — Decision 1) before any other task starts
 - [ ] 1.2 Ask DevOps to install the **CI bot GitHub App** (app-id `4117226`) on this repo, add it to the bypass list of the org ruleset "Require Peer Review" (id `5324688`) with `bypass_mode: always`, and make the `CI_BOT_PRIVATE_KEY` org secret visible to this repo — all in Terraform. This is the org's established pattern, not a new grant: `RightNowMinistries/kids-tv` already runs it (design.md — Decision 2). If refused, stop and re-open the proposal for the `hatch-vcs` tag-only fallback. Ask in the same message which actor grants the existing `current_user_can_bypass: "pull_requests_only"` on `5324688` and whether it covers self-merge — that answer shapes documentation, not the design, so it does not gate this task
 - [ ] 1.3 Confirm `CI_BOT_PRIVATE_KEY` resolves: `gh secret list --repo RightNowMinistries/universal-remote`. It is absent from kids-tv's *repo* secret list, so it is org-scoped, and org-secret visibility is a per-repo allowlist
 - [ ] 1.4 Verify: `gh repo view` reports `PUBLIC`, the App appears in the repo's installed GitHub Apps, and DevOps confirms the `bypass_actors` entry is `Integration` / app-id `4117226` / `always` (the list is not readable without `admin:org`, so this is their confirmation, not a command you run). Record their self-merge answer in design.md — Decision 2; if it never comes, note it as unanswered and move on
 
 ## 2. Prepare the branch in the current repo
 
-- [ ] 2.1 Branch from `development`
-- [ ] 2.2 Copy `Formula/universal-remote.rb` in from `praxder/homebrew-tap` (current published version), rewriting `homepage` and `url` to the new org and refreshing the PLACEHOLDER comment to say the first release from this repo fills it in
-- [ ] 2.3 Change `REPO_URL` in `src/universal_remote/tui/settings_screen.py` to `https://github.com/RightNowMinistries/universal-remote`, committed as `fix(tui): point the repo link at its new home` so the first merge to `main` cuts a release (design.md — Decision 6). `LICENSES_URL` derives from it; `tests/test_tui_settings.py` imports the constant, so confirm the suite passes with no test edit
-- [ ] 2.4 Update `README.md`: the Homebrew section to the two-step tap + install, and the Releases link at line 33
-- [ ] 2.5 Add a line to `CONTRIBUTING.md`: the formula bump lands on `main`, so `development`'s copy of `Formula/universal-remote.rb` is intentionally stale between merges
-- [ ] 2.6 Rewrite `LICENSE`'s copyright line to `Copyright (c) 2026 RightNow Ministries` (decided — design.md, Open Questions)
-- [ ] 2.7 Preflight: `uv run ruff format`, `uv run ruff check`, `uv run pytest`
+- [x] 2.1 Branch from `development`
+- [x] 2.2 Copy `Formula/universal-remote.rb` in from `praxder/homebrew-tap` (current published version), rewriting `homepage` and `url` to the new org and refreshing the PLACEHOLDER comment to say the first release from this repo fills it in
+- [x] 2.3 Change `REPO_URL` in `src/universal_remote/tui/settings_screen.py` to `https://github.com/RightNowMinistries/universal-remote`, committed as `fix(tui): point the repo link at its new home` so the first merge to `main` cuts a release (design.md — Decision 6). `LICENSES_URL` derives from it; `tests/test_tui_settings.py` imports the constant, so confirm the suite passes with no test edit
+- [x] 2.4 Update `README.md`: the Homebrew section to the two-step tap + install, and the Releases link at line 33
+- [x] 2.5 Add a line to `CONTRIBUTING.md`: the formula bump lands on `main`, so `development`'s copy of `Formula/universal-remote.rb` is intentionally stale between merges
+- [x] 2.6 Rewrite `LICENSE`'s copyright line to `Copyright (c) 2026 RightNow Ministries` (decided — design.md, Open Questions)
+- [x] 2.7 Preflight: `uv run ruff format`, `uv run ruff check`, `uv run pytest`
 
 ## 3. Rework the release pipeline
 
-- [ ] 3.1 Rewrite the `tap` job in `.github/workflows/release.yml`: check out this repo at `main` with the App token instead of `praxder/homebrew-tap` with `HOMEBREW_TAP_TOKEN`, keep the same three `sed` rewrites, and `git pull --rebase` before pushing
-- [ ] 3.2 Append `[skip ci]` to the formula-bump commit message — an App-authored push re-triggers workflows where `GITHUB_TOKEN` did not. Leave `[tool.semantic_release] commit_message` in `pyproject.toml` alone; its `[skip ci]` stops being belt-and-suspenders and becomes the only guard against a version-bump release loop (design.md — Risks)
-- [ ] 3.3 Mint an App installation token in both the `version` and `tap` jobs with `actions/create-github-app-token@v2` (`app-id: 4117226`, `private-key: ${{ secrets.CI_BOT_PRIVATE_KEY }}`, `permission-contents: write`), and push as the App — `github-actions[bot]` is not an eligible bypass actor. **`version`:** pass the token as the PSR action's `github_token`; PSR pushes to `hvcs_client.remote_url(use_token=True)`, so that one input is the whole change. **`tap`:** raw git, so follow the kids-tv shape — `actions/checkout` with the App token, or `persist-credentials: false` plus `git remote set-url origin https://x-access-token:$TOKEN@…`
-- [ ] 3.4 Leave the `build` job on `secrets.GITHUB_TOKEN` — creating the Release and uploading the asset needs no branch-protection bypass, and the credential should not be reused for it
-- [ ] 3.5 Update the workflow's header comment to describe the in-repo formula bump and the App authentication
+- [x] 3.1 Rewrite the `tap` job in `.github/workflows/release.yml`: check out this repo at `main` with the App token instead of `praxder/homebrew-tap` with `HOMEBREW_TAP_TOKEN`, keep the same three `sed` rewrites, and `git pull --rebase` before pushing
+- [x] 3.2 Append `[skip ci]` to the formula-bump commit message — an App-authored push re-triggers workflows where `GITHUB_TOKEN` did not. Leave `[tool.semantic_release] commit_message` in `pyproject.toml` alone; its `[skip ci]` stops being belt-and-suspenders and becomes the only guard against a version-bump release loop (design.md — Risks)
+- [x] 3.3 Mint an App installation token in both the `version` and `tap` jobs with `actions/create-github-app-token@v2` (`app-id: 4117226`, `private-key: ${{ secrets.CI_BOT_PRIVATE_KEY }}`, `permission-contents: write`), and push as the App — `github-actions[bot]` is not an eligible bypass actor. **`version`:** pass the token as the PSR action's `github_token`; PSR pushes to `hvcs_client.remote_url(use_token=True)`, so that one input is the whole change. **`tap`:** raw git, so follow the kids-tv shape — `actions/checkout` with the App token, or `persist-credentials: false` plus `git remote set-url origin https://x-access-token:$TOKEN@…`
+- [x] 3.4 Leave the `build` job on `secrets.GITHUB_TOKEN` — creating the Release and uploading the asset needs no branch-protection bypass, and the credential should not be reused for it
+- [x] 3.5 Update the workflow's header comment to describe the in-repo formula bump and the App authentication
 
 ## 4. Import into the new repo
 
