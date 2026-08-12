@@ -3,7 +3,7 @@
 - [x] 1.1 Ask an org owner to make `RightNowMinistries/universal-remote` **public**. If refused, stop: the Homebrew requirements in `specs/homebrew-distribution/spec.md` assume anonymous read and must be rewritten (see design.md — Decision 1) before any other task starts
 - [ ] 1.2 Ask DevOps to install the **CI bot GitHub App** (app-id `4117226`) on this repo, add it to the bypass list of the org ruleset "Require Peer Review" (id `5324688`) with `bypass_mode: always`, and make the `CI_BOT_PRIVATE_KEY` org secret visible to this repo — all in Terraform. This is the org's established pattern, not a new grant: `RightNowMinistries/kids-tv` already runs it (design.md — Decision 2). If refused, stop and re-open the proposal for the `hatch-vcs` tag-only fallback. Ask in the same message which actor grants the existing `current_user_can_bypass: "pull_requests_only"` on `5324688` and whether it covers self-merge — that answer shapes documentation, not the design, so it does not gate this task
 - [ ] 1.3 Confirm `CI_BOT_PRIVATE_KEY` resolves: `gh secret list --repo RightNowMinistries/universal-remote`. It is absent from kids-tv's *repo* secret list, so it is org-scoped, and org-secret visibility is a per-repo allowlist
-- [ ] 1.4 Verify: `gh repo view` reports `PUBLIC`, the App appears in the repo's installed GitHub Apps, and DevOps confirms the `bypass_actors` entry is `Integration` / app-id `4117226` / `always` (the list is not readable without `admin:org`, so this is their confirmation, not a command you run). Record their self-merge answer in design.md — Decision 2; if it never comes, note it as unanswered and move on
+- [ ] 1.4 Verify: `gh repo view` reports `PUBLIC`, the App appears in the repo's installed GitHub Apps, and DevOps confirms the `bypass_actors` entry is `Integration` / app-id `4117226` / `always` (the list is not readable without `admin:org`, so this is their confirmation, not a command you run). Record their self-merge answer in design.md — Decision 2 (already answered empirically by PR #1: self-merge works with zero reviews)
 
 ## 2. Prepare the branch in the current repo
 
@@ -25,21 +25,21 @@
 
 ## 4. Import into the new repo
 
-- [ ] 4.1 Add the org repo as a second remote and fetch it
-- [ ] 4.2 `git merge --allow-unrelated-histories org/development` into the working branch, resolving the README in favour of ours, so the eventual push is a fast-forward past the `non_fast_forward` rule
-- [ ] 4.3 Push `main` to the org repo (a branch creation, not an update). If rejected, seed it through the same pull request as task 4.5
-- [ ] 4.4 Push the working branch as `import`
-- [ ] 4.5 Open `import` → `development` and merge it (with the bypass, or one colleague's approval)
-- [ ] 4.6 Push all tags `v1.0.0`–`v2.0.0` — tags are unruled, so this goes through untouched. Confirm python-semantic-release will continue from `v2.0.0`
-- [ ] 4.7 Do **not** push the 15 stale feature branches
+- [x] 4.1 Add the org repo as a second remote and fetch it
+- [x] 4.2 `git merge --allow-unrelated-histories org/development` into the working branch, resolving the README in favour of ours, so the eventual push is a fast-forward past the `non_fast_forward` rule
+- [x] 4.3 Push `main` to the org repo (a branch creation, not an update). If rejected, seed it through the same pull request as task 4.5
+- [x] 4.4 Push the working branch as `import`
+- [x] 4.5 Open `import` → `development` and merge it (with the bypass, or one colleague's approval)
+- [x] 4.6 Push all tags `v1.0.0`–`v2.0.0` — tags are unruled, so this goes through untouched. Confirm python-semantic-release will continue from `v2.0.0`
+- [x] 4.7 Do **not** push the 15 stale feature branches
 
 ## 5. Configure the new repo
 
-- [ ] 5.1 Set the default branch to `main` — Homebrew reads a tap from its default branch, so leaving it on `development` serves every user a stale formula (design.md — Decision 4)
+- [ ] 5.1 **Ask DevOps** to set the default branch to `main` — Homebrew reads a tap from its default branch, so leaving it on `development` serves every user a stale formula (design.md — Decision 4). Not self-serve: `PATCH /repos/…` with `default_branch=main` returns `422 You don't have permission to change the default branch` even with `permissions.admin: true`, so an org or enterprise policy owns it
 - [ ] 5.2 No PAT to create — confirm instead that the CI bot App is installed on the repo and that `CI_BOT_PRIVATE_KEY` resolves in a workflow run (task 1.4 checks visibility; this checks it actually mints a token)
-- [ ] 5.3 Confirm "Allow merge commits" is enabled — python-semantic-release needs every conventional commit, so `development` → `main` must never be squashed
-- [ ] 5.4 Confirm repo Actions settings still report `allowed_actions: "all"`, so `python-semantic-release` and `astral-sh/setup-uv` run
-- [ ] 5.5 Repoint the local clone's `origin` at the new URL
+- [x] 5.3 Confirm "Allow merge commits" is enabled — python-semantic-release needs every conventional commit, so `development` → `main` must never be squashed
+- [x] 5.4 Confirm repo Actions settings still report `allowed_actions: "all"`, so `python-semantic-release` and `astral-sh/setup-uv` run
+- [x] 5.5 Repoint the local clone's `origin` at the new URL
 
 ## 6. Cut the first release and verify
 
