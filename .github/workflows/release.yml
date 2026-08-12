@@ -135,6 +135,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
+          fetch-depth: 0 # full history, so the pull --rebase below has a merge base
           token: ${{ steps.app-token.outputs.token }}
       - name: Rewrite formula
         run: |
