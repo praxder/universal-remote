@@ -25,13 +25,13 @@
 
 ## 4. Import into the new repo
 
-- [ ] 4.1 Add the org repo as a second remote and fetch it
-- [ ] 4.2 `git merge --allow-unrelated-histories org/development` into the working branch, resolving the README in favour of ours, so the eventual push is a fast-forward past the `non_fast_forward` rule
-- [ ] 4.3 Push `main` to the org repo (a branch creation, not an update). If rejected, seed it through the same pull request as task 4.5
-- [ ] 4.4 Push the working branch as `import`
+- [x] 4.1 Add the org repo as a second remote and fetch it
+- [x] 4.2 `git merge --allow-unrelated-histories org/development` into the working branch, resolving the README in favour of ours, so the eventual push is a fast-forward past the `non_fast_forward` rule
+- [x] 4.3 Push `main` to the org repo (a branch creation, not an update). If rejected, seed it through the same pull request as task 4.5
+- [x] 4.4 Push the working branch as `import`
 - [ ] 4.5 Open `import` → `development` and merge it (with the bypass, or one colleague's approval)
 - [ ] 4.6 Push all tags `v1.0.0`–`v2.0.0` — tags are unruled, so this goes through untouched. Confirm python-semantic-release will continue from `v2.0.0`
-- [ ] 4.7 Do **not** push the 15 stale feature branches
+- [x] 4.7 Do **not** push the 15 stale feature branches
 
 ## 5. Configure the new repo
 
