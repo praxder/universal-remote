@@ -93,6 +93,31 @@ in the `CI_BOT_PRIVATE_KEY` org secret), Terraform-managed onto the bypass list
 of every `main`-targeting ruleset with `bypass_mode: always`. The workflow mints
 an installation token and pushes as the App.
 
+**The bypass already covers this repo — nothing to request.**
+`tf-engineering-tools/github/repos/rulesets.tf` declares
+`github_organization_ruleset.require_review` with
+`repository_name.include = ["~ALL"]` and an exclude list of six analytics repos
+that does not name `universal-remote`, plus:
+
+```hcl
+bypass_actors {
+  actor_id    = local.integrations.rightnow_ci  # 4117226
+  actor_type  = "Integration"
+  bypass_mode = "always"
+}
+```
+
+The same block appears on every other ruleset that could touch this repo. So the
+grant is org-wide and declared, and almost certainly applied —
+`repos-universal-remote.tf` in the same workspace carries
+`visibility = "public"`, which matches reality. That is read off `main` in a
+shallow clone, though, so it does not rule out an unapplied change or a pending
+pull request; the first release run is what confirms it. What remains is making
+`CI_BOT_PRIVATE_KEY` readable here; that secret is **not** in
+`github/secrets/secrets.tf` and appears in no Terraform in the org, so it is
+managed by hand in the org's Actions settings and cannot be moved by a pull
+request.
+
 This is strictly better than what was asked for:
 
 - **The repo-admin trade-off disappears.** Peer review does not become advisory
@@ -103,16 +128,21 @@ This is strictly better than what was asked for:
 - **Scope follows the App installation**, so a ruleset-wide bypass entry still
   only reaches repos the App is installed on.
 
-**Unresolved gap — the human merge.** The App bypass covers the pipeline's
-pushes. It does not let a solo maintainer merge `development` → `main`: GitHub
-forbids approving your own pull request, and the ruleset wants one approval plus
-code-owner review plus last-push approval. The repo currently reports
-`current_user_can_bypass: "pull_requests_only"` for the maintainer, which would
-cover exactly this — but the actor behind that entry is not visible without
-`admin:org`, so it is unconfirmed. DevOps has been asked. If it does not cover
-self-merge, every release needs a colleague on the `development` → `main` PR;
-that is an accepted operational cost, not a redesign, since the pipeline itself
-still runs unattended.
+**The human merge — resolved, and it is fine.** The App bypass covers the
+pipeline's pushes, not a person's pull request, so the question was whether a
+solo maintainer can merge `development` → `main` at all: GitHub forbids
+approving your own pull request, and the ruleset wants one approval plus
+code-owner review plus last-push approval.
+
+The import pull request answered it empirically. PR #1 (`import` →
+`development`) reported `mergeStateStatus: BLOCKED` and
+`reviewDecision: REVIEW_REQUIRED`, and the maintainer merged it anyway with
+**zero reviews on record**. So the pre-existing
+`current_user_can_bypass: "pull_requests_only"` entry does cover self-merge, and
+releases need no colleague. Which actor grants it is still not visible without
+`admin:org`, and it is not ours to rely on permanently — if it is ever removed,
+each `development` → `main` merge needs one approval. That is an operational
+cost, not a redesign.
 
 **Alternatives considered:**
 
@@ -162,6 +192,28 @@ Not a settings-checklist item — a correctness requirement. Homebrew reads a ta
 from its default branch. The formula bump is committed to `main`. The target repo
 currently defaults to `development`; leaving it there would serve every `brew`
 user a formula frozen at whatever version `development` happens to hold.
+
+**And it is not ours to set, nor Terraform's.** `PATCH /repos/…` with
+`default_branch=main` returns `422 You don't have permission to change the
+default branch`, despite `permissions.admin: true` on the repo and a `repo`
+scope on the token — an org or enterprise policy reserves it.
+
+Terraform is not the lever either. The shared repository module does expose a
+`default_branch` variable, but `github_repository.repository` carries:
+
+```hcl
+lifecycle {
+  ignore_changes = [auto_init, default_branch]
+}
+```
+
+`ignore_changes` suppresses the attribute whatever its source, so setting
+`default_branch = "main"` in `repos-universal-remote.tf` would plan and apply as
+a no-op. Removing it from `ignore_changes` would put Terraform in charge of the
+default branch for **every** repo in the org — far too broad a blast radius for
+this change. So an org admin flips it in the GitHub UI. Note `kids-tv` still
+defaults to `development` and is fine, because it is not a Homebrew tap; this
+repo is, which is the whole reason the setting matters here.
 
 The corollary is that `development`'s copy of the formula is permanently stale
 between merges, exactly as `pyproject.toml`'s version already is. That is

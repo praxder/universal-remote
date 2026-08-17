@@ -18,19 +18,32 @@ platform-agnostic, so supporting a new TV platform is one new adapter module.
 ### Homebrew (macOS, Apple Silicon) — recommended
 
 ```sh
-brew install praxder/tap/universal-remote
+brew tap rightnowministries/universal-remote https://github.com/RightNowMinistries/universal-remote
+brew install rightnowministries/universal-remote/universal-remote
 ur   # or the full name: universal-remote
 ```
+
+The repository is its own Homebrew tap, but it isn't named `homebrew-*`, so
+Homebrew's one-line shorthand can't auto-tap it — hence the explicit `brew tap`
+first. You only run it once.
 
 Installs a self-contained binary — no Python or `uv` needed. The formula puts
 both `ur` and `universal-remote` on your PATH; they're the same program. Apple
 Silicon (arm64) only; an Intel Mac gets a clear architecture error rather than a
 broken install.
 
+Already installed from the old `praxder/tap`? Re-tap:
+
+```sh
+brew uninstall universal-remote && brew untap praxder/tap
+brew tap rightnowministries/universal-remote https://github.com/RightNowMinistries/universal-remote
+brew install rightnowministries/universal-remote/universal-remote
+```
+
 ### Download from GitHub Releases
 
 Grab the latest `universal-remote-macos-arm64.tar.gz` from the
-[Releases page](https://github.com/praxder/universal-remote/releases/latest).
+[Releases page](https://github.com/RightNowMinistries/universal-remote/releases/latest).
 The binary isn't notarized, so macOS quarantines a browser download — clear the
 flag once after extracting:
 
@@ -345,7 +358,8 @@ The Keyboard Shortcuts screen itself:
   `insertText`, and Android TV's Remote v2 input method support all vary by app
   and firmware; a failed send reports "not supported" rather than silently
   dropping input. Android TV and Fire TV both need a text field already focused
-  on the TV — with nothing focused they report "not supported" instead.
+  on the TV — with nothing focused they report "not supported" instead, except on
+  a Vega-based Fire TV, which reports no focus at all (see below).
 - **Power-on is best-effort.** A TV that's off is woken with a Wake-on-LAN magic
   packet to its stored MAC, which requires the TV's "Wake on LAN / Network
   Standby" setting to be enabled (off by default on many sets). Power-**off** is
@@ -362,6 +376,15 @@ The Keyboard Shortcuts screen itself:
   verification is waived for those requests and no others.
 - **Fire TV number-pad digits only reach a focused text field**, since its
   control API has no arbitrary-keycode path — they are typed, not sent as keys.
+- **Newer (Vega) Fire TVs type text one character at a time**, which is all their
+  control API accepts, and the characters are **appended** to the focused field
+  rather than replacing what it holds. Only printable ASCII can be sent — the
+  device rejects anything else, so a send containing one is refused outright
+  before a single character is typed. The platform reports neither which field
+  has focus nor what one holds, so a send is reported as successful without a
+  read-back: with nothing focused on the TV it will say it worked. A send that
+  fails part-way says part of the text may already have been typed, since a
+  character on an appending route cannot safely be sent again.
 - **Fire TV rewind and fast-forward scrub with the player's d-pad** (±10s per
   press), which is a Fire TV player convention rather than a protocol guarantee,
   so an app with a custom player may not honour it.

@@ -5,10 +5,22 @@ name: Release
 # warrant a release; it bumps pyproject.toml, commits, and tags ONLY
 # (vcs_release: false — it does not create the GitHub Release). "Build" then
 # creates the GitHub Release (with PSR's grouped notes) and attaches the binary,
-# and "Update Homebrew tap" points the formula at it. Both downstream jobs run
-# only when a release happened. The bump commit PSR pushes back carries
-# "[skip ci]" (see [tool.semantic_release] in pyproject.toml), so it does not
-# re-trigger this workflow.
+# and "Update Homebrew formula" rewrites Formula/universal-remote.rb IN THIS
+# REPO — the repository is its own tap — and commits it to main, the branch
+# Homebrew reads a tap from. Both downstream jobs run only when a release
+# happened.
+#
+# Both pushes to main authenticate as the org's CI bot GitHub App, which the
+# org rulesets grant bypass_mode: always. The default GITHUB_TOKEN /
+# github-actions[bot] is NOT an eligible ruleset bypass actor and cannot push
+# to main here. "Build" stays on GITHUB_TOKEN: publishing a release needs no
+# bypass.
+#
+# Both automated commits carry "[skip ci]" — the version bump via
+# [tool.semantic_release] commit_message in pyproject.toml, the formula bump
+# below. That is load-bearing, not cosmetic: unlike GITHUB_TOKEN, an
+# App-authored push DOES re-fire `on: push: main`, so removing either marker
+# creates an endless release loop.
 on:
   push:
     branches: [main]
@@ -33,13 +45,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Mint CI bot App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: 4117226 # RightNow CI bot; on the rulesets' bypass list
+          private-key: ${{ secrets.CI_BOT_PRIVATE_KEY }}
+          permission-contents: write
       - name: Bump version + tag
         id: version
         uses: python-semantic-release/python-semantic-release@v10.6.1
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          git_committer_name: github-actions
-          git_committer_email: actions@users.noreply.github.com
+          # PSR pushes to hvcs_client.remote_url(use_token=True) — it builds its
+          # own authenticated remote from this input rather than using the
+          # credential checkout persisted, so handing it the App token is the
+          # whole bypass. ignore_token_for_push is left at its default (false).
+          github_token: ${{ steps.app-token.outputs.token }}
+          git_committer_name: ${{ steps.app-token.outputs.app-slug }}[bot]
+          git_committer_email: ${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com
           vcs_release: "false" # bump + commit + tag only; the build job creates the release
 
   build:
@@ -92,16 +115,28 @@ jobs:
             --verify-tag
 
   tap:
-    name: Update Homebrew tap
+    name: Update Homebrew formula
     needs: [version, build]
     if: needs.version.outputs.released == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout tap
+      - name: Mint CI bot App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: 4117226 # RightNow CI bot; on the rulesets' bypass list
+          private-key: ${{ secrets.CI_BOT_PRIVATE_KEY }}
+          permission-contents: write
+      # main, not the release tag: Homebrew reads a tap from the default branch,
+      # and the version job has already pushed the bump commit there. Checking
+      # out with the App token persists it as origin's credential, so the pull
+      # and push below both authenticate as the bypass-eligible App.
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
-          repository: praxder/homebrew-tap
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }} # fine-grained PAT, contents:write on the tap only
+          ref: main
+          fetch-depth: 0 # full history, so the pull --rebase below has a merge base
+          token: ${{ steps.app-token.outputs.token }}
       - name: Rewrite formula
         run: |
           version="${{ needs.version.outputs.version }}"
@@ -113,8 +148,13 @@ jobs:
           git diff "$formula"
       - name: Commit + push
         run: |
-          git config user.name github-actions
-          git config user.email actions@users.noreply.github.com
+          git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
+          git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
           git add Formula/universal-remote.rb
-          git commit -m "chore: universal-remote ${{ needs.version.outputs.version }}"
+          # [skip ci] is required, not tidy: an App-authored push re-fires
+          # `on: push: main`, and without it this commit starts a second run.
+          git commit -m "chore: universal-remote ${{ needs.version.outputs.version }} [skip ci]"
+          # concurrency: release serialises runs, but the version job pushed to
+          # main after this job's checkout was queued — rebase rather than race.
+          git pull --rebase
           git push

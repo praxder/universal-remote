@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import asyncio
 from ipaddress import ip_address
+from typing import Any
 
 from androidtvremote2 import remotemessage_pb2 as pb
 from pyatv.const import Protocol
 
 from universal_remote.adapters.firetv_api import (
+    KEY_PATH,
     KEYBOARD_PATH,
     PIN_VERIFY_PATH,
+    PROPERTIES_PATH,
+    TEXT_PATH,
     Request,
     Response,
 )
@@ -197,20 +201,36 @@ class FakeFireTvTransport:
 
     Every request is recorded, so a test can assert the URL, headers, and body the
     API built. Routes answer 200 with what the device returns: a keyboard read
-    reports the focused field's state and contents, and a PIN verify reports the
-    pairing token in its `description`.
+    reports the focused field's state and contents, an info read reports what the
+    device supports, a properties read reports its platform, and a PIN verify reports
+    the pairing token in its `description`.
+
+    The default device is an Android Fire OS one — it reports no properties route, so
+    a session built against it takes the keyboard text path.
     """
 
     def __init__(
         self,
         *,
-        keyboard: dict[str, str] | None = None,
+        keyboard: dict[str, str | None] | None = None,
+        info: dict[str, Any] | None = None,
+        properties: dict[str, Any] | None = None,
         token: str = "AB1CD2E",
     ) -> None:
         self.requests: list[Request] = []
         # What a keyboard read reports; a "hidden" state stands in for a device with
-        # no text field focused.
+        # no text field focused, and a null `text` for a device that reports no
+        # contents at all (a Vega reports both, permanently).
         self.keyboard = keyboard or {"state": "text", "text": ""}
+        # What the info route reports; `isPropertiesApiSupported` is how a device
+        # says the properties route exists.
+        self.info = info or {}
+        # What the properties route reports; `platformType` names the platform.
+        self.properties = properties or {}
+        # The characters the single-character text route typed, in order. The route
+        # appends to the focused field, which the platform serving it never reports
+        # back, so this stands in for the field rather than `keyboard`.
+        self.typed: list[str] = []
         self.token = token
         self.closed = False
         # A URL fragment whose requests the device answers 400 — a rejected action.
@@ -223,15 +243,21 @@ class FakeFireTvTransport:
         # A URL fragment whose every request fails at the transport, standing in for
         # a service that stays gone however often it is re-woken.
         self.fail: str | None = None
+        # How many matching requests `fail` lets through before it starts failing, so
+        # a test can stop the device part-way through a sequence of them.
+        self.fail_after = 0
         # When True a write leaves the field untouched even though it is accepted,
         # standing in for a field something else owns.
         self.keep_keyboard = False
         self._failed = False
+        self._matched = 0
 
     async def __call__(self, request: Request) -> Response:
         self.requests.append(request)
         if self.fail and self.fail in request.url:
-            raise OSError("connection refused")
+            self._matched += 1
+            if self._matched > self.fail_after:
+                raise OSError("connection refused")
         if self.fail_once and self.fail_once in request.url and not self._failed:
             self._failed = True
             raise OSError("connection refused")
@@ -239,9 +265,23 @@ class FakeFireTvTransport:
             return Response(400, {"description": self.reject_reason})
         if request.method == "POST" and request.url.endswith(KEYBOARD_PATH):
             self._type(request.json or {})
+        if request.method == "POST" and request.url.endswith(TEXT_PATH):
+            return self._type_character(request.json or {})
         return Response(200, self._body(request))
 
-    def _type(self, body: dict[str, str]) -> None:
+    def _type_character(self, body: dict[str, str | None]) -> Response:
+        """Model the single-character route: exactly one character, or 400.
+
+        The device answers `{"text": "we"}` with `400 Bad arguments supplied`, so a
+        caller that sent a whole string would be refused rather than quietly served.
+        """
+        character = body.get("text") or ""
+        if len(character) != 1:
+            return Response(400, {"description": "Bad arguments supplied"})
+        self.typed.append(character)
+        return Response(200, {})
+
+    def _type(self, body: dict[str, str | None]) -> None:
         """Model the route: a write with no field focused is accepted and discarded.
 
         Whatever the field's state was before, a write that lands leaves it reporting
@@ -251,9 +291,13 @@ class FakeFireTvTransport:
             return
         self.keyboard = {"state": "text", "text": body.get("text", "")}
 
-    def _body(self, request: Request) -> dict[str, str]:
+    def _body(self, request: Request) -> dict[str, Any]:
         if request.method == "GET" and request.url.endswith(KEYBOARD_PATH):
             return dict(self.keyboard)
+        if request.method == "GET" and request.url.endswith(PROPERTIES_PATH):
+            return dict(self.properties)
+        if request.method == "GET" and request.url.endswith(KEY_PATH):
+            return dict(self.info)
         if request.url.endswith(PIN_VERIFY_PATH):
             return {"description": self.token}
         return {}
