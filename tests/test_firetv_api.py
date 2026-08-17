@@ -7,6 +7,8 @@ from universal_remote.adapters.firetv_api import (
     API_KEY,
     CONTROL_PORT,
     DIAL_PORT,
+    PROPERTIES_PATH,
+    TEXT_PATH,
     USER_AGENT,
     WAKE_PATH,
     CommandRejectedError,
@@ -15,6 +17,7 @@ from universal_remote.adapters.firetv_api import (
 )
 
 _HOST = "10.0.0.5"
+_CONTROL = f"https://{_HOST}:{CONTROL_PORT}"
 
 
 def run(coro):
@@ -209,3 +212,53 @@ class TestFireTvCommandOutcome:
         transport = FakeFireTvTransport(keyboard={"state": "text", "text": "cat"})
 
         assert run(_api(transport).keyboard_state()) == ("text", "cat")
+
+    def test_given_a_keyboard_read_reporting_null_contents_then_it_reads_as_empty_text(
+        self,
+    ):
+        # A Vega answers `"text": null`. The key is present, so a lookup default never
+        # fires, and the None it yields is what every caller then concatenates.
+        transport = FakeFireTvTransport(keyboard={"state": "text", "text": None})
+
+        assert run(_api(transport).keyboard_state()) == ("text", "")
+
+
+class TestFireTvProperties:
+    def test_given_a_properties_read_when_sent_then_the_route_is_read_with_the_token(
+        self,
+    ):
+        transport = FakeFireTvTransport(properties={"platformType": "native"})
+
+        run(_api(transport, token="AB1CD2E").properties())
+
+        request = transport.requests[0]
+        assert (request.method, request.url) == ("GET", f"{_CONTROL}{PROPERTIES_PATH}")
+        assert request.headers["X-Client-Token"] == "AB1CD2E"
+
+    def test_given_a_properties_read_when_answered_then_the_reported_body_is_returned(
+        self,
+    ):
+        # The platform marker lives in the body, so the caller needs the body itself
+        # rather than the bare success the other commands return.
+        transport = FakeFireTvTransport(properties={"platformType": "native"})
+
+        assert run(_api(transport).properties()) == {"platformType": "native"}
+
+
+class TestFireTvSingleCharacterText:
+    def test_given_a_character_when_typed_then_it_is_posted_to_the_text_route(self):
+        transport = FakeFireTvTransport()
+
+        run(_api(transport).type_character("q"))
+
+        request = transport.requests[0]
+        assert (request.method, request.url) == ("POST", f"{_CONTROL}{TEXT_PATH}")
+        assert request.json == {"text": "q"}
+
+    def test_given_more_than_one_character_when_typed_then_the_device_refuses_it(self):
+        # The route takes exactly one character; `{"text": "we"}` is 400. Sending a
+        # whole string would otherwise look like it worked.
+        transport = FakeFireTvTransport()
+
+        with pytest.raises(CommandRejectedError):
+            run(_api(transport).type_character("we"))

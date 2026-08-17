@@ -13,6 +13,15 @@ process-wide — the waiver rides the request and reaches no other host.
 Two failures are distinguished, because only one of them is worth retrying: a
 transport failure means the idle remote service has gone away (re-wake and retry),
 while a failure status means the device answered and refused.
+
+Two platforms answer these routes, and only text entry tells them apart. An Android
+Fire OS device takes a whole string on `KEYBOARD_PATH` and reports the focused
+field's state and contents back; a Vega accepts that write, discards it, and reports
+`hidden` with null contents whether or not a field has focus, so nothing read from it
+can confirm or refuse a send. A Vega types through `TEXT_PATH` instead, which takes
+exactly one character and appends it. `PROPERTIES_PATH` is what separates the two,
+and only a device whose info reports that route exists answers it — the rest send
+405.
 """
 
 from __future__ import annotations
@@ -34,6 +43,8 @@ WAKE_PATH = "/apps/FireTVRemote"
 KEY_PATH = "/v1/FireTV"  # also the info route, which reports device capabilities
 MEDIA_PATH = "/v1/media"
 KEYBOARD_PATH = "/v1/FireTV/keyboard"
+TEXT_PATH = "/v1/FireTV/text"  # takes exactly one character, appended to the field
+PROPERTIES_PATH = "/v1/FireTV/properties"  # 405 unless info says the route exists
 PIN_DISPLAY_PATH = "/v1/FireTV/pin/display"
 PIN_VERIFY_PATH = "/v1/FireTV/pin/verify"
 
@@ -47,6 +58,12 @@ USER_AGENT = "okhttp/4.10.0"
 # but has never been typed into — are not an exhaustive list, so no code should treat
 # any single state as the definition of writable (see FireTvSession's confirmation).
 KEYBOARD_STATE_HIDDEN = "hidden"
+
+# The `platformType` a Vega device reports. Amazon's newer Fire TVs answer every
+# navigation and transport route identically to an Android Fire OS device, so this
+# is the only signal that separates them — and text entry is the only thing that
+# depends on the answer.
+PLATFORM_TYPE_NATIVE = "native"
 
 WAKE_TIMEOUT = 10.0  # seconds to wait for the control port after a wake
 _WAKE_POLL_INTERVAL = 0.25  # seconds between control-port probes
@@ -196,15 +213,39 @@ class RemoteApi:
         await self._command(self._control("POST", f"{MEDIA_PATH}?action={action}"))
 
     async def keyboard_state(self) -> tuple[str, str]:
-        """The focused text field's state and current contents."""
+        """The focused text field's state and current contents.
+
+        Absent contents normalise to empty text here rather than at each use: a
+        device can report `"text": null`, so the key is present and a lookup default
+        never fires, leaving every caller to concatenate onto None.
+        """
         body = (await self._command(self._control("GET", KEYBOARD_PATH))).body
-        return body.get("state", ""), body.get("text", "")
+        return body.get("state") or "", body.get("text") or ""
 
     async def set_keyboard_text(self, text: str) -> None:
         """Replace the focused field's contents; the route has no append mode."""
         await self._command(
             self._control("POST", KEYBOARD_PATH, json={"text": text}),
         )
+
+    async def type_character(self, character: str) -> None:
+        """Type one character, appending it to the focused field's contents.
+
+        The route takes exactly one character — more is `400 Bad arguments supplied`
+        — and reports nothing about where the character landed.
+        """
+        await self._command(
+            self._control("POST", TEXT_PATH, json={"text": character}),
+        )
+
+    async def properties(self) -> dict[str, Any]:
+        """The device's reported properties, which name its platform.
+
+        Returns the body rather than the response, since the platform marker it
+        carries is the only reason to ask. A device whose info does not report this
+        route answers 405, so only one that does should be asked.
+        """
+        return (await self._command(self._control("GET", PROPERTIES_PATH))).body
 
     async def display_pin(self, friendly_name: str) -> None:
         """Ask the device to show a pairing PIN on the television.

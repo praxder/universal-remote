@@ -12,6 +12,7 @@ from universal_remote.adapters.firetv import (
     PLATFORM,
     FireTvAdapter,
     FireTvSession,
+    VegaTextWriter,
     register,
 )
 from universal_remote.adapters.firetv_api import (
@@ -22,8 +23,11 @@ from universal_remote.adapters.firetv_api import (
     MEDIA_PATH,
     PIN_DISPLAY_PATH,
     PIN_VERIFY_PATH,
+    PROPERTIES_PATH,
+    TEXT_PATH,
     WAKE_PATH,
     CommandRejectedError,
+    RemoteApi,
 )
 from universal_remote.devices.models import Device
 from universal_remote.discovery import DiscoveredDevice, MdnsHit
@@ -113,6 +117,27 @@ async def _session(transport: FakeFireTvTransport) -> FireTvSession:
     session = await _adapter(transport).connect(_device())
     transport.requests.clear()
     return session
+
+
+def _vega_transport(**overrides) -> FakeFireTvTransport:
+    """A device that reports the properties route, and a native platform through it."""
+    options = dict(
+        info={"isPropertiesApiSupported": True},
+        properties={"platformType": "native"},
+    )
+    options.update(overrides)
+    return FakeFireTvTransport(**options)
+
+
+def _properties_reads(transport: FakeFireTvTransport) -> list[str]:
+    return [url for url in _urls(transport) if url.endswith(PROPERTIES_PATH)]
+
+
+def _vega_writer(transport: FakeFireTvTransport) -> VegaTextWriter:
+    """The Vega text path on its own, without a session's platform detection."""
+    return VegaTextWriter(
+        RemoteApi(_IP, transport, port_open=firetv_port_open, wake_timeout=0.0)
+    )
 
 
 class TestFireTvRegistration:
@@ -335,6 +360,111 @@ class TestFireTvConnect:
         run(scenario())
 
         assert transport.closed is True
+
+
+class TestFireTvPlatformDetection:
+    def test_given_a_device_reporting_the_properties_route_when_connecting_then_it_is_read(
+        self,
+    ):
+        transport = _vega_transport()
+
+        run(_adapter(transport).connect(_device()))
+
+        assert _properties_reads(transport) == [f"{_CONTROL}{PROPERTIES_PATH}"]
+
+    def test_given_a_native_platform_type_when_text_is_sent_then_it_takes_the_vega_path(
+        self,
+    ):
+        transport = _vega_transport()
+
+        async def scenario():
+            session = await _session(transport)
+            await session.send_text("hi")
+
+        run(scenario())
+
+        assert transport.typed == ["h", "i"]
+
+    def test_given_no_properties_route_when_connecting_then_properties_are_not_read(
+        self,
+    ):
+        # An Android Fire OS device answers that route 405, so asking would be a
+        # wasted round trip on every connection.
+        transport = FakeFireTvTransport()
+
+        run(_adapter(transport).connect(_device()))
+
+        assert _properties_reads(transport) == []
+
+    def test_given_no_properties_route_when_text_is_sent_then_it_takes_the_keyboard_path(
+        self,
+    ):
+        transport = FakeFireTvTransport()
+
+        async def scenario():
+            session = await _session(transport)
+            await session.send_text("hi")
+
+        run(scenario())
+
+        assert transport.keyboard == {"state": "text", "text": "hi"}
+
+    def test_given_a_failed_properties_read_when_connecting_then_a_session_is_returned(
+        self,
+    ):
+        # A properties hiccup must not stop a device connecting at all: text entry is
+        # then wrong on a Vega, but every navigation and transport key still works.
+        transport = _vega_transport()
+        transport.reject = PROPERTIES_PATH
+
+        session = run(_adapter(transport).connect(_device()))
+
+        assert isinstance(session, FireTvSession)
+
+    def test_given_a_failed_properties_read_when_text_is_sent_then_the_keyboard_path(
+        self,
+    ):
+        transport = _vega_transport()
+        transport.reject = PROPERTIES_PATH
+
+        async def scenario():
+            session = await _session(transport)
+            await session.send_text("hi")
+
+        run(scenario())
+
+        assert transport.keyboard == {"state": "text", "text": "hi"}
+
+    def test_given_an_unrecognised_platform_type_when_text_is_sent_then_the_keyboard_path(
+        self,
+    ):
+        # `platformType` is undocumented, so an unexpected value costs Vega text entry
+        # rather than the whole session.
+        transport = _vega_transport(properties={"platformType": "something-new"})
+
+        async def scenario():
+            session = await _session(transport)
+            await session.send_text("hi")
+
+        run(scenario())
+
+        assert transport.keyboard == {"state": "text", "text": "hi"}
+
+    def test_given_a_vega_session_when_keys_are_sent_then_properties_are_never_reread(
+        self,
+    ):
+        # Detection is settled once per connect; a keypress costs one request.
+        transport = _vega_transport()
+
+        async def scenario():
+            session = await _session(transport)
+            await session.send_key(Key.OK)
+            await session.send_text("a")
+            await session.send_key(Key.NUM_1)
+
+        run(scenario())
+
+        assert _properties_reads(transport) == []
 
 
 class TestFireTvKeyDispatch:
@@ -568,6 +698,66 @@ class TestFireTvText:
         run(scenario())
 
 
+class TestFireTvVegaText:
+    def test_given_a_string_when_sent_then_each_character_is_typed_in_order(self):
+        # The route takes exactly one character, so a whole-string write is a 400 —
+        # which is why the fake refuses one rather than quietly accepting it.
+        transport = FakeFireTvTransport()
+
+        run(_vega_writer(transport).send_text("hi!"))
+
+        assert transport.typed == ["h", "i", "!"]
+
+    @pytest.mark.parametrize("text", ["café", "a\tb", "hi 😀"])
+    def test_given_text_the_route_cannot_accept_when_sent_then_nothing_is_typed(
+        self, text
+    ):
+        # The device answers non-ASCII with a 500, so the check has to run before the
+        # first request — otherwise the failure arrives over a half-typed field the
+        # user then has to clear by hand.
+        transport = FakeFireTvTransport()
+
+        with pytest.raises(TextUnsupportedError, match="printable ASCII"):
+            run(_vega_writer(transport).send_text(text))
+
+        assert transport.requests == []
+
+    def test_given_a_string_when_sent_then_the_service_is_readied_up_front(self):
+        # Readying once beats re-waking mid-string: the wake launches a DIAL app that
+        # can move focus while the rest of the characters are still queued.
+        transport = FakeFireTvTransport()
+
+        run(_vega_writer(transport).send_text("hi"))
+
+        assert _urls(transport)[0] == _WAKE_URL
+
+    def test_given_the_device_stops_part_way_when_sending_then_no_character_is_resent(
+        self,
+    ):
+        # An appending route cannot be retried: a character the device applied before
+        # its answer was lost would land a second time.
+        transport = FakeFireTvTransport()
+        transport.fail = TEXT_PATH
+        transport.fail_after = 2
+
+        with pytest.raises(TextUnsupportedError, match="may already have been typed"):
+            run(_vega_writer(transport).send_text("hello"))
+
+        assert transport.typed == ["h", "e"]
+
+    def test_given_a_device_reporting_no_keyboard_when_text_is_sent_then_it_lands(self):
+        # A Vega reports `hidden` with null contents permanently, focused field or
+        # not, so gating a send on that state would refuse every send there is.
+        transport = FakeFireTvTransport(
+            keyboard={"mode": None, "state": "hidden", "text": None}
+        )
+
+        run(_vega_writer(transport).send_text("hi"))
+
+        assert transport.typed == ["h", "i"]
+        assert [url for url in _urls(transport) if url.endswith(KEYBOARD_PATH)] == []
+
+
 class TestFireTvDigits:
     def test_given_a_digit_key_when_sent_then_the_field_is_read_and_written_back(self):
         # The keyboard route replaces the field rather than appending to it, so a
@@ -586,6 +776,37 @@ class TestFireTvDigits:
             "GET",  # confirmation that it landed
         ]
         assert transport.keyboard == {"state": "text", "text": "53"}
+
+    def test_given_a_digit_key_on_a_vega_when_sent_then_it_is_typed_as_one_character(
+        self,
+    ):
+        # A Vega reports no field contents to read back, so the read-modify-write the
+        # keyboard path needs cannot serve it.
+        transport = _vega_transport()
+
+        async def scenario():
+            session = await _session(transport)
+            await session.send_key(Key.NUM_3)
+
+        run(scenario())
+
+        assert transport.typed == ["3"]
+        assert _urls(transport) == [f"{_CONTROL}{TEXT_PATH}"]
+
+    def test_given_a_field_reporting_null_contents_when_a_digit_is_sent_then_it_lands(
+        self,
+    ):
+        # Concatenating the contents onto the digit raised `TypeError` out of the
+        # adapter when the device reported them as null rather than as a string.
+        transport = FakeFireTvTransport(keyboard={"state": "text", "text": None})
+
+        async def scenario():
+            session = await _session(transport)
+            await session.send_key(Key.NUM_3)
+
+        run(scenario())
+
+        assert transport.keyboard == {"state": "text", "text": "3"}
 
     def test_given_no_focused_field_when_a_digit_is_sent_then_text_unsupported(self):
         # Digits have no keycode path, so they are only sendable into a text field.
